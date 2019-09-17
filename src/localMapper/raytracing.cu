@@ -1,253 +1,6 @@
-#pragma once
 #include "utils/numType.h"
 #include "utils/prefixSum.h"
 #include "localMapper/denseMap.h"
-
-#define RenderingBlockSizeX 16
-#define RenderingBlockSizeY 16
-#define RenderingBlockSubSample 8
-#define MaxNumRenderingBlock 100000
-
-__device__ __forceinline__ Vec2f project(
-    const Vec3f &pt, const float &fx, const float &fy,
-    const float &cx, const float &cy)
-{
-    Vec2f ptWarped;
-    ptWarped(0) = fx * ptWarped(0) / ptWarped(2) + cx;
-    ptWarped(1) = fy * ptWarped(1) / ptWarped(2) + cy;
-    return ptWarped;
-}
-
-__device__ __forceinline__ Vec3f unproject(
-    const int &x, const int &y, const float &z,
-    const float &invfx, const float &invfy,
-    const float &cx, const float &cy)
-{
-    Vec3f pt;
-    pt(0) = z * (x - cx) * invfx;
-    pt(1) = z * (y - cy) * invfy;
-    pt(2) = z;
-    return pt;
-}
-
-__device__ __forceinline__ Vec3f unprojectWorld(
-    const int &x, const int &y, const float &z,
-    const float &invfx, const float &invfy,
-    const float &cx, const float &cy, const SE3f &T)
-{
-    return T * unproject(x, y, z, invfx, invfy, cx, cy);
-}
-
-__device__ __forceinline__ bool checkVertexVisibility(
-    const Vec3f &pt, const SE3f &TInv,
-    const int &cols, const int &rows,
-    const float &fx, const float &fy,
-    const float &cx, const float &cy,
-    const float &depthMin, const float &depthMax)
-{
-    auto ptFrame = TInv * pt;
-    auto ptWarped = project(ptFrame, fx, fy, cx, cy);
-
-    return ptWarped(0) >= 0 && ptWarped(1) >= 0 &&
-           ptWarped(0) < cols && ptWarped(1) < rows &&
-           ptFrame(2) >= depthMin && ptFrame(2) <= depthMax;
-}
-
-__device__ __forceinline__ bool checkBlockVisibility(
-    const Vec3f &blockPos, const SE3f &TInv,
-    const int &cols, const int &rows,
-    const float &fx, const float &fy,
-    const float &cx, const float &cy,
-    const float &depthMin, const float &depthMax,
-    const float &voxelSize)
-{
-
-    float scale = voxelSize * BlockSize;
-#pragma unroll
-    for (int corner = 0; corner < 8; ++corner)
-    {
-        auto tmp = blockPos;
-        tmp(0) += (corner & 1) ? 1 : 0;
-        tmp(1) += (corner & 2) ? 1 : 0;
-        tmp(2) += (corner & 4) ? 1 : 0;
-
-        if (checkVertexVisibility(tmp * scale, TInv, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
-            return true;
-    }
-
-    return false;
-}
-
-struct CreateVoxelBlockFunctor
-{
-    SE3f T;
-    float invfx, invfy;
-    float cx, cy;
-
-    float truncDistHalf;
-    float voxelSizeInv;
-
-    float depthMin, depthMax;
-    int cols, rows;
-    int numEntry, numBucket;
-    HashEntry *hashTable;
-    int *bucketMutex;
-    int *heap;
-    int *heapPtr;
-    int *excessPtr;
-    cv::cuda::PtrStep<float> depth;
-
-    __device__ __forceinline__ void operator()() const
-    {
-        int x = blockIdx.x * blockDim.x + threadIdx.x;
-        int y = blockIdx.y * blockDim.y + threadIdx.y;
-        if (x >= cols && y >= rows)
-            return;
-
-        float dist = depth.ptr(y)[x];
-        if (dist < FLT_EPSILON || dist < depthMin || dist > depthMax)
-            return;
-
-        float distNear = fmax(depthMin, dist - truncDistHalf);
-        float distFar = fmin(depthMax, dist + truncDistHalf);
-        if (distNear >= distFar)
-            return;
-
-        Vec3f ptNear = unprojectWorld(x, y, distNear, invfx, invfy, cx, cy, T) * voxelSizeInv;
-        Vec3f ptFar = unprojectWorld(x, y, distFar, invfx, invfy, cx, cy, T) * voxelSizeInv;
-        Vec3f dir = ptFar - ptNear;
-
-        float length = dir.norm();
-        int nSteps = (int)ceil(2.0 * length);
-        dir = dir / (float)(nSteps - 1);
-
-        for (int i = 0; i < nSteps; ++i)
-        {
-            auto blockPos = voxelPosToBlockPos(ptNear.cast<int>());
-            createBlock(hashTable, bucketMutex, heap, heapPtr, excessPtr, numEntry, numBucket, blockPos);
-            ptNear += dir;
-        }
-    }
-};
-
-struct CheckEntryVisibilityFunctor
-{
-    SE3f TInv;
-    int cols, rows;
-    float fx, fy, cx, cy;
-    float depthMin, depthMax;
-    float voxelSize;
-    int numEntry;
-    HashEntry *hashTable;
-    HashEntry *visibleEntry;
-
-    uint *numVisibleEntry;
-
-    __device__ __forceinline__ void operator()() const
-    {
-        int idx = threadIdx.x + blockDim.x * blockIdx.x;
-
-        __shared__ bool needScan;
-        if (threadIdx.x == 0)
-            needScan = false;
-
-        __syncthreads();
-
-        uint increment = 0;
-        if (idx < numEntry)
-        {
-            HashEntry &entry = hashTable[idx];
-            if (entry.ptr != -1)
-            {
-                if (checkBlockVisibility(
-                        entry.pos.cast<float>(), TInv,
-                        cols, rows,
-                        fx, fy,
-                        cx, cy,
-                        depthMin, depthMax,
-                        voxelSize))
-                {
-                    needScan = true;
-                    increment = 1;
-                }
-            }
-        }
-
-        __syncthreads();
-
-        if (needScan)
-        {
-            int offset = computeOffset<1024>(increment, numVisibleEntry);
-            if (offset != -1 && offset < numEntry && idx < numEntry)
-                visibleEntry[offset] = hashTable[idx];
-        }
-    }
-};
-
-struct DepthFusionFunctor
-{
-    uint numEntry;
-    uint numVisibleEntry;
-    cv::cuda::PtrStep<float> depth;
-    HashEntry *visibleEntry;
-    Voxel *voxels;
-    SE3f TInv;
-
-    int cols, rows;
-    float fx, fy, cx, cy;
-
-    float depthMax, depthMin;
-    float truncDist;
-    float voxelSize;
-
-    __device__ __forceinline__ void operator()() const
-    {
-        if (blockIdx.x >= numEntry || blockIdx.x >= numVisibleEntry)
-            return;
-
-        HashEntry &entry = visibleEntry[blockIdx.x];
-        if (entry.ptr == -1)
-            return;
-
-        auto blockPos = entry.pos * BlockSize;
-
-#pragma unroll
-        for (int blockIdxZ = 0; blockIdxZ < 8; ++blockIdxZ)
-        {
-            auto localPos = Vec3i(threadIdx.x, threadIdx.y, blockIdxZ);
-            auto pt = TInv * (blockPos + localPos).cast<float>() * voxelSize;
-            int u = __float2int_rd(fx * pt(0) / pt(2) + cx + 0.5f);
-            int v = __float2int_rd(fy * pt(1) / pt(2) + cy + 0.5f);
-            if (u < 0 || v < 0 || u >= cols || v >= rows)
-                continue;
-
-            float dist = depth.ptr(v)[u];
-            if (dist < FLT_EPSILON || dist > depthMax || dist < depthMin)
-                continue;
-
-            float newSDF = dist - pt(2);
-            if (newSDF < -truncDist)
-                continue;
-
-            newSDF = fmin(1.0f, newSDF / truncDist);
-            int localIdx = localPosToLocalIdx(localPos);
-            Voxel &curr = voxels[entry.ptr + localIdx];
-
-            float oldSDF = unpackFloat(curr.sdf);
-            uchar oldWT = curr.wt;
-
-            if (oldWT == 0)
-            {
-                curr.sdf = packFloat(newSDF);
-                curr.wt = 1;
-                continue;
-            }
-
-            curr.sdf = packFloat((oldWT * oldSDF + newSDF) / (oldWT + 1));
-            curr.wt = min(255, oldWT + 1);
-        }
-    }
-};
 
 #define RenderingBlockSizeX 16
 #define RenderingBlockSizeY 16
@@ -279,9 +32,10 @@ __device__ __forceinline__ void atomicMin(float *add, float val)
     } while (assumed != old);
 }
 
-struct ProjectBlockFunctor
+struct RenderingBlockDelegate
 {
     SE3f TInv;
+    int cols, rows;
     float fx, fy, cx, cy;
 
     float scale;
@@ -289,6 +43,7 @@ struct ProjectBlockFunctor
 
     uint *numRenderingBlock;
     uint numVisibleEntry;
+    uint numMaxRenderingBlock;
 
     HashEntry *visibleEntry;
     RenderingBlock *renderingBlock;
@@ -351,7 +106,7 @@ struct ProjectBlockFunctor
     {
         for (int y = 0; y < ny; ++y)
             for (int x = 0; x < nx; ++x)
-                if (offset < MaxNumRenderingBlock)
+                if (offset < numMaxRenderingBlock)
                 {
                     RenderingBlock &b(renderingBlock[offset++]);
                     b.upperLeft(0) = block.upperLeft(0) + x * RenderingBlockSizeX;
@@ -390,13 +145,13 @@ struct ProjectBlockFunctor
                 ny = __float2int_ru(dy / RenderingBlockSizeY);
                 requiredBlocks = nx * ny;
                 uint totalBlocks = *numRenderingBlock + requiredBlocks;
-                if (totalBlocks >= MaxNumRenderingBlock)
+                if (totalBlocks >= numMaxRenderingBlock)
                     requiredBlocks = 0;
             }
         }
 
         int offset = computeOffset<1024>(requiredBlocks, numRenderingBlock);
-        if (valid && offset != -1 && (offset + requiredBlocks) < MaxNumRenderingBlock)
+        if (valid && offset != -1 && (offset + requiredBlocks) < numMaxRenderingBlock)
             splitRenderingBlock(offset, block, nx, ny);
     }
 };
@@ -584,3 +339,117 @@ struct RaytracingFunctor
         }
     }
 };
+
+// __global__ void __launch_bounds__(32, 16) raycast_kernel(MapRenderingDelegate delegate)
+// {
+//     delegate();
+// }
+
+// __global__ void __launch_bounds__(32, 16) raycast_with_colour_kernel(MapRenderingDelegate delegate)
+// {
+//     delegate.raycast_with_colour();
+// }
+
+// void raycast(MapStorage map_struct,
+//              MapState state,
+//              cv::cuda::GpuMat vmap,
+//              cv::cuda::GpuMat nmap,
+//              cv::cuda::GpuMat zRangeX,
+//              cv::cuda::GpuMat zRangeY,
+//              const Sophus::SE3d &pose,
+//              const IntrinsicMatrix intrinsic_matrix)
+// {
+//     const int cols = vmap.cols;
+//     const int rows = vmap.rows;
+
+//     MapRenderingDelegate delegate;
+
+//     delegate.cols = cols;
+//     delegate.rows = rows;
+//     delegate.map_struct = map_struct;
+//     delegate.vmap = vmap;
+//     delegate.nmap = nmap;
+//     delegate.zRangeX = zRangeX;
+//     delegate.zRangeY = zRangeY;
+//     delegate.invfx = intrinsic_matrix.invfx;
+//     delegate.invfy = intrinsic_matrix.invfy;
+//     delegate.cx = intrinsic_matrix.cx;
+//     delegate.cy = intrinsic_matrix.cy;
+//     delegate.pose = pose.cast<float>().matrix3x4();
+//     delegate.inv_pose = pose.inverse().cast<float>().matrix3x4();
+
+//     dim3 thread(4, 8);
+//     dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
+
+//     call_device_functor<<<block, thread>>>(delegate);
+// }
+
+// void raycast_with_colour(MapStorage map_struct,
+//                          MapState state,
+//                          cv::cuda::GpuMat vmap,
+//                          cv::cuda::GpuMat nmap,
+//                          cv::cuda::GpuMat image,
+//                          cv::cuda::GpuMat zRangeX,
+//                          cv::cuda::GpuMat zRangeY,
+//                          const Sophus::SE3d &pose,
+//                          const IntrinsicMatrix intrinsic_matrix)
+// {
+//     const int cols = vmap.cols;
+//     const int rows = vmap.rows;
+
+//     MapRenderingDelegate delegate;
+
+//     delegate.cols = cols;
+//     delegate.rows = rows;
+//     delegate.map_struct = map_struct;
+//     delegate.vmap = vmap;
+//     delegate.nmap = nmap;
+//     delegate.image = image;
+//     delegate.zRangeX = zRangeX;
+//     delegate.zRangeY = zRangeY;
+//     delegate.invfx = intrinsic_matrix.invfx;
+//     delegate.invfy = intrinsic_matrix.invfy;
+//     delegate.cx = intrinsic_matrix.cx;
+//     delegate.cy = intrinsic_matrix.cy;
+//     delegate.pose = pose.cast<float>().matrix3x4();
+//     delegate.inv_pose = pose.inverse().cast<float>().matrix3x4();
+
+//     dim3 thread(4, 8);
+//     dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
+
+//     call_device_functor<<<block, thread>>>(delegate);
+// }
+
+// __device__ __forceinline__ bool is_vertex_visible(
+//     Vec3f pt, Matrix3x4f inv_pose,
+//     int cols, int rows, float fx,
+//     float fy, float cx, float cy)
+// {
+//     pt = inv_pose(pt);
+//     Vector2f pt2d = Vector2f(fx * pt.x / pt.z + cx, fy * pt.y / pt.z + cy);
+//     return !(ptWarped(0) < 0 || ptWarped(1) < 0 ||
+//              ptWarped(0) > cols - 1 || ptWarped(1) > rows - 1 ||
+//              pt.z < param.zmin_update || pt.z > param.zmax_update);
+// }
+
+// __device__ __forceinline__ bool is_block_visible(
+//     const Vector3i &block_pos,
+//     const Matrix3x4f &inv_pose,
+//     int cols, int rows, float fx,
+//     float fy, float cx, float cy)
+// {
+//     float scale = param.block_size_metric();
+// #pragma unroll
+//     for (int corner = 0; corner < 8; ++corner)
+//     {
+//         Vector3i tmp = block_pos;
+//         tmp.x += (corner & 1) ? 1 : 0;
+//         tmp.y += (corner & 2) ? 1 : 0;
+//         tmp.z += (corner & 4) ? 1 : 0;
+
+//         if (is_vertex_visible(tmp * scale, inv_pose, cols, rows, fx, fy, cx, cy))
+//             return true;
+//     }
+
+//     return false;
+// }

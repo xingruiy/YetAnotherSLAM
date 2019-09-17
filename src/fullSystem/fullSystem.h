@@ -3,7 +3,6 @@
 #include <iostream>
 #include "utils/numType.h"
 #include "mapViewer/mapViewer.h"
-#include "localMapper/localMapper.h"
 #include "denseTracker/denseTracker.h"
 
 class FullSystem
@@ -16,7 +15,6 @@ class FullSystem
     bool trackCurrentFrame();
 
     std::shared_ptr<MapViewer> mapViewer;
-    std::shared_ptr<LocalMapper> localMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
 
     std::shared_ptr<Frame> currentFrame;

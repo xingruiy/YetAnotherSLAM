@@ -21,6 +21,7 @@ using Mat26f = Eigen::Matrix<float, 2, 6>;
 using Mat66f = Eigen::Matrix<float, 6, 6>;
 
 using Vec2b = Eigen::Matrix<uchar, 2, 1>;
+using Vec2s = Eigen::Matrix<short, 2, 1>;
 using Vec2i = Eigen::Matrix<int, 2, 1>;
 using Vec2f = Eigen::Matrix<float, 2, 1>;
 using Vec2d = Eigen::Matrix<double, 2, 1>;
@@ -45,6 +46,7 @@ using Vec29d = Eigen::Matrix<double, 29, 1>;
 // Sophus Shortcuts
 using SE3 = Sophus::SE3d;
 using SO3 = Sophus::SO3d;
+using SE3f = Sophus::SE3f;
 
 // OpenCV Shortcuts
 using Mat = cv::Mat;

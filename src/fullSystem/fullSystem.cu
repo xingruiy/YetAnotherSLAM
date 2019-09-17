@@ -12,7 +12,6 @@ FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool view)
         mapViewer = std::make_shared<MapViewer>(640, 480);
     }
 
-    localMapper = std::make_shared<LocalMapper>(w, h, K);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 }
 

@@ -12,12 +12,12 @@ PRIVATE
     src/utils/frame.cu
     src/fullSystem/fullSystem.cu
     src/mapViewer/mapViewer.cu
-    src/localMapper/localMap.cu
-    src/localMapper/localMapper.cu
     src/denseTracker/denseTracker.cu
     src/denseTracker/cudaImageProc.cu
     src/globalMapper/ceresSolver.cpp
     src/globalMapper/globalMap.cpp
+    src/localMapper/localMapper.cu
+    src/localMapper/denseMap.cu
 )
 
 target_compile_features(athena

@@ -1,5 +1,10 @@
 #include <cuda_runtime_api.h>
 
+static dim3 getGridConfiguration1D(dim3 &block, int k)
+{
+    return dim3((k + block.x - 1) / block.x);
+}
+
 static dim3 getGridConfiguration2D(dim3 &block, int w, int h)
 {
     dim3 grid;

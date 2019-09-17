@@ -1,90 +1,200 @@
 #include "localMapper/localMapper.h"
 #include "localMapper/mapFunctor.h"
+#include "utils/cudaUtils.h"
 
 LocalMapper::LocalMapper(int w, int h, Mat33d &K)
-    : frameWidth(w), frameHeight(h), Intrinsics(K)
+    : intrinsics(K), frameWidth(w), frameHeight(h)
 {
-    localMap = std::make_shared<VoxelMap>(30000, 40000, 50000);
+  deviceMap.create(20000, 15000, 10000, 0.005f, 0.03f);
+  zrangeX.create(h / 8, w / 8, CV_32FC1);
+  zrangeY.create(h / 8, w / 8, CV_32FC1);
+  cudaMalloc((void **)&numRenderingBlock, sizeof(uint));
+  cudaMalloc((void **)&listRenderingBlock, sizeof(RenderingBlock) * MaxNumRenderingBlock);
 }
 
-void LocalMapper::fuseFrame(std::shared_ptr<Frame> frame)
+LocalMapper::~LocalMapper()
 {
-    auto depth = GMat(frame->getDepth());
-    auto poseInv = frame->getPose().inverse().cast<float>();
-    auto cols = depth.cols;
-    auto rows = depth.rows;
-    uint numVisibleEntry = 0;
-
-    AllocateBlockFunctor allocateBlock;
-    allocateBlock.cols = frameWidth;
-    allocateBlock.rows = frameHeight;
-    allocateBlock.invfx = 1.0 / Intrinsics(0, 0);
-    allocateBlock.invfy = 1.0 / Intrinsics(1, 1);
-    allocateBlock.cx = Intrinsics(0, 2);
-    allocateBlock.cy = Intrinsics(1, 2);
-    allocateBlock.depthMin = 0.5f;
-    allocateBlock.depthMax = 3.0f;
-    allocateBlock.truncationDistTH = localMap->truncationDist * 0.5f;
-    allocateBlock.voxelSizeInv = 1.0f / localMap->voxelSize;
-    allocateBlock.depth = depth;
-    allocateBlock.hashTable = localMap->hashTable;
-    allocateBlock.memStack = localMap->memStack;
-    allocateBlock.stackPtr = localMap->stackPtr;
-    allocateBlock.llPtr = localMap->llPtr;
-    allocateBlock.bucketMutex;
-    allocateBlock.numBlocks;
-    allocateBlock.numBuckets;
-    allocateBlock.numExcessEntries;
-
-    dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, cols, rows);
-    callDeviceFunctor<<<grid, block>>>(allocateBlock);
-
-    CheckVisibilityFunctor checkVisible;
-    checkVisible.TInv = poseInv;
-    checkVisible.hashTable = localMap->hashTable;
-    checkVisible.numHashEntry = localMap->numEntries;
-    checkVisible.visibleEntry;
-    checkVisible.numVisibleEntry;
-    checkVisible.cols = frameWidth;
-    checkVisible.rows = frameHeight;
-    checkVisible.fx = Intrinsics(0, 0);
-    checkVisible.fy = Intrinsics(1, 1);
-    checkVisible.cx = Intrinsics(0, 2);
-    checkVisible.cy = Intrinsics(1, 2);
-    checkVisible.voxelSize = localMap->voxelSize;
-    checkVisible.depthMin = 0.5f;
-    checkVisible.depthMax = 3.0f;
-
-    callDeviceFunctor<<<grid, block>>>(allocateBlock);
-
-    DepthFusionFunctor depthFusion;
-    depthFusion.TInv = poseInv;
-    depthFusion.cols = frameWidth;
-    depthFusion.rows = frameHeight;
-    depthFusion.depthMin = 0.5f;
-    depthFusion.depthMax = 3.0f;
-    depthFusion.fx = Intrinsics(0, 0);
-    depthFusion.fy = Intrinsics(1, 1);
-    depthFusion.cx = Intrinsics(0, 2);
-    depthFusion.cy = Intrinsics(1, 2);
-    depthFusion.numVisibleEntry = numVisibleEntry;
-    depthFusion.depth = depth;
-
-    depthFusion.voxelSize = localMap->voxelSize;
-    depthFusion.numHashEntry = localMap->numEntries;
-    depthFusion.truncationDist = localMap->truncationDist;
-    depthFusion.visibleEntry = localMap->hashTable;
-    depthFusion.voxelBlock = localMap->voxels;
-
-    callDeviceFunctor<<<grid, block>>>(depthFusion);
+  deviceMap.release();
+  cudaFree(numRenderingBlock);
+  cudaFree(listRenderingBlock);
 }
 
-void raytracing(Mat &vmap, Mat &image)
+void LocalMapper::fuseFrame(GMat depth, const SE3 &T)
 {
+  preAllocateBlock(depth, T);
+  checkBlockInFrustum(T);
+
+  uint hostData = 0;
+  deviceMap.getNumVisibleEntry(hostData);
+
+  if (hostData == 0)
+  {
+    printf("No map is observed!\n");
+    return;
+  }
+
+  DepthFusionFunctor functor;
+  functor.numVisibleEntry = hostData;
+  functor.depth = depth;
+  functor.TInv = T.inverse().cast<float>();
+  functor.cols = depth.cols;
+  functor.rows = depth.rows;
+  functor.fx = intrinsics(0, 0);
+  functor.fy = intrinsics(1, 1);
+  functor.cx = intrinsics(0, 2);
+  functor.cy = intrinsics(1, 2);
+  functor.depthMax = 3.0f;
+  functor.depthMin = 0.4f;
+
+  functor.voxels = deviceMap.voxelBlocks;
+  functor.visibleEntry = deviceMap.visibleEntry;
+  functor.numEntry = deviceMap.numEntry;
+  functor.truncDist = deviceMap.truncDist;
+  functor.voxelSize = deviceMap.voxelSize;
+
+  dim3 block(8, 8);
+  dim3 grid = getGridConfiguration2D(block, depth.cols, depth.rows);
+  callDeviceFunctor<<<grid, block>>>(functor);
 }
 
-size_t getMesh(float *vertex, float *normal, size_t bufferSize)
+void LocalMapper::raytrace(GMat &vertex, const SE3 &T)
 {
-    return 0;
+  deviceMap.getNumVisibleEntry(numVisibleBlock);
+  if (numVisibleBlock == 0)
+    return;
+
+  zrangeX.setTo(cv::Scalar(100.f));
+  zrangeY.setTo(cv::Scalar(0));
+
+  projectVisibleBlock(T);
+
+  uint hostData;
+  cudaMemcpy(&hostData, numRenderingBlock, sizeof(uint), cudaMemcpyDeviceToHost);
+  if (numRenderingBlock == 0)
+    return;
+
+  predictDepthMap(hostData);
+
+  RaytracingFunctor functor;
+  functor.zRangeX = zrangeX;
+  functor.zRangeY = zrangeY;
+  functor.cols = vertex.cols;
+  functor.rows = vertex.rows;
+  functor.voxelSize = deviceMap.voxelSize;
+  functor.voxelSizeInv = 1.0 / deviceMap.voxelSize;
+  functor.invfx = 1.0 / intrinsics(0, 0);
+  functor.invfy = 1.0 / intrinsics(1, 1);
+  functor.cx = intrinsics(0, 2);
+  functor.cy = intrinsics(1, 2);
+  functor.raycastStep = deviceMap.truncDist / deviceMap.voxelSize;
+  functor.T = T.cast<float>();
+  functor.TInv = T.inverse().cast<float>();
+  functor.hashTable = deviceMap.hashTable;
+  functor.blocks = deviceMap.voxelBlocks;
+  functor.numBucket = deviceMap.numBucket;
+  functor.vmap = vertex;
+
+  dim3 block(8, 8);
+  dim3 grid = getGridConfiguration2D(block, vertex.cols, vertex.rows);
+  callDeviceFunctor<<<grid, block>>>(functor);
+}
+
+void LocalMapper::reset()
+{
+  deviceMap.reset();
+}
+
+void LocalMapper::preAllocateBlock(GMat depth, const SE3 &T)
+{
+  int cols = depth.cols;
+  int rows = depth.rows;
+
+  CreateVoxelBlockFunctor functor;
+  functor.T = T.cast<float>();
+  functor.invfx = 1.0 / intrinsics(0, 0);
+  functor.invfy = 1.0 / intrinsics(1, 1);
+  functor.cx = intrinsics(0, 2);
+  functor.cy = intrinsics(1, 2);
+  functor.depthMin = 0.4f,
+  functor.depthMax = 3.0f;
+  functor.cols = cols,
+  functor.rows = rows;
+  functor.depth = depth;
+
+  functor.truncDistHalf = deviceMap.truncDist * 0.5f;
+  functor.voxelSizeInv = 1.0 / deviceMap.voxelSize;
+  functor.numEntry = deviceMap.numEntry;
+  functor.numBucket = deviceMap.numBucket;
+  functor.hashTable = deviceMap.hashTable;
+  functor.bucketMutex = deviceMap.bucketMutex;
+  functor.heap = deviceMap.heap;
+  functor.heapPtr = deviceMap.heapPtr;
+  functor.excessPtr = deviceMap.excessPtr;
+
+  dim3 block(8, 8);
+  dim3 grid = getGridConfiguration2D(block, cols, rows);
+  callDeviceFunctor<<<grid, block>>>(functor);
+}
+
+void LocalMapper::checkBlockInFrustum(const SE3 &T)
+{
+  deviceMap.resetNumVisibleEntry();
+
+  CheckEntryVisibilityFunctor functor;
+  functor.TInv = T.inverse().cast<float>();
+  functor.cols = frameWidth;
+  functor.rows = frameHeight;
+  functor.fx = intrinsics(0, 0);
+  functor.fy = intrinsics(1, 1);
+  functor.cx = intrinsics(0, 2);
+  functor.cy = intrinsics(1, 2);
+  functor.depthMin = 0.4f;
+  functor.depthMax = 3.0f;
+  functor.voxelSize = deviceMap.voxelSize;
+  functor.numEntry = deviceMap.numEntry;
+  functor.hashTable = deviceMap.hashTable;
+  functor.visibleEntry = deviceMap.visibleEntry;
+  functor.numVisibleEntry = deviceMap.numVisibleEntry;
+
+  dim3 block(1024);
+  dim3 grid((deviceMap.numEntry + block.x - 1) / block.x);
+  callDeviceFunctor<<<grid, block>>>(functor);
+}
+
+void LocalMapper::projectVisibleBlock(const SE3 &T)
+{
+  cudaMemset(numRenderingBlock, 0, sizeof(uint));
+
+  ProjectBlockFunctor functor;
+  functor.TInv = T.inverse().cast<float>();
+  functor.fx = intrinsics(0, 0);
+  functor.fy = intrinsics(1, 1);
+  functor.cx = intrinsics(0, 2);
+  functor.cy = intrinsics(1, 2);
+  functor.depthMin = 0.4f;
+  functor.depthMax = 3.0f;
+  functor.numVisibleEntry = numVisibleBlock;
+  functor.renderingBlock = listRenderingBlock;
+  functor.numRenderingBlock = numRenderingBlock;
+  functor.zRangeX = zrangeX;
+  functor.zRangeY = zrangeY;
+  functor.scale = deviceMap.voxelSize * BlockSize;
+  functor.visibleEntry = deviceMap.visibleEntry;
+
+  dim3 block(1024);
+  dim3 grid = getGridConfiguration1D(block, numVisibleBlock);
+  callDeviceFunctor<<<grid, block>>>(functor);
+}
+
+void LocalMapper::predictDepthMap(uint renderingBlockNum)
+{
+  DepthPredictionFunctor functor;
+  functor.numRenderingBlock = renderingBlockNum;
+  functor.renderingBlock = listRenderingBlock;
+  functor.zRangeX = zrangeX;
+  functor.zRangeY = zrangeY;
+
+  dim3 block(RenderingBlockSizeX, RenderingBlockSizeY);
+  dim3 grid = dim3((uint)ceil(renderingBlockNum / 4.f), 4);
+  callDeviceFunctor<<<grid, block>>>(functor);
 }
