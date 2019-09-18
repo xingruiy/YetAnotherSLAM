@@ -3,7 +3,7 @@
 #include <iostream>
 #include "utils/numType.h"
 // #include "localMapper/localMapper.h"
-#include "localMapper2/voxel_hashing.h"
+#include "localMapper2/localMapper.h"
 #include "denseTracker/denseTracker.h"
 
 class FullSystem
@@ -35,5 +35,6 @@ public:
     void resetSystem();
     void processFrame(Mat rawImage, Mat rawDepth);
 
+    size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
     std::vector<SE3> getRawFramePoseHistory() const;
 };

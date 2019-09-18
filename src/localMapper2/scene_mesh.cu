@@ -3,7 +3,7 @@
 #include "vector_type.h"
 #include "safe_call.h"
 #include "utils/prefixSum.h"
-#include "voxel_hashing.h"
+#include "localMapper.h"
 #include "utils/triangleTable.h"
 
 struct BuildVertexArray
@@ -16,27 +16,26 @@ struct BuildVertexArray
     uint *triangle_count;
     Vector3f *surface_normal;
 
-    FUSION_DEVICE inline void select_blocks() const
+    __device__ __forceinline__ void select_blocks() const
     {
         int x = blockDim.x * blockIdx.x + threadIdx.x;
-
-        __shared__ bool scan_required;
+        __shared__ bool needScan;
 
         if (x == 0)
-            scan_required = false;
+            needScan = false;
 
         __syncthreads();
 
         uint val = 0;
         if (x < param.num_total_hash_entries_ && map_struct.hash_table_[x].ptr_ >= 0)
         {
-            scan_required = true;
+            needScan = true;
             val = 1;
         }
 
         __syncthreads();
 
-        if (scan_required)
+        if (needScan)
         {
             int offset = computeOffset<1024>(val, block_count);
             if (offset != -1)
@@ -46,7 +45,7 @@ struct BuildVertexArray
         }
     }
 
-    FUSION_DEVICE inline float read_sdf(Vector3f pt, bool &valid) const
+    __device__ __forceinline__ float read_sdf(Vector3f pt, bool &valid) const
     {
         Voxel *voxel = NULL;
         findVoxel(map_struct, ToVector3i(pt), voxel);
@@ -62,7 +61,7 @@ struct BuildVertexArray
         }
     }
 
-    FUSION_DEVICE inline bool read_sdf_list(float *sdf, Vector3i pos) const
+    __device__ __forceinline__ bool read_sdf_list(float *sdf, Vector3i pos) const
     {
         bool valid = false;
         sdf[0] = read_sdf(pos + Vector3f(0, 0, 0), valid);
@@ -100,7 +99,7 @@ struct BuildVertexArray
         return true;
     }
 
-    FUSION_DEVICE inline float interpolate_sdf(float &v1, float &v2) const
+    __device__ __forceinline__ float interpolate_sdf(float &v1, float &v2) const
     {
         if (fabs(0 - v1) < 1e-6)
             return 0;
@@ -111,7 +110,7 @@ struct BuildVertexArray
         return (0 - v1) / (v2 - v1);
     }
 
-    FUSION_DEVICE inline int make_vertex(Vector3f *vertex_array, const Vector3i pos)
+    __device__ __forceinline__ int make_vertex(Vector3f *vertex_array, const Vector3i pos)
     {
         float sdf[8];
 
@@ -204,7 +203,7 @@ struct BuildVertexArray
     }
 
     template <bool compute_normal = false>
-    FUSION_DEVICE inline void operator()()
+    __device__ __forceinline__ void operator()()
     {
         int x = blockIdx.y * gridDim.x + blockIdx.x;
         if (*triangle_count >= param.num_max_mesh_triangles_ || x >= *block_count)
@@ -355,27 +354,27 @@ struct BuildVertexAndColourArray
     uint *triangle_count;
     Vector3c *vertex_colour;
 
-    FUSION_DEVICE inline void select_blocks() const
+    __device__ __forceinline__ void select_blocks() const
     {
         int x = blockDim.x * blockIdx.x + threadIdx.x;
 
-        __shared__ bool scan_required;
+        __shared__ bool needScan;
 
         if (x == 0)
-            scan_required = false;
+            needScan = false;
 
         __syncthreads();
 
         uint val = 0;
         if (x < param.num_total_hash_entries_ && map_struct.hash_table_[x].ptr_ >= 0)
         {
-            scan_required = true;
+            needScan = true;
             val = 1;
         }
 
         __syncthreads();
 
-        if (scan_required)
+        if (needScan)
         {
             int offset = computeOffset<1024>(val, block_count);
             if (offset != -1)
@@ -385,7 +384,7 @@ struct BuildVertexAndColourArray
         }
     }
 
-    FUSION_DEVICE inline void read_sdf_and_colour(Vector3f pt, bool &valid, float &sdf, Vector3c &colour) const
+    __device__ __forceinline__ void read_sdf_and_colour(Vector3f pt, bool &valid, float &sdf, Vector3c &colour) const
     {
         Voxel *vx = NULL;
         findVoxel(map_struct, ToVector3i(pt), vx);
@@ -401,7 +400,7 @@ struct BuildVertexAndColourArray
         }
     }
 
-    FUSION_DEVICE inline bool read_sdf_and_colour_list(float *sdf, Vector3c *colour, Vector3i pos) const
+    __device__ __forceinline__ bool read_sdf_and_colour_list(float *sdf, Vector3c *colour, Vector3i pos) const
     {
         bool valid = false;
         read_sdf_and_colour(pos + Vector3f(0, 0, 0), valid, sdf[0], colour[0]);
@@ -439,7 +438,7 @@ struct BuildVertexAndColourArray
         return true;
     }
 
-    FUSION_DEVICE inline float interpolate_sdf(float &v1, float &v2) const
+    __device__ __forceinline__ float interpolate_sdf(float &v1, float &v2) const
     {
         if (fabs(0 - v1) < 1e-6)
             return 0;
@@ -450,7 +449,7 @@ struct BuildVertexAndColourArray
         return (0 - v1) / (v2 - v1);
     }
 
-    FUSION_DEVICE inline int make_vertex_and_colour(Vector3f *vertex_array, Vector3c *colour_array, const Vector3i pos)
+    __device__ __forceinline__ int make_vertex_and_colour(Vector3f *vertex_array, Vector3c *colour_array, const Vector3i pos)
     {
         float sdf[8];
 
@@ -546,7 +545,7 @@ struct BuildVertexAndColourArray
         return cube_index;
     }
 
-    FUSION_DEVICE inline void operator()()
+    __device__ __forceinline__ void operator()()
     {
         int x = blockIdx.y * gridDim.x + blockIdx.x;
         if (*triangle_count >= param.num_max_mesh_triangles_ || x >= *block_count)

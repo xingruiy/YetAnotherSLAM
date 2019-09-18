@@ -1,11 +1,12 @@
 #include "mapViewer/mapViewer.h"
+#include "mapViewer/shader.h"
 
 #define ZMIN 0.1
 #define ZMAX 1000
 #define ENTER_KEY 13
 
 MapViewer::MapViewer(int w, int h)
-    : numTriangles(0)
+    : numTriangles(0), maxNumTriangles(20000000)
 {
     pangolin::CreateWindowAndBind("MAP VIEWER", w, h);
 
@@ -14,18 +15,39 @@ MapViewer::MapViewer(int w, int h)
         pangolin::ModelViewLookAtRDF(0, 0, 0, 0, 0, -1, 0, 1, 0));
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
 
     setupDisplay();
     setupKeyBindings();
     initializeTextures();
-    // initializeBuffers();
+    initializeBuffers();
+    initializePrograms();
+}
+
+MapViewer::~MapViewer()
+{
+    pangolin::DestroyWindow("MAP VIEWER");
 }
 
 void MapViewer::setupDisplay()
 {
     auto MenuDividerLeft = pangolin::Attach::Pix(200);
     float RightSideBarDividerLeft = 0.7f;
+
+    modelView = &pangolin::Display("Local Map");
+    modelView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft).SetHandler(new pangolin::Handler3D(*mainCamera));
+    sidebarView = &pangolin::Display("Right Side Bar");
+    sidebarView->SetBounds(0, 1, RightSideBarDividerLeft, 1);
+    colourView = &pangolin::Display("RGB");
+    colourView->SetBounds(0, 0.5, 0, 1);
+    depthView = &pangolin::Display("Depth");
+    depthView->SetBounds(0.5, 1, 0, 1);
+
+    sidebarView->AddDisplay(*colourView);
+    sidebarView->AddDisplay(*depthView);
+
     pangolin::CreatePanel("Menu").SetBounds(0, 1, 0, MenuDividerLeft);
+
     resetBtn = std::make_shared<pangolin::Var<bool>>("Menu.RESET", false, false);
     saveMapToDiskBtn = std::make_shared<pangolin::Var<bool>>("Menu.Save Map", false, false);
     readMapFromDiskBtn = std::make_shared<pangolin::Var<bool>>("Menu.Read Map", false, false);
@@ -35,21 +57,7 @@ void MapViewer::setupDisplay()
     displayLocalMapBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Scene", true, true);
     displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Mesh", true, true);
     enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Camera", false, true);
-    displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Trajectory", false, true);
-
-    sidebarView = &pangolin::Display("Right Side Bar");
-    sidebarView->SetBounds(0, 1, RightSideBarDividerLeft, 1);
-    colourView = &pangolin::Display("RGB");
-    colourView->SetBounds(0, 0.5, 0, 1);
-    depthView = &pangolin::Display("Depth");
-    depthView->SetBounds(0.5, 1, 0, 1);
-    // localMapView = &pangolin::Display("Scene");
-    // localMapView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft);
-    modelView = &pangolin::Display("Local Map");
-    modelView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft).SetHandler(new pangolin::Handler3D(*mainCamera));
-
-    sidebarView->AddDisplay(*colourView);
-    sidebarView->AddDisplay(*depthView);
+    displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Trajectory", true, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -63,13 +71,13 @@ void MapViewer::setupKeyBindings()
 
 void MapViewer::initializePrograms()
 {
-    phongProgram.AddShaderFromFile(
+    phongProgram.AddShader(
         pangolin::GlSlShaderType::GlSlVertexShader,
-        "vsPhong");
+        vertexShader);
 
-    phongProgram.AddShaderFromFile(
+    phongProgram.AddShader(
         pangolin::GlSlShaderType::GlSlFragmentShader,
-        "vsPhong");
+        fragShader);
 
     phongProgram.Link();
 }
@@ -164,25 +172,6 @@ void MapViewer::setDenseMapImage(Mat image)
     denseMapImage.Upload(image.data, GL_RGBA, GL_UNSIGNED_BYTE);
 }
 
-void MapViewer::setRawFrameHistory(const std::vector<SE3> &history)
-{
-    rawFrameHistory.clear();
-    for (auto T : history)
-        rawFrameHistory.push_back(T.translation().cast<float>());
-}
-
-void MapViewer::setRawKeyFrameHistory(const std::vector<SE3> &history)
-{
-}
-
-void MapViewer::setFrameHistory(const std::vector<SE3> &history)
-{
-}
-
-void MapViewer::setKeyFrameHistory(const std::vector<SE3> &history)
-{
-}
-
 void MapViewer::renderView()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -244,27 +233,39 @@ void MapViewer::drawLocalMap()
 
     phongProgram.Bind();
     glBindVertexArray(vaoPhong);
-    phongProgram.SetUniform("mvp_matrix", mainCamera->GetProjectionModelViewMatrix());
-    glDrawArrays(GL_TRIANGLES, 0, numTriangles * 9);
+    phongProgram.SetUniform("mvpMat", mainCamera->GetProjectionModelViewMatrix());
+    glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
     glBindVertexArray(0);
     phongProgram.Unbind();
 }
 
-float *MapViewer::getVertexBufferPtr()
+void MapViewer::setRawFrameHistory(const std::vector<SE3> &history)
 {
-    return (float *)**vertexBufferPtr;
+    rawFrameHistory.clear();
+    for (auto T : history)
+        rawFrameHistory.push_back(T.translation().cast<float>());
 }
 
-float *MapViewer::getNormalBufferPtr()
+void MapViewer::setRawKeyFrameHistory(const std::vector<SE3> &history)
 {
-    return (float *)**normalBufferPtr;
 }
 
-uchar *MapViewer::getColourBufferPtr()
+void MapViewer::setFrameHistory(const std::vector<SE3> &history)
 {
-    return (uchar *)**colourBufferPtr;
 }
 
-void MapViewer::drawFrameHistory()
+void MapViewer::setKeyFrameHistory(const std::vector<SE3> &history)
 {
+}
+
+void MapViewer::getMeshBuffer(float *&vbuffer, float *&nbuffer, size_t &bufferSize)
+{
+    vbuffer = (float *)**vertexBufferPtr;
+    nbuffer = (float *)**normalBufferPtr;
+    bufferSize = maxNumTriangles;
+}
+
+void MapViewer::setMeshSizeToRender(size_t size)
+{
+    numTriangles = size;
 }

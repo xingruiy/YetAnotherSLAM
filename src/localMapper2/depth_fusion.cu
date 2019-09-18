@@ -2,12 +2,11 @@
 #include "matrix_type.h"
 #include "vector_type.h"
 #include "safe_call.h"
-#include "macros.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/cudaarithm.hpp>
 #include <thrust/device_vector.h>
 
-FUSION_DEVICE inline bool is_vertex_visible(
+__device__ inline bool is_vertex_visible(
     Vector3f pt, Matrix3x4f inv_pose,
     int cols, int rows, float fx,
     float fy, float cx, float cy)
@@ -19,7 +18,7 @@ FUSION_DEVICE inline bool is_vertex_visible(
              pt.z < param.zmin_update || pt.z > param.zmax_update);
 }
 
-FUSION_DEVICE inline bool is_block_visible(
+__device__ inline bool is_block_visible(
     const Vector3i &block_pos,
     Matrix3x4f inv_pose,
     int cols, int rows, float fx,
@@ -87,26 +86,26 @@ __global__ void copy_visible_block_kernel(HashEntry *hash_table, HashEntry *visi
         visible_block[pos[idx]] = hash_table[idx];
 }
 
-FUSION_DEVICE inline Vector2f project(
+__device__ inline Vector2f project(
     Vector3f pt, float fx, float fy, float cx, float cy)
 {
     return Vector2f(fx * pt.x / pt.z + cx, fy * pt.y / pt.z + cy);
 }
 
-FUSION_DEVICE inline Vector3f unproject(
+__device__ inline Vector3f unproject(
     int x, int y, float z, float invfx, float invfy, float cx, float cy)
 {
     return Vector3f(invfx * (x - cx) * z, invfy * (y - cy) * z, z);
 }
 
-FUSION_DEVICE inline Vector3f unproject_world(
+__device__ inline Vector3f unproject_world(
     int x, int y, float z, float invfx,
     float invfy, float cx, float cy, Matrix3x4f pose)
 {
     return pose(unproject(x, y, z, invfx, invfy, cx, cy));
 }
 
-FUSION_DEVICE inline int create_block(MapStorage &map_struct, const Vector3i block_pos)
+__device__ inline int create_block(MapStorage &map_struct, const Vector3i block_pos)
 {
     int hash_index;
     createBlock(map_struct, block_pos, hash_index);
@@ -464,7 +463,7 @@ void update(
         frame_pose.cast<float>().matrix3x4(),
         flag.get());
 
-    thread = dim3(MAX_THREAD);
+    thread = dim3(1024);
     block = dim3(div_up(state.num_total_hash_entries_, thread.x));
 
     check_visibility_flag_kernel<<<block, thread>>>(

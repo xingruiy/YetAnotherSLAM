@@ -34,6 +34,16 @@ int main(int argc, char **argv)
                 fullsystem.resetSystem();
 
             viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
+
+            if (!viewer.isSystemPaused())
+            {
+                float *vbuffer;
+                float *nbuffer;
+                size_t bufferSize;
+                viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
+                size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
+                viewer.setMeshSizeToRender(size);
+            }
         }
 
         viewer.renderView();

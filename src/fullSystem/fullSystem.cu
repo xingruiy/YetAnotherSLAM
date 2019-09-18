@@ -103,3 +103,8 @@ std::vector<SE3> FullSystem::getRawFramePoseHistory() const
 {
     return rawFramePoseHistory;
 }
+
+size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
+{
+    return localMapper->fetch_mesh_with_normal(vbuffer, nbuffer);
+}

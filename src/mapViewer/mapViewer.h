@@ -31,6 +31,7 @@ class MapViewer
 
     GLuint vaoPhong;
     GLuint vaoColour;
+    pangolin::GlSlProgram phongProgram;
     pangolin::GlBufferCudaPtr vertexBuffer;
     pangolin::GlBufferCudaPtr normalBuffer;
     pangolin::GlBufferCudaPtr colourBuffer;
@@ -38,11 +39,8 @@ class MapViewer
     std::shared_ptr<pangolin::CudaScopedMappedPtr> normalBufferPtr;
     std::shared_ptr<pangolin::CudaScopedMappedPtr> colourBufferPtr;
 
-    size_t numTriangles;
-    size_t numKeyPoints;
     size_t maxNumTriangles;
-
-    pangolin::GlSlProgram phongProgram;
+    size_t numTriangles;
 
     void setupDisplay();
     void initializePrograms();
@@ -58,14 +56,12 @@ class MapViewer
 
     bool requestSystemReset;
 
+    // draw calls
     void drawLocalMap();
-    void drawFrameHistory();
-    float *getVertexBufferPtr();
-    float *getNormalBufferPtr();
-    uchar *getColourBufferPtr();
 
 public:
     MapViewer(int w, int h);
+    ~MapViewer();
     void resetViewer();
     void renderView();
 
@@ -80,4 +76,7 @@ public:
     void setColourImage(Mat image);
     void setDepthImage(Mat image);
     void setDenseMapImage(Mat image);
+
+    void setMeshSizeToRender(size_t size);
+    void getMeshBuffer(float *&vbuffer, float *&nbuffer, size_t &bufferSize);
 };
