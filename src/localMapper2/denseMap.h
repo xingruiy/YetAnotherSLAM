@@ -1,82 +1,25 @@
 #pragma once
 #include "utils/numType.h"
-// #include "matrix_type.h"
-// #include "Vec_type.h"
+#include "utils/cudaUtils.h"
 
 #define BLOCK_SIZE 8
 #define BLOCK_SIZE3 512
 #define BLOCK_SIZE_SUB_1 7
 
-struct HashEntry
+/*
+    Unpack short into float 
+*/
+__host__ __device__ __forceinline__ float unpackFloat(short val)
 {
-    __host__ __device__ __forceinline__ HashEntry();
-    __host__ __device__ __forceinline__ HashEntry(Vec3i pos, int ptr, int offset);
-    __host__ __device__ __forceinline__ HashEntry(const HashEntry &);
-    __host__ __device__ __forceinline__ HashEntry &operator=(const HashEntry &);
-    __host__ __device__ __forceinline__ bool operator==(const Vec3i &) const;
-    __host__ __device__ __forceinline__ bool operator==(const HashEntry &) const;
-
-    int ptr_;
-    int offset_;
-    Vec3i pos_;
-};
-
-__host__ __device__ __forceinline__ HashEntry::HashEntry()
-    : ptr_(-1), offset_(-1)
-{
+    return val / (float)32767;
 }
 
-__host__ __device__ __forceinline__ HashEntry::HashEntry(Vec3i pos, int ptr, int offset)
-    : pos_(pos), ptr_(ptr), offset_(offset)
+/*
+    Pack float into short
+*/
+__host__ __device__ __forceinline__ short packFloat(float val)
 {
-}
-
-__host__ __device__ __forceinline__ HashEntry::HashEntry(const HashEntry &H)
-    : pos_(H.pos_), ptr_(H.ptr_), offset_(H.offset_)
-{
-}
-
-__host__ __device__ __forceinline__ HashEntry &HashEntry::operator=(const HashEntry &H)
-{
-    pos_ = H.pos_;
-    ptr_ = H.ptr_;
-    offset_ = H.offset_;
-    return *this;
-}
-
-__host__ __device__ __forceinline__ bool HashEntry::operator==(const Vec3i &pos_) const
-{
-    return this->pos_ == pos_;
-}
-
-__host__ __device__ __forceinline__ bool HashEntry::operator==(const HashEntry &other) const
-{
-    return other.pos_ == pos_;
-}
-
-struct Voxel
-{
-    __host__ __device__ __forceinline__ Voxel();
-    __host__ __device__ __forceinline__ Voxel(float sdf, float weight, Vec3b rgb);
-    __host__ __device__ __forceinline__ float getSDF() const;
-    __host__ __device__ __forceinline__ void setSDF(float val);
-    __host__ __device__ __forceinline__ float getWeight() const;
-    __host__ __device__ __forceinline__ void setWeight(float val);
-
-    short sdf;
-    float weight;
-    Vec3b rgb;
-};
-
-__host__ __device__ __forceinline__ Voxel::Voxel()
-    : sdf(0), weight(0), rgb(0)
-{
-}
-
-__host__ __device__ __forceinline__ Voxel::Voxel(float sdf, float weight, Vec3b rgb)
-    : weight(weight), rgb(rgb)
-{
-    setSDF(sdf);
+    return (short)(val * 32767);
 }
 
 __host__ __device__ __forceinline__ Vec3i floor(const Vec3f &pt)
@@ -84,37 +27,18 @@ __host__ __device__ __forceinline__ Vec3i floor(const Vec3f &pt)
     return Vec3i((int)floor(pt(0)), (int)floor(pt(1)), (int)floor(pt(2)));
 }
 
-__host__ __device__ __forceinline__ float unpackFloat(short val)
+struct HashEntry
 {
-    return val / (float)32767;
-}
+    int ptr_;
+    int offset_;
+    Vec3i pos_;
+};
 
-__host__ __device__ __forceinline__ short packFloat(float val)
+struct Voxel
 {
-    return (short)(val * 32767);
-}
-
-__host__ __device__ __forceinline__ float Voxel::getSDF() const
-{
-    return unpackFloat(sdf);
-}
-
-__host__ __device__ __forceinline__ void Voxel::setSDF(float val)
-{
-    sdf = packFloat(val);
-}
-
-__host__ __device__ __forceinline__ float Voxel::getWeight() const
-{
-    return weight;
-}
-
-__host__ __device__ __forceinline__ void Voxel::setWeight(float val)
-{
-    weight = val;
-    if (weight > 255)
-        weight = 255;
-}
+    short sdf;
+    uchar weight;
+};
 
 // Map info
 class MapState

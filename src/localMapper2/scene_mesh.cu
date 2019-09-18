@@ -50,7 +50,7 @@ struct BuildVertexArray
         if (voxel && voxel->weight != 0)
         {
             valid = true;
-            return voxel->getSDF();
+            return unpackFloat(voxel->sdf);
         }
         else
         {

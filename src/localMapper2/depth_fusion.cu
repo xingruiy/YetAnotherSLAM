@@ -260,21 +260,21 @@ __global__ void update_map_kernel(MapStorage map_struct,
         const int local_idx = localPosToLocalIdx(local_pos);
         Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
 
-        auto sdf_p = voxel.getSDF();
-        auto weight_p = voxel.getWeight();
-        auto weight = 1 / (dist);
+        auto sdf_p = unpackFloat(voxel.sdf);
+        auto weight_p = voxel.weight;
+        // auto weight = 1 / (dist);
 
-        if (weight_p < 1e-3)
+        if (weight_p == 0)
         {
-            voxel.setSDF(sdf);
-            voxel.setWeight(weight);
+            voxel.sdf = packFloat(sdf);
+            voxel.weight = 1;
             continue;
         }
 
         // fuse depth
-        sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
-        voxel.setSDF(sdf_p);
-        voxel.setWeight(weight_p + weight);
+        sdf_p = (sdf_p * weight_p + sdf) / (weight_p + 1);
+        voxel.sdf = packFloat(sdf_p);
+        voxel.weight = (weight_p + 1);
     }
 }
 

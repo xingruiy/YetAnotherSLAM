@@ -1,13 +1,10 @@
 #include "localMapper2/denseMap.h"
-#include "matrix_type.h"
-#include "vector_type.h"
-#include "safe_call.h"
 #include <fstream>
 
 __device__ MapState param;
 inline void uploadMapState(MapState state)
 {
-    safe_call(cudaMemcpyToSymbol(param, &state, sizeof(MapState)));
+    (cudaMemcpyToSymbol(param, &state, sizeof(MapState)));
 }
 
 template <bool Device>
@@ -82,9 +79,9 @@ void MapStruct<Device>::reset()
         block = dim3(div_up(state.num_total_voxel_blocks_, thread.x));
         reset_heap_memory_kernel<<<block, thread>>>(map.heap_mem_, map.heap_mem_counter_);
 
-        safe_call(cudaMemset(map.excess_counter_, 0, sizeof(int)));
-        safe_call(cudaMemset(map.bucket_mutex_, 0, sizeof(int) * state.num_total_buckets_));
-        safe_call(cudaMemset(map.voxels_, 0, sizeof(Voxel) * state.num_total_voxels()));
+        (cudaMemset(map.excess_counter_, 0, sizeof(int)));
+        (cudaMemset(map.bucket_mutex_, 0, sizeof(int) * state.num_total_buckets_));
+        (cudaMemset(map.voxels_, 0, sizeof(Voxel) * state.num_total_voxels()));
 #endif
     }
 }
@@ -207,7 +204,10 @@ __device__ bool createHashEntry(MapStorage &map, const Vec3i &pos, const int &of
         int ptr = map.heap_mem_[old];
         if (ptr != -1 && entry != nullptr)
         {
-            *entry = HashEntry(pos, ptr * BLOCK_SIZE3, offset);
+            // *entry = HashEntry(pos, ptr * BLOCK_SIZE3, offset);
+            entry->pos_ = pos;
+            entry->ptr_ = ptr * BLOCK_SIZE3;
+            entry->offset_ = offset;
             return true;
         }
     }
@@ -391,12 +391,12 @@ void MapStruct<Device>::create()
     if (Device)
     {
 #ifdef __CUDACC__
-        safe_call(cudaMalloc((void **)&map.excess_counter_, sizeof(int)));
-        safe_call(cudaMalloc((void **)&map.heap_mem_counter_, sizeof(int)));
-        safe_call(cudaMalloc((void **)&map.bucket_mutex_, sizeof(int) * state.num_total_buckets_));
-        safe_call(cudaMalloc((void **)&map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_));
-        safe_call(cudaMalloc((void **)&map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_));
-        safe_call(cudaMalloc((void **)&map.voxels_, sizeof(Voxel) * state.num_total_voxels()));
+        (cudaMalloc((void **)&map.excess_counter_, sizeof(int)));
+        (cudaMalloc((void **)&map.heap_mem_counter_, sizeof(int)));
+        (cudaMalloc((void **)&map.bucket_mutex_, sizeof(int) * state.num_total_buckets_));
+        (cudaMalloc((void **)&map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_));
+        (cudaMalloc((void **)&map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_));
+        (cudaMalloc((void **)&map.voxels_, sizeof(Voxel) * state.num_total_voxels()));
 #endif
     }
     else
@@ -424,12 +424,12 @@ void MapStruct<Device>::release()
     if (Device)
     {
 #ifdef __CUDACC__
-        safe_call(cudaFree((void *)map.heap_mem_));
-        safe_call(cudaFree((void *)map.heap_mem_counter_));
-        safe_call(cudaFree((void *)map.hash_table_));
-        safe_call(cudaFree((void *)map.bucket_mutex_));
-        safe_call(cudaFree((void *)map.excess_counter_));
-        safe_call(cudaFree((void *)map.voxels_));
+        (cudaFree((void *)map.heap_mem_));
+        (cudaFree((void *)map.heap_mem_counter_));
+        (cudaFree((void *)map.hash_table_));
+        (cudaFree((void *)map.bucket_mutex_));
+        (cudaFree((void *)map.excess_counter_));
+        (cudaFree((void *)map.voxels_));
 #endif
     }
     else
@@ -454,12 +454,12 @@ void MapStruct<Device>::copyTo(MapStruct<Device> &other) const
         if (other.empty())
             other.create();
 
-        safe_call(cudaMemcpy(other.map.excess_counter_, map.excess_counter_, sizeof(int), cudaMemcpyDeviceToDevice));
-        safe_call(cudaMemcpy(other.map.heap_mem_counter_, map.heap_mem_counter_, sizeof(int), cudaMemcpyDeviceToDevice));
-        safe_call(cudaMemcpy(other.map.bucket_mutex_, map.bucket_mutex_, sizeof(int) * state.num_total_buckets_, cudaMemcpyDeviceToDevice));
-        safe_call(cudaMemcpy(other.map.heap_mem_, map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_, cudaMemcpyDeviceToDevice));
-        safe_call(cudaMemcpy(other.map.hash_table_, map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_, cudaMemcpyDeviceToDevice));
-        safe_call(cudaMemcpy(other.map.voxels_, map.voxels_, sizeof(Voxel) * state.num_total_voxels(), cudaMemcpyDeviceToDevice));
+        (cudaMemcpy(other.map.excess_counter_, map.excess_counter_, sizeof(int), cudaMemcpyDeviceToDevice));
+        (cudaMemcpy(other.map.heap_mem_counter_, map.heap_mem_counter_, sizeof(int), cudaMemcpyDeviceToDevice));
+        (cudaMemcpy(other.map.bucket_mutex_, map.bucket_mutex_, sizeof(int) * state.num_total_buckets_, cudaMemcpyDeviceToDevice));
+        (cudaMemcpy(other.map.heap_mem_, map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_, cudaMemcpyDeviceToDevice));
+        (cudaMemcpy(other.map.hash_table_, map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_, cudaMemcpyDeviceToDevice));
+        (cudaMemcpy(other.map.voxels_, map.voxels_, sizeof(Voxel) * state.num_total_voxels(), cudaMemcpyDeviceToDevice));
 #endif
     }
     else
@@ -480,12 +480,12 @@ void MapStruct<Device>::upload(MapStruct<false> &other)
         if (other.empty())
             return;
 
-        safe_call(cudaMemcpy(map.excess_counter_, other.map.excess_counter_, sizeof(int), cudaMemcpyHostToDevice));
-        safe_call(cudaMemcpy(map.heap_mem_counter_, other.map.heap_mem_counter_, sizeof(int), cudaMemcpyHostToDevice));
-        safe_call(cudaMemcpy(map.bucket_mutex_, other.map.bucket_mutex_, sizeof(int) * state.num_total_buckets_, cudaMemcpyHostToDevice));
-        safe_call(cudaMemcpy(map.heap_mem_, other.map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_, cudaMemcpyHostToDevice));
-        safe_call(cudaMemcpy(map.hash_table_, other.map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_, cudaMemcpyHostToDevice));
-        safe_call(cudaMemcpy(map.voxels_, other.map.voxels_, sizeof(Voxel) * state.num_total_voxels(), cudaMemcpyHostToDevice));
+        (cudaMemcpy(map.excess_counter_, other.map.excess_counter_, sizeof(int), cudaMemcpyHostToDevice));
+        (cudaMemcpy(map.heap_mem_counter_, other.map.heap_mem_counter_, sizeof(int), cudaMemcpyHostToDevice));
+        (cudaMemcpy(map.bucket_mutex_, other.map.bucket_mutex_, sizeof(int) * state.num_total_buckets_, cudaMemcpyHostToDevice));
+        (cudaMemcpy(map.heap_mem_, other.map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_, cudaMemcpyHostToDevice));
+        (cudaMemcpy(map.hash_table_, other.map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_, cudaMemcpyHostToDevice));
+        (cudaMemcpy(map.voxels_, other.map.voxels_, sizeof(Voxel) * state.num_total_voxels(), cudaMemcpyHostToDevice));
 #endif
     }
 }
@@ -503,12 +503,12 @@ void MapStruct<Device>::download(MapStruct<false> &other) const
         if (other.empty())
             other.create();
 
-        safe_call(cudaMemcpy(other.map.excess_counter_, map.excess_counter_, sizeof(int), cudaMemcpyDeviceToHost));
-        safe_call(cudaMemcpy(other.map.heap_mem_counter_, map.heap_mem_counter_, sizeof(int), cudaMemcpyDeviceToHost));
-        safe_call(cudaMemcpy(other.map.bucket_mutex_, map.bucket_mutex_, sizeof(int) * state.num_total_buckets_, cudaMemcpyDeviceToHost));
-        safe_call(cudaMemcpy(other.map.heap_mem_, map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_, cudaMemcpyDeviceToHost));
-        safe_call(cudaMemcpy(other.map.hash_table_, map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_, cudaMemcpyDeviceToHost));
-        safe_call(cudaMemcpy(other.map.voxels_, map.voxels_, sizeof(Voxel) * state.num_total_voxels(), cudaMemcpyDeviceToHost));
+        (cudaMemcpy(other.map.excess_counter_, map.excess_counter_, sizeof(int), cudaMemcpyDeviceToHost));
+        (cudaMemcpy(other.map.heap_mem_counter_, map.heap_mem_counter_, sizeof(int), cudaMemcpyDeviceToHost));
+        (cudaMemcpy(other.map.bucket_mutex_, map.bucket_mutex_, sizeof(int) * state.num_total_buckets_, cudaMemcpyDeviceToHost));
+        (cudaMemcpy(other.map.heap_mem_, map.heap_mem_, sizeof(int) * state.num_total_voxel_blocks_, cudaMemcpyDeviceToHost));
+        (cudaMemcpy(other.map.hash_table_, map.hash_table_, sizeof(HashEntry) * state.num_total_hash_entries_, cudaMemcpyDeviceToHost));
+        (cudaMemcpy(other.map.voxels_, map.voxels_, sizeof(Voxel) * state.num_total_voxels(), cudaMemcpyDeviceToHost));
 #endif
     }
 }

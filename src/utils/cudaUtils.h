@@ -1,3 +1,4 @@
+#pragma once
 #include <cuda_runtime_api.h>
 
 #define cudaCheckError()                                                                     \
