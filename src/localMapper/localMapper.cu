@@ -5,16 +5,18 @@
 LocalMapper::LocalMapper(int w, int h, Mat33d &K)
     : intrinsics(K), frameWidth(w), frameHeight(h)
 {
-  deviceMap.create(40000, 30000, 20000, 0.005f, 0.02f);
+  deviceMap.create(200000, 100000, 80000, 0.004f, 0.02f);
   zrangeX.create(h / RenderingBlockSubSample, w / RenderingBlockSubSample, CV_32FC1);
   zrangeY.create(h / RenderingBlockSubSample, w / RenderingBlockSubSample, CV_32FC1);
   cudaMalloc((void **)&numRenderingBlock, sizeof(uint));
+  cudaMalloc((void **)&numTriangle, sizeof(uint));
   cudaMalloc((void **)&listRenderingBlock, sizeof(RenderingBlock) * MaxNumRenderingBlock);
 }
 
 LocalMapper::~LocalMapper()
 {
   deviceMap.release();
+  cudaFree(numTriangle);
   cudaFree(numRenderingBlock);
   cudaFree(listRenderingBlock);
 }
@@ -30,6 +32,8 @@ void LocalMapper::fuseFrame(GMat depth, const SE3 &T)
     printf("ERROR: no visible block, depth fusion failed.\n");
     return;
   }
+
+  std::cout << numVisibleBlock << std::endl;
 
   DepthFusionFunctor functor;
   functor.depth = depth;
@@ -78,9 +82,9 @@ void LocalMapper::raytrace(GMat &vertex, const SE3 &T)
   predictDepthMap(hostData);
 
   Mat img(zrangeX);
-  cv::resize(img, img, cv::Size(), 8, 8);
-  cv::imwrite("img2.png", img);
-  // cv::waitKey(1);
+  cv::resize(img, img, cv::Size2i(), 8, 8);
+  cv::imshow("img2", img);
+  cv::waitKey(1);
 
   RaytracingFunctor functor;
   functor.zRangeX = zrangeX;
@@ -123,7 +127,7 @@ void LocalMapper::preAllocateBlock(GMat depth, const SE3 &T)
   functor.invfy = 1.0 / intrinsics(1, 1);
   functor.cx = intrinsics(0, 2);
   functor.cy = intrinsics(1, 2);
-  functor.depthMin = 0.4f,
+  functor.depthMin = 0.1f,
   functor.depthMax = 3.0f;
   functor.cols = cols,
   functor.rows = rows;
@@ -149,6 +153,8 @@ void LocalMapper::checkBlockInFrustum(const SE3 &T)
 {
   deviceMap.resetNumVisibleEntry();
 
+  std::cout << intrinsics << std::endl;
+
   CheckEntryVisibilityFunctor functor;
   functor.Tinv = T.inverse().cast<float>();
   functor.cols = frameWidth;
@@ -157,7 +163,7 @@ void LocalMapper::checkBlockInFrustum(const SE3 &T)
   functor.fy = intrinsics(1, 1);
   functor.cx = intrinsics(0, 2);
   functor.cy = intrinsics(1, 2);
-  functor.depthMin = 0.4f;
+  functor.depthMin = 0.1f;
   functor.depthMax = 3.0f;
   functor.voxelSize = deviceMap.voxelSize;
   functor.numEntry = deviceMap.numEntry;
@@ -183,7 +189,7 @@ void LocalMapper::projectVisibleBlock(const SE3 &T)
   functor.fy = intrinsics(1, 1);
   functor.cx = intrinsics(0, 2);
   functor.cy = intrinsics(1, 2);
-  functor.depthMin = 0.4f;
+  functor.depthMin = 0.1f;
   functor.depthMax = 3.0f;
   functor.zRangeX = zrangeX;
   functor.zRangeY = zrangeY;
@@ -212,4 +218,30 @@ void LocalMapper::predictDepthMap(uint renderingBlockNum)
   dim3 grid = dim3((uint)ceil((float)renderingBlockNum / 4.f), 4);
   callDeviceFunctor<<<grid, block>>>(functor);
   cudaCheckError();
+}
+
+size_t LocalMapper::getSceneMesh(float *vertexBuffer, float *normalBuffer, size_t bufferSize)
+{
+  cudaMemset(numTriangle, 0, sizeof(uint));
+
+  GenerateMeshFunctor functor;
+  functor.triangles = (Vec3f *)vertexBuffer;
+  functor.numTriangle = numTriangle;
+  functor.surfaceNormal = (Vec3f *)normalBuffer;
+  functor.numVisibleBlock = numVisibleBlock;
+  functor.visibleEntry = deviceMap.visibleEntry;
+  functor.hashTable = deviceMap.hashTable;
+  functor.blocks = deviceMap.voxelBlocks;
+  functor.numBucket = deviceMap.numBucket;
+  functor.voxelSize = deviceMap.voxelSize;
+
+  dim3 block(8, 8);
+  dim3 grid;
+  grid.x = (numVisibleBlock + 15) / 16;
+  grid.y = 16;
+  callDeviceFunctor<<<grid, block>>>(functor);
+
+  uint hostData = 0;
+  cudaMemcpy(&hostData, numTriangle, sizeof(uint), cudaMemcpyDeviceToHost);
+  return hostData;
 }

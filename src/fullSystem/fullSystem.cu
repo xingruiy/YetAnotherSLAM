@@ -1,6 +1,5 @@
 #include "fullSystem/fullSystem.h"
 #include "denseTracker/cudaImageProc.h"
-#include <chrono>
 
 FullSystem::FullSystem(const char *configFile)
 {
@@ -9,7 +8,8 @@ FullSystem::FullSystem(const char *configFile)
 FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool view)
     : currentState(-1)
 {
-    localMapper = std::make_shared<LocalMapper>(w, h, K);
+    // localMapper = std::make_shared<LocalMapper>(w, h, K);
+    localMapper = std::make_shared<DenseMapping>(w, h, K);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
@@ -19,14 +19,13 @@ FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool view)
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 {
     currentFrame = std::make_shared<Frame>(rawImage, rawDepth);
-    cv::imwrite("Raw.png", rawImage);
 
     switch (currentState)
     {
     case -1:
     {
         coarseTracker->setReferenceFrame(currentFrame);
-        fuseCurrentFrame();
+        fuseCurrentFrame(lastTrackedPose);
         currentState = 0;
         break;
     }
@@ -35,13 +34,23 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         auto rval = trackCurrentFrame();
         if (rval)
         {
+            fuseCurrentFrame(lastTrackedPose);
+            updateLocalMapObservation(lastTrackedPose);
             rawFramePoseHistory.push_back(lastTrackedPose);
-            fuseCurrentFrame();
+
             if (needNewKF())
                 createNewKF();
         }
+        else
+        {
+            currentState = 1;
+        }
+
         break;
     }
+    case 1:
+        printf("tracking loast, attempt to resuming...\n");
+        break;
     }
 }
 
@@ -53,21 +62,27 @@ bool FullSystem::trackCurrentFrame()
     return true;
 }
 
-void FullSystem::fuseCurrentFrame()
+void FullSystem::fuseCurrentFrame(const SE3 &T)
 {
     GMat currDepth = coarseTracker->getReferenceDepth();
-    localMapper->fuseFrame(currDepth, lastTrackedPose);
+    // Mat depth(currDepth);
+    // cv::imshow("depth", depth);
+    // cv::waitKey(1);
+    localMapper->fuseFrame(currDepth, T);
+}
+
+void FullSystem::updateLocalMapObservation(const SE3 &T)
+{
     GMat vertex(480, 640, CV_32FC4);
-    localMapper->raytrace(vertex, lastTrackedPose);
-    std::cout << lastTrackedPose.matrix3x4() << std::endl;
+    localMapper->raytrace(vertex, T);
+
     GMat nmap, scene;
     computeNormal(vertex, nmap);
     renderScene(vertex, nmap, scene);
     Mat map(scene);
-    cv::imwrite("test.png", map);
 
-    // cv::imshow("img", map);
-    // cv::waitKey(1);
+    cv::imshow("img", map);
+    cv::waitKey(1);
 }
 
 bool FullSystem::needNewKF()
@@ -81,6 +96,7 @@ void FullSystem::createNewKF()
 
 void FullSystem::resetSystem()
 {
+    localMapper->reset();
 }
 
 std::vector<SE3> FullSystem::getRawFramePoseHistory() const

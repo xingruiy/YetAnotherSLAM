@@ -7,17 +7,14 @@
 #define RenderingBlockSizeX 16
 #define RenderingBlockSizeY 16
 #define RenderingBlockSubSample 8
-#define MaxNumRenderingBlock 100000
+#define MaxNumRenderingBlock 1000000
 #define MaxNumTriangle 20000000
 
 __device__ __forceinline__ Vec2f project(
     const Vec3f &pt, const float &fx, const float &fy,
     const float &cx, const float &cy)
 {
-    Vec2f ptWarped;
-    ptWarped(0) = fx * pt(0) / pt(2) + cx;
-    ptWarped(1) = fy * pt(1) / pt(2) + cy;
-    return ptWarped;
+    return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
 }
 
 __device__ __forceinline__ Vec3f unproject(
@@ -25,11 +22,7 @@ __device__ __forceinline__ Vec3f unproject(
     const float &invfx, const float &invfy,
     const float &cx, const float &cy)
 {
-    Vec3f pt;
-    pt(0) = z * (x - cx) * invfx;
-    pt(1) = z * (y - cy) * invfy;
-    pt(2) = z;
-    return pt;
+    return Vec3f((x - cx) * invfx * z, (y - cy) * invfy * z, z);
 }
 
 __device__ __forceinline__ Vec3f unprojectWorld(
@@ -100,7 +93,7 @@ __device__ __forceinline__ float readSDF(
     else
     {
         valid = false;
-        return 1.0f;
+        return std::nanf("nan");
     }
 }
 
@@ -127,41 +120,151 @@ struct CreateVoxelBlockFunctor
 
     __device__ __forceinline__ void operator()() const
     {
-        int x = blockIdx.x * blockDim.x + threadIdx.x;
-        int y = blockIdx.y * blockDim.y + threadIdx.y;
-        if (x >= cols && y >= rows)
+        // int x = blockIdx.x * blockDim.x + threadIdx.x;
+        // int y = blockIdx.y * blockDim.y + threadIdx.y;
+        // if (x >= cols && y >= rows)
+        //     return;
+
+        // float dist = depth.ptr(y)[x];
+        // if (isnan(dist) || dist < depthMin || dist > depthMax)
+        //     return;
+
+        // float distNear = fmax(depthMin, dist - truncDistHalf);
+        // float distFar = fmin(depthMax, dist + truncDistHalf);
+        // if (distNear >= distFar)
+        //     return;
+
+        // Vec3f ptNear = unprojectWorld(x, y, distNear, invfx, invfy, cx, cy, T) * voxelSizeInv;
+        // Vec3f ptFar = unprojectWorld(x, y, distFar, invfx, invfy, cx, cy, T) * voxelSizeInv;
+        // Vec3f dir = ptFar - ptNear;
+
+        // float length = dir.norm();
+        // int nSteps = (int)ceil(2 * length);
+        // dir = dir / (float)(nSteps - 1);
+
+        // for (int i = 0; i < nSteps; ++i)
+        // {
+        //     Vec3i voxelPos;
+        //     voxelPos(0) = static_cast<int>(floor(ptNear(0)));
+        //     voxelPos(1) = static_cast<int>(floor(ptNear(1)));
+        //     voxelPos(2) = static_cast<int>(floor(ptNear(2)));
+        //     Vec3i blockPos = voxelPosToBlockPos(voxelPos);
+        //     createBlock(hashTable, bucketMutex, heap, heapPtr,
+        //                 excessPtr, numEntry, numBucket, blockPos);
+
+        //     ptNear += dir;
+        // }
+
+        const int x = threadIdx.x + blockDim.x * blockIdx.x;
+        const int y = threadIdx.y + blockDim.y * blockIdx.y;
+        if (x >= cols || y >= rows)
+            return;
+        // if (x < 30)
+        //     printf("%i, %i\n", x, y);
+
+        float z = depth.ptr(y)[x];
+        if (isnan(z) || z < depthMin || z > depthMax)
             return;
 
-        float dist = depth.ptr(y)[x];
-        if (isnan(dist) || dist < depthMin || dist > depthMax)
+        float z_near = max(depthMin, z - truncDistHalf);
+        float z_far = min(depthMax, z + truncDistHalf);
+        if (z_near >= z_far)
             return;
 
-        float distNear = fmax(depthMin, dist - truncDistHalf);
-        float distFar = fmin(depthMax, dist + truncDistHalf);
-        if (distNear >= distFar)
-            return;
+        Vec3i block_near = voxelPosToBlockPos(worldPtToVoxelPos(unprojectWorld(x, y, z_near, invfx, invfy, cx, cy, T), 1.0 / voxelSizeInv));
+        Vec3i block_far = voxelPosToBlockPos(worldPtToVoxelPos(unprojectWorld(x, y, z_far, invfx, invfy, cx, cy, T), 1.0 / voxelSizeInv));
 
-        Vec3f ptNear = unprojectWorld(x, y, distNear, invfx, invfy, cx, cy, T) * voxelSizeInv;
-        Vec3f ptFar = unprojectWorld(x, y, distFar, invfx, invfy, cx, cy, T) * voxelSizeInv;
-        Vec3f dir = ptFar - ptNear;
+        Vec3i d = block_far - block_near;
+        Vec3i increment = Vec3i(d(0) < 0 ? -1 : 1, d(1) < 0 ? -1 : 1, d(2) < 0 ? -1 : 1);
+        Vec3i incre_abs = Vec3i(abs(d(0)), abs(d(1)), abs(d(2)));
+        Vec3i incre_err = Vec3i(incre_abs(0) << 1, incre_abs(1) << 1, incre_abs(2) << 1);
 
-        float length = dir.norm();
-        int nSteps = (int)ceil(2.0 * length);
-        dir = dir / (float)(nSteps - 1);
+        int err_1;
+        int err_2;
 
-        for (int i = 0; i < nSteps; ++i)
+        // Bresenham's line algorithm
+        // details see : https://en.m.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+        if ((incre_abs(0) >= incre_abs(1)) && (incre_abs(0) >= incre_abs(2)))
         {
-            Vec3i voxelPos(floor(ptNear(0)), floor(ptNear(1)), floor(ptNear(2)));
-            createBlock(
-                hashTable,
-                bucketMutex,
-                heap,
-                heapPtr,
-                excessPtr,
-                numEntry,
-                numBucket,
-                voxelPosToBlockPos(voxelPos));
-            ptNear += dir;
+            err_1 = incre_err(1) - 1;
+            err_2 = incre_err(2) - 1;
+
+            createBlock(hashTable, bucketMutex, heap, heapPtr,
+                        excessPtr, numEntry, numBucket, block_near);
+            for (int i = 0; i < incre_abs(0); ++i)
+            {
+                if (err_1 > 0)
+                {
+                    block_near(1) += increment(1);
+                    err_1 -= incre_err(0);
+                }
+
+                if (err_2 > 0)
+                {
+                    block_near(2) += increment(2);
+                    err_2 -= incre_err(0);
+                }
+
+                err_1 += incre_err(1);
+                err_2 += incre_err(2);
+                block_near(0) += increment(0);
+                createBlock(hashTable, bucketMutex, heap, heapPtr,
+                            excessPtr, numEntry, numBucket, block_near);
+            }
+        }
+        else if ((incre_abs(1) >= incre_abs(0)) && (incre_abs(1) >= incre_abs(2)))
+        {
+            err_1 = incre_err(0) - 1;
+            err_2 = incre_err(2) - 1;
+            createBlock(hashTable, bucketMutex, heap, heapPtr,
+                        excessPtr, numEntry, numBucket, block_near);
+            for (int i = 0; i < incre_abs(1); ++i)
+            {
+                if (err_1 > 0)
+                {
+                    block_near(0) += increment(0);
+                    err_1 -= incre_err(1);
+                }
+
+                if (err_2 > 0)
+                {
+                    block_near(2) += increment(2);
+                    err_2 -= incre_err(1);
+                }
+
+                err_1 += incre_err(0);
+                err_2 += incre_err(2);
+                block_near(1) += increment(1);
+                createBlock(hashTable, bucketMutex, heap, heapPtr,
+                            excessPtr, numEntry, numBucket, block_near);
+            }
+        }
+        else
+        {
+            err_1 = incre_err(1) - 1;
+            err_2 = incre_err(0) - 1;
+            createBlock(hashTable, bucketMutex, heap, heapPtr,
+                        excessPtr, numEntry, numBucket, block_near);
+            for (int i = 0; i < incre_abs(2); ++i)
+            {
+                if (err_1 > 0)
+                {
+                    block_near(1) += increment(1);
+                    err_1 -= incre_err(2);
+                }
+
+                if (err_2 > 0)
+                {
+                    block_near(0) += increment(0);
+                    err_2 -= incre_err(2);
+                }
+
+                err_1 += incre_err(1);
+                err_2 += incre_err(0);
+                block_near(2) += increment(2);
+                createBlock(hashTable, bucketMutex, heap, heapPtr,
+                            excessPtr, numEntry, numBucket, block_near);
+            }
         }
     }
 };
@@ -181,32 +284,64 @@ struct CheckEntryVisibilityFunctor
 
     __device__ __forceinline__ void operator()() const
     {
-        int idx = threadIdx.x + blockDim.x * blockIdx.x;
+        // int idx = threadIdx.x + blockDim.x * blockIdx.x;
 
-        __shared__ bool needScan;
+        // __shared__ bool needScan;
+        // if (threadIdx.x == 0)
+        //     needScan = false;
+
+        // __syncthreads();
+
+        // uint increment = 0;
+        // if (idx < numEntry)
+        // {
+        //     HashEntry &entry = hashTable[idx];
+        //     if (entry.ptr != -1)
+        //     {
+        //         bool visible = checkBlockVisibility(
+        //             entry.pos.cast<float>(), Tinv,
+        //             cols, rows,
+        //             fx, fy,
+        //             cx, cy,
+        //             depthMin,
+        //             depthMax,
+        //             voxelSize);
+
+        //         if (visible)
+        //         {
+        //             needScan = true;
+        //             increment = 1;
+        //         }
+        //     }
+        // }
+
+        // __syncthreads();
+
+        // if (needScan)
+        // {
+        //     int offset = computeOffset<1024>(increment, numVisibleEntry);
+        //     if (offset != -1 && offset < numEntry && idx < numEntry)
+        //         visibleEntry[offset] = hashTable[idx];
+        // }
+        __shared__ bool bScan;
         if (threadIdx.x == 0)
-            needScan = false;
+            bScan = false;
 
         __syncthreads();
 
         uint increment = 0;
-        if (idx < numEntry)
+        int x = blockDim.x * blockIdx.x + threadIdx.x;
+        if (x < numEntry)
         {
-            HashEntry &entry = hashTable[idx];
-            if (entry.ptr != -1)
+            HashEntry &e = hashTable[x];
+            if (e.ptr != -1)
             {
-                bool visible = checkBlockVisibility(
-                    entry.pos.cast<float>(), Tinv,
-                    cols, rows,
-                    fx, fy,
-                    cx, cy,
-                    depthMin,
-                    depthMax,
-                    voxelSize);
-
-                if (visible)
+                if (checkBlockVisibility(e.pos.cast<float>(),
+                                         Tinv, cols, rows,
+                                         fx, fy, cx, cy,
+                                         depthMin, depthMax, voxelSize))
                 {
-                    needScan = true;
+                    bScan = true;
                     increment = 1;
                 }
             }
@@ -214,11 +349,11 @@ struct CheckEntryVisibilityFunctor
 
         __syncthreads();
 
-        if (needScan)
+        if (bScan)
         {
             int offset = computeOffset<1024>(increment, numVisibleEntry);
-            if (offset != -1 && offset < numEntry && idx < numEntry)
-                visibleEntry[offset] = hashTable[idx];
+            if (offset != -1 && offset < numEntry && x < numEntry)
+                visibleEntry[offset] = hashTable[x];
         }
     }
 };
@@ -272,10 +407,7 @@ struct DepthFusionFunctor
             int localIdx = localPosToLocalIdx(localPos);
             Voxel &curr = voxels[entry.ptr + localIdx];
 
-            float oldSDF = unpackFloat(curr.sdf);
-            int oldWT = curr.wt;
-
-            if (oldWT == 0)
+            if (curr.wt == 0)
             {
                 curr.sdf = packFloat(newSDF);
                 curr.wt = 1;
@@ -283,10 +415,55 @@ struct DepthFusionFunctor
             }
             else
             {
-                curr.sdf = packFloat((oldWT * oldSDF + newSDF) / (oldWT + 1));
-                curr.wt = min(255, oldWT + 1);
+                float oldSDF = unpackFloat(curr.sdf);
+                curr.sdf = packFloat((curr.wt * oldSDF + newSDF) / (curr.wt + 1));
+                curr.wt = min(255, curr.wt + 1);
             }
         }
+        //         if (blockIdx.x >= numVisibleEntry)
+        //             return;
+
+        //         HashEntry &entry = visibleEntry[blockIdx.x];
+        //         if (entry.ptr == -1)
+        //             return;
+
+        //         Vec3i block_pos = entry.pos * BlockSize;
+
+        // #pragma unroll
+        //         for (int i = 0; i < 8; ++i)
+        //         {
+        //             Vec3i localPos = Vec3i(threadIdx.x, threadIdx.y, i);
+        //             int locId = localPosToLocalIdx(localPos);
+        //             Vec3f pos = Tinv * (block_pos + localPos).cast<float>() * voxelSize;
+        //             int u = __float2int_rd(fx * pos(0) / pos(2) + cx + 0.5f);
+        //             int v = __float2int_rd(fy * pos(1) / pos(2) + cy + 0.5f);
+        //             if (u < 0 || v < 0 || u >= cols || v >= rows)
+        //                 continue;
+
+        //             float dp = depth.ptr(v)[u];
+        //             if (isnan(dp) || dp > depthMax || dp < depthMin)
+        //                 continue;
+
+        //             float sdf = dp - pos(2);
+
+        //             if (sdf >= -truncDist)
+        //             {
+        //                 sdf = fmin(1.0f, sdf / truncDist);
+
+        //                 Voxel &prev = voxels[entry.ptr + locId];
+        //                 if (prev.wt == 0)
+        //                 {
+        //                     prev.sdf = packFloat(sdf);
+        //                     prev.wt = 1;
+        //                 }
+        //                 else
+        //                 {
+        //                     float oldSDF = unpackFloat(prev.sdf);
+        //                     prev.sdf = packFloat((oldSDF * prev.wt + sdf) / (prev.wt + 1));
+        //                     prev.wt = min(255, prev.wt + 1);
+        //                 }
+        //             }
+        //         }
     }
 };
 
@@ -537,83 +714,162 @@ struct RaytracingFunctor
 
     __device__ __forceinline__ void operator()() const
     {
+        // const int x = threadIdx.x + blockDim.x * blockIdx.x;
+        // const int y = threadIdx.y + blockDim.y * blockIdx.y;
+        // if (x >= vmap.cols || y >= vmap.rows)
+        //     return;
+
+        // vmap.ptr(y)[x](0) = __int_as_float(0x7fffffff);
+
+        // short u = __float2int_rd((float)x / 8);
+        // short v = __float2int_rd((float)y / 8);
+
+        // float zNear = zRangeX.ptr(v)[u];
+        // float zFar = zRangeY.ptr(v)[u];
+        // // float zNear = 0.3f;
+        // // float zFar = 3.0f;
+        // if (zFar <= zNear)
+        //     return;
+
+        // Vec3f pt = unproject(x, y, zNear, invfx, invfy, cx, cy);
+        // float distStart = pt.norm() * voxelSizeInv;
+        // Vec3f blockStart = T * pt * voxelSizeInv;
+
+        // pt = unproject(x, y, zFar, invfx, invfy, cx, cy);
+        // float distEnd = pt.norm() * voxelSizeInv;
+        // Vec3f blockEnd = T * pt * voxelSizeInv;
+
+        // Vec3f dir = (blockEnd - blockStart).normalized();
+        // Vec3f result = blockStart;
+
+        // bool validSDF = false;
+        // bool ptFound = false;
+        // float step;
+        // float sdf = 1.0f;
+        // float lastReadSDF = 1.0f;
+
+        // while (distStart < distEnd)
+        // {
+        //     lastReadSDF = sdf;
+        //     sdf = readSDF(result, validSDF, hashTable, blocks, numBucket);
+
+        //     if (sdf <= 0.5f && sdf >= -0.5f)
+        //         sdf = readSDFInterp(result, validSDF);
+        //     if (sdf <= 0.0f)
+        //         break;
+        //     if (sdf >= 0.f && lastReadSDF < 0.f)
+        //         return;
+        //     if (validSDF)
+        //         step = max(sdf * raycastStep, 1.0f);
+        //     else
+        //         step = 2;
+
+        //     result += step * dir;
+        //     distStart += step;
+        // }
+
+        // if (sdf <= 0.0f)
+        // {
+        //     lastReadSDF = sdf;
+        //     step = sdf * raycastStep;
+        //     result += step * dir;
+
+        //     sdf = readSDFInterp(result, validSDF);
+
+        //     step = sdf * raycastStep;
+        //     result += step * dir;
+
+        //     if (validSDF)
+        //         ptFound = true;
+        // }
+
+        // if (ptFound)
+        // {
+        //     Vec3f worldPt = Tinv * result * voxelSize;
+        //     vmap.ptr(y)[x].head<3>() = worldPt;
+        //     vmap.ptr(y)[x](3) = 1.0f;
+        // }
+        // else
+        //     vmap.ptr(y)[x](3) = -1.0f;
+
         const int x = threadIdx.x + blockDim.x * blockIdx.x;
         const int y = threadIdx.y + blockDim.y * blockIdx.y;
-        if (x >= vmap.cols || y >= vmap.rows)
+        if (x >= cols || y >= rows)
             return;
 
         vmap.ptr(y)[x](0) = __int_as_float(0x7fffffff);
 
-        short u = __float2int_rd((float)x / 8);
-        short v = __float2int_rd((float)y / 8);
+        int u = __float2int_rd((float)x / 8);
+        int v = __float2int_rd((float)y / 8);
 
-        // float zNear = zRangeX.ptr(v)[u];
-        // float zFar = zRangeY.ptr(v)[u];
-        float zNear = 0.3f;
-        float zFar = 3.0f;
-        if (zFar <= zNear)
-            return;
+        float zrangex = 0.3f;
+        float zrangey = 3.0f;
 
-        Vec3f pt = unproject(x, y, zNear, invfx, invfy, cx, cy);
-        float distStart = pt.norm() * voxelSizeInv;
-        Vec3f blockStart = T * pt * voxelSizeInv;
-
-        pt = unproject(x, y, zFar, invfx, invfy, cx, cy);
-        float distEnd = pt.norm() * voxelSizeInv;
-        Vec3f blockEnd = T * pt * voxelSizeInv;
-
-        Vec3f dir = (blockEnd - blockStart).normalized();
-        Vec3f result = blockStart;
-
-        bool validSDF = false;
-        bool ptFound = false;
-        float step;
         float sdf = 1.0f;
-        float lastReadSDF = 1.0f;
+        float last_sdf;
 
-        while (distStart < distEnd)
+        Vec3f pt = unproject(x, y, zrangex, invfx, invfy, cx, cy);
+        float dist_s = pt.norm() * voxelSizeInv;
+        Vec3f block_s = T * pt * voxelSizeInv;
+
+        pt = unproject(x, y, zrangey, invfx, invfy, cx, cy);
+        float dist_e = pt.norm() * voxelSizeInv;
+        Vec3f block_e = T * pt * voxelSizeInv;
+
+        Vec3f dir = (block_e - block_s).normalized();
+        Vec3f result = block_s;
+
+        bool valid_sdf = false;
+        bool found_pt = false;
+        float step = 1;
+
+        while (dist_s < dist_e)
         {
-            lastReadSDF = sdf;
-            sdf = readSDF(result, validSDF, hashTable, blocks, numBucket);
+            last_sdf = sdf;
+            sdf = readSDF(result, valid_sdf, hashTable, blocks, numBucket);
+
+            if (valid_sdf)
+                break;
 
             if (sdf <= 0.5f && sdf >= -0.5f)
-                sdf = readSDFInterp(result, validSDF);
+                sdf = readSDFInterp(result, valid_sdf);
+
             if (sdf <= 0.0f)
                 break;
-            if (sdf >= 0.f && lastReadSDF < 0.f)
+
+            if (sdf >= 0.f && last_sdf < 0.f)
                 return;
-            if (validSDF)
-                step = max(sdf * raycastStep, 1.0f);
-            else
-                step = 2;
+
+            // if (valid_sdf)
+            //     step = max(sdf * raycastStep, 1.0f);
+            // else
+            //     step = 1;
 
             result += step * dir;
-            distStart += step;
+            dist_s += step;
         }
 
-        if (sdf <= 0.0f)
+        // if (sdf <= 0.0f)
+        // {
+        //     // step = sdf * raycastStep;
+        //     // result += step * dir;
+
+        //     // sdf = readSDFInterp(result, valid_sdf);
+
+        //     // step = sdf * raycastStep;
+        //     // result += step * dir;
+
+        //     if (valid_sdf)
+        //         found_pt = true;
+        // }
+        if (valid_sdf)
+            found_pt = true;
+
+        if (found_pt)
         {
-            lastReadSDF = sdf;
-            step = sdf * raycastStep;
-            result += step * dir;
-
-            sdf = readSDFInterp(result, validSDF);
-
-            step = sdf * raycastStep;
-            result += step * dir;
-
-            if (validSDF)
-                ptFound = true;
+            result = Tinv * result * voxelSize;
+            vmap.ptr(y)[x] = Vec4f(result(0), result(1), result(2), 1.0f);
         }
-
-        if (ptFound)
-        {
-            Vec3f worldPt = Tinv * result * voxelSize;
-            vmap.ptr(y)[x].head<3>() = worldPt;
-            vmap.ptr(y)[x](3) = 1.0f;
-        }
-        else
-            vmap.ptr(y)[x](3) = -1.0f;
     }
 };
 

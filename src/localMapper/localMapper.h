@@ -14,6 +14,7 @@ class LocalMapper
   GMat zrangeY;
   MapStruct deviceMap;
   RenderingBlock *listRenderingBlock;
+  uint *numTriangle;
   uint *numRenderingBlock;
   uint numVisibleBlock;
 
@@ -28,5 +29,6 @@ public:
 
   void fuseFrame(GMat depth, const SE3 &T);
   void raytrace(GMat &vertex, const SE3 &T);
+  size_t getSceneMesh(float *vertexBuffer, float *normalBuffer, size_t bufferSize);
   void reset();
 };

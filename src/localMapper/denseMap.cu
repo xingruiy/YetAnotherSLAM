@@ -94,7 +94,7 @@ void MapStruct::reset()
     grid = getGridConfiguration1D(block, numBlock);
     resetHeap<<<grid, block>>>(heap, heapPtr, numBlock);
 
-    cudaMemset(excessPtr, 0, sizeof(uint));
-    cudaMemset(bucketMutex, 0, sizeof(int) * numBucket);
-    cudaMemset(voxelBlocks, 0, sizeof(Voxel) * numBlock * BlockSize);
+    cudaMemset((void *)excessPtr, 0, sizeof(int));
+    cudaMemset((void *)bucketMutex, 0, sizeof(int) * numBucket);
+    cudaMemset((void *)voxelBlocks, 0, sizeof(Voxel) * numBlock * BlockSize);
 }

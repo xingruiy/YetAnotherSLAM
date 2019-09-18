@@ -11,12 +11,12 @@
         }                                                                                    \
     }
 
-static dim3 getGridConfiguration1D(dim3 &block, int k)
+static dim3 getGridConfiguration1D(const dim3 &block, int k)
 {
     return dim3((k + block.x - 1) / block.x);
 }
 
-static dim3 getGridConfiguration2D(dim3 &block, int w, int h)
+static dim3 getGridConfiguration2D(const dim3 &block, int w, int h)
 {
     dim3 grid;
     grid.x = (w + block.x - 1) / block.x;
