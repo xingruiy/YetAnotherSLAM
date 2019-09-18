@@ -10,6 +10,7 @@ class Frame
 
 public:
     Frame();
+    Frame(Mat rawImage, Mat rawDepth);
     Mat getDepth();
     Mat getImage();
     Mat getIntensity();

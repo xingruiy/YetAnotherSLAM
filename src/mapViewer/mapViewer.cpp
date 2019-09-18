@@ -1,11 +1,11 @@
 #include "mapViewer/mapViewer.h"
-#include "mapViewer/shader.h"
 
 #define ZMIN 0.1
 #define ZMAX 1000
 #define ENTER_KEY 13
 
 MapViewer::MapViewer(int w, int h)
+    : numTriangles(0)
 {
     pangolin::CreateWindowAndBind("MAP VIEWER", w, h);
 
@@ -18,7 +18,7 @@ MapViewer::MapViewer(int w, int h)
     setupDisplay();
     setupKeyBindings();
     initializeTextures();
-    initializeBuffers();
+    // initializeBuffers();
 }
 
 void MapViewer::setupDisplay()
@@ -35,6 +35,7 @@ void MapViewer::setupDisplay()
     displayLocalMapBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Scene", true, true);
     displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Mesh", true, true);
     enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Camera", false, true);
+    displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Trajectory", false, true);
 
     sidebarView = &pangolin::Display("Right Side Bar");
     sidebarView->SetBounds(0, 1, RightSideBarDividerLeft, 1);
@@ -42,9 +43,9 @@ void MapViewer::setupDisplay()
     colourView->SetBounds(0, 0.5, 0, 1);
     depthView = &pangolin::Display("Depth");
     depthView->SetBounds(0.5, 1, 0, 1);
-    localMapView = &pangolin::Display("Scene");
-    localMapView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft);
-    modelView = &pangolin::Display("Mesh");
+    // localMapView = &pangolin::Display("Scene");
+    // localMapView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft);
+    modelView = &pangolin::Display("Local Map");
     modelView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft).SetHandler(new pangolin::Handler3D(*mainCamera));
 
     sidebarView->AddDisplay(*colourView);
@@ -64,11 +65,11 @@ void MapViewer::initializePrograms()
 {
     phongProgram.AddShaderFromFile(
         pangolin::GlSlShaderType::GlSlVertexShader,
-        vsPhong);
+        "vsPhong");
 
     phongProgram.AddShaderFromFile(
         pangolin::GlSlShaderType::GlSlFragmentShader,
-        vsPhong);
+        "vsPhong");
 
     phongProgram.Link();
 }
@@ -165,6 +166,9 @@ void MapViewer::setDenseMapImage(Mat image)
 
 void MapViewer::setRawFrameHistory(const std::vector<SE3> &history)
 {
+    rawFrameHistory.clear();
+    for (auto T : history)
+        rawFrameHistory.push_back(T.translation().cast<float>());
 }
 
 void MapViewer::setRawKeyFrameHistory(const std::vector<SE3> &history)
@@ -201,6 +205,14 @@ void MapViewer::renderView()
         modelView->Activate();
         drawLocalMap();
     }
+
+    if (*displayFrameHistoryBox)
+    {
+        modelView->Activate();
+        pangolin::glDrawLineStrip(rawFrameHistory);
+    }
+
+    pangolin::FinishFrame();
 }
 
 void MapViewer::checkButtonsAndBoxes()
@@ -251,4 +263,8 @@ float *MapViewer::getNormalBufferPtr()
 uchar *MapViewer::getColourBufferPtr()
 {
     return (uchar *)**colourBufferPtr;
+}
+
+void MapViewer::drawFrameHistory()
+{
 }

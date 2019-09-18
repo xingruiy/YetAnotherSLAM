@@ -1,9 +1,8 @@
 #pragma once
-#include <memory>
 #include "utils/numType.h"
-#include <opencv2/opencv.hpp>
 #include <pangolin/pangolin.h>
 #include <pangolin/gl/glcuda.h>
+#include <memory>
 
 class MapViewer
 {
@@ -28,8 +27,10 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> displayLocalMapBox;
     std::shared_ptr<pangolin::Var<bool>> displayModelBox;
     std::shared_ptr<pangolin::Var<bool>> enableMappingBox;
+    std::shared_ptr<pangolin::Var<bool>> displayFrameHistoryBox;
 
     GLuint vaoPhong;
+    GLuint vaoColour;
     pangolin::GlBufferCudaPtr vertexBuffer;
     pangolin::GlBufferCudaPtr normalBuffer;
     pangolin::GlBufferCudaPtr colourBuffer;
@@ -40,7 +41,6 @@ class MapViewer
     size_t numTriangles;
     size_t numKeyPoints;
     size_t maxNumTriangles;
-    size_t maxNumKeyPoints;
 
     pangolin::GlSlProgram phongProgram;
 
@@ -59,6 +59,7 @@ class MapViewer
     bool requestSystemReset;
 
     void drawLocalMap();
+    void drawFrameHistory();
     float *getVertexBufferPtr();
     float *getNormalBufferPtr();
     uchar *getColourBufferPtr();

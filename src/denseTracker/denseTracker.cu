@@ -21,15 +21,16 @@ DenseTracker::DenseTracker(int w, int h, Mat33d &K, int numLvl)
     frameHeight.resize(numLvl);
     intrinsics.resize(numLvl);
 
+    currentDepth.resize(numLvl);
+    referenceDepth.resize(numLvl);
     currentIntensity.resize(numLvl);
     referenceIntensity.resize(numLvl);
-    currentInvDepth.resize(numLvl);
-    referenceInvDepth.resize(numLvl);
-    referencePointWarped.resize(numLvl);
-    invDepthGradientX.resize(numLvl);
-    invDepthGradientY.resize(numLvl);
-    IntensityGradientX.resize(numLvl);
-    IntensityGradientY.resize(numLvl);
+    intensityGradientX.resize(numLvl);
+    intensityGradientY.resize(numLvl);
+    referencePointTransformed.resize(numLvl);
+
+    rawImageBuffer.create(h, w, CV_8UC3);
+    rawDepthBuffer.create(h, w, CV_32FC1);
 
     for (int lvl = 0; lvl < numLvl; ++lvl)
     {
@@ -41,27 +42,55 @@ DenseTracker::DenseTracker(int w, int h, Mat33d &K, int numLvl)
         intrinsics[lvl] = K / (1 << lvl);
         intrinsics[lvl](2, 2) = 1.0f;
 
+        currentDepth[lvl].create(hLvl, wLvl, CV_32FC1);
+        referenceDepth[lvl].create(hLvl, wLvl, CV_32FC1);
         currentIntensity[lvl].create(hLvl, wLvl, CV_32FC1);
         referenceIntensity[lvl].create(hLvl, wLvl, CV_32FC1);
-        currentInvDepth[lvl].create(hLvl, wLvl, CV_32FC1);
-        referenceInvDepth[lvl].create(hLvl, wLvl, CV_32FC1);
-        invDepthGradientX[lvl].create(hLvl, wLvl, CV_32FC1);
-        invDepthGradientY[lvl].create(hLvl, wLvl, CV_32FC1);
-        IntensityGradientX[lvl].create(hLvl, wLvl, CV_32FC1);
-        IntensityGradientY[lvl].create(hLvl, wLvl, CV_32FC1);
-        referencePointWarped[lvl].create(hLvl, wLvl, CV_32FC4);
+        intensityGradientX[lvl].create(hLvl, wLvl, CV_32FC1);
+        intensityGradientY[lvl].create(hLvl, wLvl, CV_32FC1);
+        referencePointTransformed[lvl].create(hLvl, wLvl, CV_32FC4);
     }
+
+    iterationPerLvl = {10, 5, 4, 3, 3};
 }
 
 void DenseTracker::setReferenceInvDepth(GMat ref)
 {
 }
 
-void DenseTracker::setReferenceFrame(std::shared_ptr<Frame> ref)
+void DenseTracker::setReferenceFrame(std::shared_ptr<Frame> frame)
 {
+    auto depth = frame->getDepth();
+    auto image = frame->getImage();
+
+    referenceDepth[0].upload(depth);
+    referenceIntensity[0].upload(image);
+
+    for (int lvl = 1; lvl < numTrackingLvl; ++lvl)
+    {
+        cv::cuda::pyrDown(referenceDepth[lvl - 1], referenceDepth[lvl]);
+        cv::cuda::pyrDown(referenceIntensity[lvl - 1], referenceIntensity[lvl]);
+    }
 }
 
-SE3 DenseTracker::getIncrementalTransform(std::shared_ptr<Frame> frame, SE3 initAlign, bool switchBuffer)
+void DenseTracker::setTrackingFrame(std::shared_ptr<Frame> frame)
+{
+    auto depth = frame->getDepth();
+    auto image = frame->getImage();
+    currentDepth[0].upload(depth);
+    currentIntensity[0].upload(image);
+
+    for (int lvl = 1; lvl < numTrackingLvl; ++lvl)
+    {
+        cv::cuda::pyrDown(currentDepth[lvl - 1], currentDepth[lvl]);
+        cv::cuda::pyrDown(currentIntensity[lvl - 1], currentIntensity[lvl]);
+    }
+
+    for (int lvl = 0; lvl < numTrackingLvl; ++lvl)
+        computeImageGradientCentralDiff(currentIntensity[lvl], intensityGradientX[lvl], intensityGradientY[lvl]);
+}
+
+SE3 DenseTracker::getIncrementalTransform(SE3 initAlign, bool switchBuffer)
 {
     SE3 estimate = initAlign;
     SE3 lastSuccessEstimate = estimate;
@@ -102,14 +131,22 @@ SE3 DenseTracker::getIncrementalTransform(std::shared_ptr<Frame> frame, SE3 init
     }
 
     if (switchBuffer)
-    {
         for (int lvl = 0; lvl < numTrackingLvl; ++lvl)
         {
+            std::swap(referenceDepth[lvl], currentDepth[lvl]);
             std::swap(referenceIntensity[lvl], currentIntensity[lvl]);
         }
-    }
 
     return lastSuccessEstimate;
+}
+
+void DenseTracker::transformReferencePoint(const int lvl, const SE3 &estimate)
+{
+    auto referenceDepthLvl = referenceDepth[lvl];
+    auto referencePointTransformedLvl = referencePointTransformed[lvl];
+    auto KLvl = intrinsics[lvl];
+
+    ::transformReferencePoint(referenceDepthLvl, referencePointTransformedLvl, KLvl, estimate);
 }
 
 void DenseTracker::computeSE3StepRGB(
@@ -118,6 +155,7 @@ void DenseTracker::computeSE3StepRGB(
     float *hessian,
     float *residual)
 {
+    transformReferencePoint(lvl, estimate);
 
     const int w = frameWidth[lvl];
     const int h = frameHeight[lvl];
@@ -128,9 +166,9 @@ void DenseTracker::computeSE3StepRGB(
     functor.n = w * h;
     functor.refInt = referenceIntensity[lvl];
     functor.currInt = currentIntensity[lvl];
-    functor.currGx = IntensityGradientX[lvl];
-    functor.currGy = IntensityGradientY[lvl];
-    functor.refPtWarped = referencePointWarped[lvl];
+    functor.currGx = intensityGradientX[lvl];
+    functor.currGy = intensityGradientY[lvl];
+    functor.refPtWarped = referencePointTransformed[lvl];
     functor.refResidual = bufferVec4hxw;
     functor.fx = intrinsics[lvl](0, 0);
     functor.fy = intrinsics[lvl](1, 1);
@@ -165,7 +203,7 @@ void DenseTracker::computeSE3StepRGB(
     sfunctor.h = h;
     sfunctor.n = w * h;
     sfunctor.huberTh = 4.685 * varEstimated;
-    sfunctor.refPtWarped = referencePointWarped[lvl];
+    sfunctor.refPtWarped = referencePointTransformed[lvl];
     sfunctor.refResidual = bufferVec4hxw;
     sfunctor.fx = intrinsics[lvl](0, 0);
     sfunctor.fy = intrinsics[lvl](1, 1);
@@ -178,4 +216,9 @@ void DenseTracker::computeSE3StepRGB(
     rankUpdateHessian<6, 7>(hostData.ptr<float>(0), hessian, residual);
 
     residualSum = hostData.ptr<float>(0)[27];
+}
+
+GMat DenseTracker::getReferenceDepth(const int lvl) const
+{
+    return referenceDepth[lvl];
 }

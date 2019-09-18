@@ -4,6 +4,12 @@ Frame::Frame()
 {
 }
 
+Frame::Frame(Mat rawImage, Mat rawDepth)
+{
+    rawImage.copyTo(this->rawImage);
+    rawDepth.copyTo(this->rawDepth);
+}
+
 Mat Frame::getDepth()
 {
     return rawDepth;

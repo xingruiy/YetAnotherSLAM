@@ -1,13 +1,10 @@
 #include "localMapper/denseMap.h"
+#include "utils/cudaUtils.h"
 
 MapStruct::MapStruct()
     : numEntry(0), numBucket(0),
       numBlock(0), voxelSize(0),
       truncDist(0)
-{
-}
-
-void MapStruct::reset()
 {
 }
 
@@ -28,6 +25,8 @@ void MapStruct::create(int numEntry, int numBucket, int numBlock,
     this->numBucket = numBucket;
     this->voxelSize = voxelSize;
     this->truncDist = truncationDist;
+
+    reset();
 }
 
 void MapStruct::release()
@@ -61,4 +60,41 @@ void MapStruct::resetNumVisibleEntry()
 void MapStruct::getNumVisibleEntry(uint &hostData)
 {
     cudaMemcpy(&hostData, numVisibleEntry, sizeof(uint), cudaMemcpyDeviceToHost);
+}
+
+__global__ void resetHashEntryKernel(HashEntry *hashTable, int numEntry)
+{
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    if (idx >= numEntry)
+        return;
+
+    hashTable[idx].offset = -1;
+    hashTable[idx].ptr = -1;
+}
+
+__global__ void resetHeap(int *heap, int *heapPtr, int numBlock)
+{
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    if (idx >= numBlock)
+        return;
+
+    if (idx == 0)
+        heapPtr[0] = numBlock - 1;
+
+    heap[idx] = numBlock - idx - 1;
+}
+
+void MapStruct::reset()
+{
+    dim3 block(1024);
+    dim3 grid = getGridConfiguration1D(block, numEntry);
+
+    resetHashEntryKernel<<<grid, block>>>(hashTable, numEntry);
+
+    grid = getGridConfiguration1D(block, numBlock);
+    resetHeap<<<grid, block>>>(heap, heapPtr, numBlock);
+
+    cudaMemset(excessPtr, 0, sizeof(uint));
+    cudaMemset(bucketMutex, 0, sizeof(int) * numBucket);
+    cudaMemset(voxelBlocks, 0, sizeof(Voxel) * numBlock * BlockSize);
 }

@@ -9,7 +9,7 @@
 struct Voxel
 {
     short sdf;
-    short wt;
+    uchar wt;
     Vec3b rgb;
 };
 
@@ -57,6 +57,8 @@ struct MapStruct
     float truncDist;
 };
 
+#ifdef __CUDACC__
+
 __host__ __device__ __forceinline__ Vec3i worldPtToVoxelPos(const Vec3f &pt, const float &voxelSize)
 {
     Vec3i pos((int)(pt(0) / voxelSize), (int)(pt(1) / voxelSize), (int)(pt(2) / voxelSize));
@@ -83,16 +85,16 @@ __host__ __device__ __forceinline__ Vec3i voxelPosToBlockPos(Vec3i voxelPos)
     return voxelPos / BlockSize;
 }
 
-// __host__ __device__ __forceinline__ Vec3i blockPosToVoxelPos(const Vec3i &blockPos)
-// {
-//     return blockPos * BlockSize;
-// }
+__host__ __device__ __forceinline__ Vec3i blockPosToVoxelPos(const Vec3i &blockPos)
+{
+    return blockPos * BlockSize;
+}
 
 __host__ __device__ __forceinline__ Vec3i voxelPosToLocalPos(Vec3i voxelPos)
 {
     int x = voxelPos(0) % BlockSize;
-    int y = voxelPos(0) % BlockSize;
-    int z = voxelPos(0) % BlockSize;
+    int y = voxelPos(1) % BlockSize;
+    int z = voxelPos(2) % BlockSize;
 
     if (x < 0)
         x += BlockSize;
@@ -127,7 +129,7 @@ __host__ __device__ __forceinline__ int voxelPosToLocalIdx(const Vec3i &voxelPos
 */
 __host__ __device__ __forceinline__ float unpackFloat(short val)
 {
-    return val / (float)SHRT_MAX;
+    return val / (float)32767;
 }
 
 /*
@@ -135,7 +137,7 @@ __host__ __device__ __forceinline__ float unpackFloat(short val)
 */
 __host__ __device__ __forceinline__ short packFloat(float val)
 {
-    return (short)(val * SHRT_MAX);
+    return (short)(val * 32767);
 }
 
 /*
@@ -153,7 +155,7 @@ __host__ __device__ __forceinline__ int hash(const Vec3i &pos, const int &noBuck
 */
 __device__ __forceinline__ bool lockBucket(int *mutex)
 {
-    if (atomicExch(mutex, 1) == 0)
+    if (atomicExch(mutex, 1) != 1)
         return true;
     else
         return false;
@@ -189,19 +191,18 @@ __device__ __forceinline__ bool removeHashEntry(int *heapPtr, int *heap, int num
 /*
     create new hash entry
 */
-__device__ __forceinline__ bool createHashEntry(int *heapPtr, int *heap, const Vec3i &pos, const int &offset, HashEntry *entry)
+__device__ __forceinline__ bool createHashEntry(int *heapPtr, int *heap, const Vec3i &pos, const int &offset, HashEntry *emptyEntry)
 {
+    if (emptyEntry == NULL)
+        return false;
+
     int old = atomicSub(heapPtr, 1);
     if (old >= 0)
     {
-        int ptr = heap[old];
-        if (ptr != -1 && entry != nullptr)
-        {
-            entry->pos = pos;
-            entry->ptr = ptr * BlockSize3;
-            entry->offset = offset;
-            return true;
-        }
+        emptyEntry->pos = pos;
+        emptyEntry->ptr = heap[old] * BlockSize3;
+        emptyEntry->offset = offset;
+        return true;
     }
     else
     {
@@ -222,7 +223,7 @@ __device__ __forceinline__ bool findEntry(HashEntry *hashTable, const Vec3i &blo
     if (out->pos == blockPos && out->ptr != -1)
         return true;
 
-    while (out->offset > 0)
+    while (out->offset >= 0)
     {
         volatileIdx = numBucket + out->offset - 1;
         out = &hashTable[volatileIdx];
@@ -253,42 +254,70 @@ __device__ __forceinline__ void createBlock(
     int *excessPtr, const int numEntry,
     const int numBucket, const Vec3i &blockPos)
 {
+    // auto volatileIdx = hash(blockPos, numBucket);
+    // auto *mutex = &bucketMutex[volatileIdx];
+    // HashEntry *lastLookedEntry = &hashTable[volatileIdx];
+    // HashEntry *emptyEntry = NULL;
+    // if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
+    //     return;
+
+    // if (lastLookedEntry->ptr == -1)
+    //     emptyEntry = lastLookedEntry;
+
+    // while (lastLookedEntry->offset >= 0)
+    // {
+    //     volatileIdx = numBucket + lastLookedEntry->offset - 1;
+    //     lastLookedEntry = &hashTable[volatileIdx];
+    //     if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
+    //         return;
+
+    //     if (lastLookedEntry->ptr == -1)
+    //         emptyEntry = lastLookedEntry;
+    // }
+
+    // if (lockBucket(mutex))
+    // {
+    //     if (emptyEntry != NULL)
+    //         createHashEntry(heapPtr, heap, blockPos, lastLookedEntry->offset, emptyEntry);
+    //     else
+    //     {
+    //         int newOffset = atomicAdd(excessPtr, 1);
+    //         if (newOffset + numBucket <= numEntry)
+    //         {
+    //             emptyEntry = &hashTable[numBucket + newOffset - 1];
+    //             if (createHashEntry(heapPtr, heap, blockPos, -1, emptyEntry))
+    //                 lastLookedEntry->offset = newOffset;
+    //         }
+    //     }
+
+    //     unlockBucket(mutex);
+    // }
     auto volatileIdx = hash(blockPos, numBucket);
     auto *mutex = &bucketMutex[volatileIdx];
     HashEntry *lastLookedEntry = &hashTable[volatileIdx];
-    HashEntry *emptyEntry = nullptr;
     if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
         return;
 
-    if (lastLookedEntry->ptr == -1)
-        emptyEntry = lastLookedEntry;
-
-    while (emptyEntry == NULL && lastLookedEntry->offset > 0)
+    while (lastLookedEntry->offset >= 0)
     {
         volatileIdx = numBucket + lastLookedEntry->offset - 1;
         lastLookedEntry = &hashTable[volatileIdx];
         if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
             return;
-
-        if (lastLookedEntry->ptr == -1)
-            emptyEntry = lastLookedEntry;
     }
 
     if (lockBucket(mutex))
     {
-        if (emptyEntry != NULL)
-            createHashEntry(heapPtr, heap, blockPos, lastLookedEntry->offset, emptyEntry);
-        else
+        int newOffset = atomicAdd(excessPtr, 1);
+        if (newOffset + numBucket <= numEntry)
         {
-            int newOffset = atomicAdd(excessPtr, 1);
-            if (newOffset + numBucket <= numEntry)
-            {
-                emptyEntry = &hashTable[numBucket + newOffset - 1];
-                if (createHashEntry(heapPtr, heap, blockPos, 0, emptyEntry))
-                    lastLookedEntry->offset = newOffset;
-            }
+            auto *emptyEntry = &hashTable[numBucket + newOffset - 1];
+            if (createHashEntry(heapPtr, heap, blockPos, -1, emptyEntry))
+                lastLookedEntry->offset = newOffset;
         }
 
         unlockBucket(mutex);
     }
 }
+
+#endif

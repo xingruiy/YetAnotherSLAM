@@ -2,19 +2,21 @@
 #include "utils/numType.h"
 #include "utils/prefixSum.h"
 #include "localMapper/denseMap.h"
+#include "utils/triangleTable.h"
 
 #define RenderingBlockSizeX 16
 #define RenderingBlockSizeY 16
 #define RenderingBlockSubSample 8
 #define MaxNumRenderingBlock 100000
+#define MaxNumTriangle 20000000
 
 __device__ __forceinline__ Vec2f project(
     const Vec3f &pt, const float &fx, const float &fy,
     const float &cx, const float &cy)
 {
     Vec2f ptWarped;
-    ptWarped(0) = fx * ptWarped(0) / ptWarped(2) + cx;
-    ptWarped(1) = fy * ptWarped(1) / ptWarped(2) + cy;
+    ptWarped(0) = fx * pt(0) / pt(2) + cx;
+    ptWarped(1) = fy * pt(1) / pt(2) + cy;
     return ptWarped;
 }
 
@@ -39,29 +41,29 @@ __device__ __forceinline__ Vec3f unprojectWorld(
 }
 
 __device__ __forceinline__ bool checkVertexVisibility(
-    const Vec3f &pt, const SE3f &TInv,
+    const Vec3f &pt, const SE3f &Tinv,
     const int &cols, const int &rows,
     const float &fx, const float &fy,
     const float &cx, const float &cy,
     const float &depthMin, const float &depthMax)
 {
-    auto ptFrame = TInv * pt;
-    auto ptWarped = project(ptFrame, fx, fy, cx, cy);
+    auto ptTransformed = Tinv * pt;
+    auto ptWarped = project(ptTransformed, fx, fy, cx, cy);
 
     return ptWarped(0) >= 0 && ptWarped(1) >= 0 &&
            ptWarped(0) < cols && ptWarped(1) < rows &&
-           ptFrame(2) >= depthMin && ptFrame(2) <= depthMax;
+           ptTransformed(2) >= depthMin &&
+           ptTransformed(2) <= depthMax;
 }
 
 __device__ __forceinline__ bool checkBlockVisibility(
-    const Vec3f &blockPos, const SE3f &TInv,
+    const Vec3f &blockPos, const SE3f &Tinv,
     const int &cols, const int &rows,
     const float &fx, const float &fy,
     const float &cx, const float &cy,
     const float &depthMin, const float &depthMax,
     const float &voxelSize)
 {
-
     float scale = voxelSize * BlockSize;
 #pragma unroll
     for (int corner = 0; corner < 8; ++corner)
@@ -71,30 +73,56 @@ __device__ __forceinline__ bool checkBlockVisibility(
         tmp(1) += (corner & 2) ? 1 : 0;
         tmp(2) += (corner & 4) ? 1 : 0;
 
-        if (checkVertexVisibility(tmp * scale, TInv, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
+        if (checkVertexVisibility(tmp * scale, Tinv, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
             return true;
     }
 
     return false;
 }
 
+__device__ __forceinline__ float readSDF(
+    const Vec3f &ptWorldScaled, bool &valid,
+    HashEntry *hashTable, Voxel *blocks,
+    int numBucket)
+{
+    Voxel *voxel = NULL;
+    Vec3i voxelPos;
+    voxelPos(0) = floor(ptWorldScaled(0));
+    voxelPos(1) = floor(ptWorldScaled(1));
+    voxelPos(2) = floor(ptWorldScaled(2));
+    findVoxel(hashTable, blocks, numBucket, voxelPos, voxel);
+
+    if (voxel != NULL && voxel->wt != 0)
+    {
+        valid = true;
+        return unpackFloat(voxel->sdf);
+    }
+    else
+    {
+        valid = false;
+        return 1.0f;
+    }
+}
+
 struct CreateVoxelBlockFunctor
 {
     SE3f T;
+    int cols, rows;
     float invfx, invfy;
     float cx, cy;
+    float depthMin;
+    float depthMax;
 
     float truncDistHalf;
     float voxelSizeInv;
-
-    float depthMin, depthMax;
-    int cols, rows;
-    int numEntry, numBucket;
+    int numEntry;
+    int numBucket;
     HashEntry *hashTable;
     int *bucketMutex;
     int *heap;
     int *heapPtr;
     int *excessPtr;
+
     cv::cuda::PtrStep<float> depth;
 
     __device__ __forceinline__ void operator()() const
@@ -105,7 +133,7 @@ struct CreateVoxelBlockFunctor
             return;
 
         float dist = depth.ptr(y)[x];
-        if (dist < FLT_EPSILON || dist < depthMin || dist > depthMax)
+        if (isnan(dist) || dist < depthMin || dist > depthMax)
             return;
 
         float distNear = fmax(depthMin, dist - truncDistHalf);
@@ -123,8 +151,16 @@ struct CreateVoxelBlockFunctor
 
         for (int i = 0; i < nSteps; ++i)
         {
-            auto blockPos = voxelPosToBlockPos(ptNear.cast<int>());
-            createBlock(hashTable, bucketMutex, heap, heapPtr, excessPtr, numEntry, numBucket, blockPos);
+            Vec3i voxelPos(floor(ptNear(0)), floor(ptNear(1)), floor(ptNear(2)));
+            createBlock(
+                hashTable,
+                bucketMutex,
+                heap,
+                heapPtr,
+                excessPtr,
+                numEntry,
+                numBucket,
+                voxelPosToBlockPos(voxelPos));
             ptNear += dir;
         }
     }
@@ -132,7 +168,7 @@ struct CreateVoxelBlockFunctor
 
 struct CheckEntryVisibilityFunctor
 {
-    SE3f TInv;
+    SE3f Tinv;
     int cols, rows;
     float fx, fy, cx, cy;
     float depthMin, depthMax;
@@ -159,13 +195,16 @@ struct CheckEntryVisibilityFunctor
             HashEntry &entry = hashTable[idx];
             if (entry.ptr != -1)
             {
-                if (checkBlockVisibility(
-                        entry.pos.cast<float>(), TInv,
-                        cols, rows,
-                        fx, fy,
-                        cx, cy,
-                        depthMin, depthMax,
-                        voxelSize))
+                bool visible = checkBlockVisibility(
+                    entry.pos.cast<float>(), Tinv,
+                    cols, rows,
+                    fx, fy,
+                    cx, cy,
+                    depthMin,
+                    depthMax,
+                    voxelSize);
+
+                if (visible)
                 {
                     needScan = true;
                     increment = 1;
@@ -191,7 +230,7 @@ struct DepthFusionFunctor
     cv::cuda::PtrStep<float> depth;
     HashEntry *visibleEntry;
     Voxel *voxels;
-    SE3f TInv;
+    SE3f Tinv;
 
     int cols, rows;
     float fx, fy, cx, cy;
@@ -206,7 +245,7 @@ struct DepthFusionFunctor
             return;
 
         HashEntry &entry = visibleEntry[blockIdx.x];
-        if (entry.ptr == -1)
+        if (entry.ptr < 0)
             return;
 
         auto blockPos = entry.pos * BlockSize;
@@ -215,14 +254,14 @@ struct DepthFusionFunctor
         for (int blockIdxZ = 0; blockIdxZ < 8; ++blockIdxZ)
         {
             auto localPos = Vec3i(threadIdx.x, threadIdx.y, blockIdxZ);
-            auto pt = TInv * (blockPos + localPos).cast<float>() * voxelSize;
+            auto pt = Tinv * (blockPos + localPos).cast<float>() * voxelSize;
             int u = __float2int_rd(fx * pt(0) / pt(2) + cx + 0.5f);
             int v = __float2int_rd(fy * pt(1) / pt(2) + cy + 0.5f);
             if (u < 0 || v < 0 || u >= cols || v >= rows)
                 continue;
 
             float dist = depth.ptr(v)[u];
-            if (dist < FLT_EPSILON || dist > depthMax || dist < depthMin)
+            if (isnan(dist) || dist > depthMax || dist < depthMin)
                 continue;
 
             float newSDF = dist - pt(2);
@@ -234,7 +273,7 @@ struct DepthFusionFunctor
             Voxel &curr = voxels[entry.ptr + localIdx];
 
             float oldSDF = unpackFloat(curr.sdf);
-            uchar oldWT = curr.wt;
+            int oldWT = curr.wt;
 
             if (oldWT == 0)
             {
@@ -242,16 +281,14 @@ struct DepthFusionFunctor
                 curr.wt = 1;
                 continue;
             }
-
-            curr.sdf = packFloat((oldWT * oldSDF + newSDF) / (oldWT + 1));
-            curr.wt = min(255, oldWT + 1);
+            else
+            {
+                curr.sdf = packFloat((oldWT * oldSDF + newSDF) / (oldWT + 1));
+                curr.wt = min(255, oldWT + 1);
+            }
         }
     }
 };
-
-#define RenderingBlockSizeX 16
-#define RenderingBlockSizeY 16
-#define RenderingBlockSubSample 8
 
 // compare val with the old value stored in *add
 // and write the bigger one to *add
@@ -281,7 +318,7 @@ __device__ __forceinline__ void atomicMin(float *add, float val)
 
 struct ProjectBlockFunctor
 {
-    SE3f TInv;
+    SE3f Tinv;
     float fx, fy, cx, cy;
 
     float scale;
@@ -295,7 +332,7 @@ struct ProjectBlockFunctor
     mutable cv::cuda::PtrStepSz<float> zRangeX;
     mutable cv::cuda::PtrStep<float> zRangeY;
 
-    __device__ __forceinline__ bool projectBlock(const Vec3i &blockPos, RenderingBlock &block) const
+    __device__ __forceinline__ bool projectBlock(const Vec3f &blockPos, RenderingBlock &block) const
     {
         block.upperLeft = Vec2s(zRangeX.cols, zRangeX.rows);
         block.lowerRight = Vec2s(-1, -1);
@@ -304,12 +341,12 @@ struct ProjectBlockFunctor
 #pragma unroll
         for (int corner = 0; corner < 8; ++corner)
         {
-            Vec3f tmp = blockPos.cast<float>();
+            Vec3f tmp = blockPos;
             tmp(0) += (corner & 1) ? 1 : 0;
             tmp(1) += (corner & 2) ? 1 : 0;
             tmp(2) += (corner & 4) ? 1 : 0;
 
-            Vec3f ptTransformed = TInv * tmp * scale;
+            Vec3f ptTransformed = Tinv * tmp * scale;
             Vec2f ptWarped = project(ptTransformed, fx, fy, cx, cy) / RenderingBlockSubSample;
 
             if (block.upperLeft(0) > std::floor(ptWarped(0)))
@@ -350,7 +387,9 @@ struct ProjectBlockFunctor
         const int &nx, const int &ny) const
     {
         for (int y = 0; y < ny; ++y)
+        {
             for (int x = 0; x < nx; ++x)
+            {
                 if (offset < MaxNumRenderingBlock)
                 {
                     RenderingBlock &b(renderingBlock[offset++]);
@@ -367,6 +406,8 @@ struct ProjectBlockFunctor
 
                     b.zrange = block.zrange;
                 }
+            }
+        }
     }
 
     __device__ __forceinline__ void operator()() const
@@ -374,29 +415,28 @@ struct ProjectBlockFunctor
         int idx = threadIdx.x + blockDim.x * blockIdx.x;
 
         bool valid = false;
-        uint requiredBlocks = 0;
+        uint requiredNumBlocks = 0;
         RenderingBlock block;
         int nx, ny;
 
-        HashEntry &curr = visibleEntry[idx];
-        if (idx < numVisibleEntry && curr.ptr != -1)
+        if (idx < numVisibleEntry && visibleEntry[idx].ptr != -1)
         {
-            valid = projectBlock(curr.pos, block);
+            valid = projectBlock(visibleEntry[idx].pos.cast<float>(), block);
             if (valid)
             {
                 float dx = (float)block.lowerRight(0) - block.upperLeft(0) + 1;
                 float dy = (float)block.lowerRight(1) - block.upperLeft(1) + 1;
                 nx = __float2int_ru(dx / RenderingBlockSizeX);
                 ny = __float2int_ru(dy / RenderingBlockSizeY);
-                requiredBlocks = nx * ny;
-                uint totalBlocks = *numRenderingBlock + requiredBlocks;
+                requiredNumBlocks = nx * ny;
+                uint totalBlocks = *numRenderingBlock + requiredNumBlocks;
                 if (totalBlocks >= MaxNumRenderingBlock)
-                    requiredBlocks = 0;
+                    requiredNumBlocks = 0;
             }
         }
 
-        int offset = computeOffset<1024>(requiredBlocks, numRenderingBlock);
-        if (valid && offset != -1 && (offset + requiredBlocks) < MaxNumRenderingBlock)
+        int offset = computeOffset<1024>(requiredNumBlocks, numRenderingBlock);
+        if (valid && offset != -1 && (offset + requiredNumBlocks) < MaxNumRenderingBlock)
             splitRenderingBlock(offset, block, nx, ny);
     }
 };
@@ -446,29 +486,16 @@ struct RaytracingFunctor
     float invfx, invfy, cx, cy;
     float raycastStep;
     SE3f T;
-    SE3f TInv;
+    SE3f Tinv;
 
     HashEntry *hashTable;
     Voxel *blocks;
     int numBucket;
 
-    mutable cv::cuda::PtrStep<Vec4f> vmap;
+    mutable cv::cuda::PtrStepSz<Vec4f> vmap;
 
-    __device__ __forceinline__ float readSDF(const Vec3f &voxelPos, bool &valid) const
-    {
-        Voxel *voxel = NULL;
-        findVoxel(hashTable, blocks, numBucket, voxelPos.cast<int>(), voxel);
-        if (voxel && voxel->wt != 0)
-        {
-            valid = true;
-            return unpackFloat(voxel->sdf);
-        }
-
-        valid = false;
-        return 0;
-    }
-
-    __device__ __forceinline__ float readSDFInterp(const Vec3f &pt, bool &valid) const
+    __device__ __forceinline__ float readSDFInterp(
+        const Vec3f &pt, bool &valid) const
     {
         Vec3f xyz;
         xyz(0) = pt(0) - floor(pt(0));
@@ -477,28 +504,28 @@ struct RaytracingFunctor
         float sdf[2], result[4];
         bool validPt;
 
-        sdf[0] = readSDF(pt, validPt);
-        sdf[1] = readSDF(pt + Vec3f(1, 0, 0), valid);
+        sdf[0] = readSDF(pt, validPt, hashTable, blocks, numBucket);
+        sdf[1] = readSDF(pt + Vec3f(1, 0, 0), valid, hashTable, blocks, numBucket);
         validPt &= valid;
         result[0] = (1.0f - xyz(0)) * sdf[0] + xyz(0) * sdf[1];
 
-        sdf[0] = readSDF(pt + Vec3f(0, 1, 0), valid);
+        sdf[0] = readSDF(pt + Vec3f(0, 1, 0), valid, hashTable, blocks, numBucket);
         validPt &= valid;
-        sdf[1] = readSDF(pt + Vec3f(1, 1, 0), valid);
+        sdf[1] = readSDF(pt + Vec3f(1, 1, 0), valid, hashTable, blocks, numBucket);
         validPt &= valid;
 
         result[1] = (1.0f - xyz(0)) * sdf[0] + xyz(0) * sdf[1];
         result[2] = (1.0f - xyz(1)) * result[0] + xyz(1) * result[1];
 
-        sdf[0] = readSDF(pt + Vec3f(0, 0, 1), valid);
+        sdf[0] = readSDF(pt + Vec3f(0, 0, 1), valid, hashTable, blocks, numBucket);
         validPt &= valid;
-        sdf[1] = readSDF(pt + Vec3f(1, 0, 1), valid);
+        sdf[1] = readSDF(pt + Vec3f(1, 0, 1), valid, hashTable, blocks, numBucket);
         validPt &= valid;
         result[0] = (1.0f - xyz(0)) * sdf[0] + xyz(0) * sdf[1];
 
-        sdf[0] = readSDF(pt + Vec3f(0, 1, 1), valid);
+        sdf[0] = readSDF(pt + Vec3f(0, 1, 1), valid, hashTable, blocks, numBucket);
         validPt &= valid;
-        sdf[1] = readSDF(pt + Vec3f(1, 1, 1), valid);
+        sdf[1] = readSDF(pt + Vec3f(1, 1, 1), valid, hashTable, blocks, numBucket);
         validPt &= valid;
 
         result[1] = (1.0f - xyz(0)) * sdf[0] + xyz(0) * sdf[1];
@@ -512,24 +539,26 @@ struct RaytracingFunctor
     {
         const int x = threadIdx.x + blockDim.x * blockIdx.x;
         const int y = threadIdx.y + blockDim.y * blockIdx.y;
-        if (x >= cols || y >= rows)
+        if (x >= vmap.cols || y >= vmap.rows)
             return;
 
-        Vec2s localIdx;
-        localIdx(0) = __float2int_rd((float)x / 8);
-        localIdx(1) = __float2int_rd((float)y / 8);
+        vmap.ptr(y)[x](0) = __int_as_float(0x7fffffff);
 
-        Vec2f zrange;
-        zrange(0) = zRangeX.ptr(localIdx(1))[localIdx(0)];
-        zrange(1) = zRangeY.ptr(localIdx(1))[localIdx(0)];
-        if (zrange(1) < FLT_EPSILON)
+        short u = __float2int_rd((float)x / 8);
+        short v = __float2int_rd((float)y / 8);
+
+        // float zNear = zRangeX.ptr(v)[u];
+        // float zFar = zRangeY.ptr(v)[u];
+        float zNear = 0.3f;
+        float zFar = 3.0f;
+        if (zFar <= zNear)
             return;
 
-        Vec3f pt = unproject(x, y, zrange(0), invfx, invfy, cx, cy);
+        Vec3f pt = unproject(x, y, zNear, invfx, invfy, cx, cy);
         float distStart = pt.norm() * voxelSizeInv;
         Vec3f blockStart = T * pt * voxelSizeInv;
 
-        pt = unproject(x, y, zrange(1), invfx, invfy, cx, cy);
+        pt = unproject(x, y, zFar, invfx, invfy, cx, cy);
         float distEnd = pt.norm() * voxelSizeInv;
         Vec3f blockEnd = T * pt * voxelSizeInv;
 
@@ -540,12 +569,12 @@ struct RaytracingFunctor
         bool ptFound = false;
         float step;
         float sdf = 1.0f;
-        float lastReadSDF;
+        float lastReadSDF = 1.0f;
 
         while (distStart < distEnd)
         {
             lastReadSDF = sdf;
-            sdf = readSDF(result, validSDF);
+            sdf = readSDF(result, validSDF, hashTable, blocks, numBucket);
 
             if (sdf <= 0.5f && sdf >= -0.5f)
                 sdf = readSDFInterp(result, validSDF);
@@ -564,6 +593,7 @@ struct RaytracingFunctor
 
         if (sdf <= 0.0f)
         {
+            lastReadSDF = sdf;
             step = sdf * raycastStep;
             result += step * dir;
 
@@ -578,9 +608,195 @@ struct RaytracingFunctor
 
         if (ptFound)
         {
-            result = TInv * result * voxelSize;
-            vmap.ptr(y)[x].head<3>() = result;
+            Vec3f worldPt = Tinv * result * voxelSize;
+            vmap.ptr(y)[x].head<3>() = worldPt;
             vmap.ptr(y)[x](3) = 1.0f;
+        }
+        else
+            vmap.ptr(y)[x](3) = -1.0f;
+    }
+};
+
+struct GenerateMeshFunctor
+{
+    Vec3f *triangles;
+    uint *numTriangle;
+    Vec3f *surfaceNormal;
+
+    uint numVisibleBlock;
+    HashEntry *visibleEntry;
+    HashEntry *hashTable;
+    Voxel *blocks;
+    int numBucket;
+    float voxelSize;
+
+    __device__ __forceinline__ bool readAdjecentSDF(
+        float *sdf, const Vec3f &ptWorldScaled) const
+    {
+        bool valid = false;
+        sdf[0] = readSDF(ptWorldScaled, valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        sdf[1] = readSDF(ptWorldScaled + Vec3f(1, 0, 0), valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        sdf[2] = readSDF(ptWorldScaled + Vec3f(1, 1, 0), valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        sdf[3] = readSDF(ptWorldScaled + Vec3f(0, 1, 0), valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        sdf[4] = readSDF(ptWorldScaled + Vec3f(0, 0, 1), valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        sdf[5] = readSDF(ptWorldScaled + Vec3f(1, 0, 1), valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        sdf[6] = readSDF(ptWorldScaled + Vec3f(1, 1, 1), valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        sdf[7] = readSDF(ptWorldScaled + Vec3f(0, 1, 1), valid, hashTable, blocks, numBucket);
+        if (!valid)
+            return false;
+        return true;
+    }
+
+    __device__ __forceinline__ float interpolateLinear(float &v1, float &v2) const
+    {
+        if (fabs(0 - v1) < 1e-6)
+            return 0;
+        if (fabs(0 - v2) < 1e-6)
+            return 1;
+        if (fabs(v1 - v2) < 1e-6)
+            return 0;
+        return (0 - v1) / (v2 - v1);
+    }
+
+    __device__ __forceinline__ int getVertexArray(Vec3f *array, const Vec3f &voxelPos) const
+    {
+        float sdf[8];
+
+        if (!readAdjecentSDF(sdf, voxelPos))
+            return -1;
+
+        int cubeIdx = 0;
+        if (sdf[0] < 0)
+            cubeIdx |= 1;
+        if (sdf[1] < 0)
+            cubeIdx |= 2;
+        if (sdf[2] < 0)
+            cubeIdx |= 4;
+        if (sdf[3] < 0)
+            cubeIdx |= 8;
+        if (sdf[4] < 0)
+            cubeIdx |= 16;
+        if (sdf[5] < 0)
+            cubeIdx |= 32;
+        if (sdf[6] < 0)
+            cubeIdx |= 64;
+        if (sdf[7] < 0)
+            cubeIdx |= 128;
+
+        if (edgeTable[cubeIdx] == 0)
+            return -1;
+
+        if (edgeTable[cubeIdx] & 1)
+        {
+            float val = interpolateLinear(sdf[0], sdf[1]);
+            array[0] = voxelPos + Vec3f(val, 0, 0);
+        }
+        if (edgeTable[cubeIdx] & 2)
+        {
+            float val = interpolateLinear(sdf[1], sdf[2]);
+            array[1] = voxelPos + Vec3f(1, val, 0);
+        }
+        if (edgeTable[cubeIdx] & 4)
+        {
+            float val = interpolateLinear(sdf[2], sdf[3]);
+            array[2] = voxelPos + Vec3f(1 - val, 1, 0);
+        }
+        if (edgeTable[cubeIdx] & 8)
+        {
+            float val = interpolateLinear(sdf[3], sdf[0]);
+            array[3] = voxelPos + Vec3f(0, 1 - val, 0);
+        }
+        if (edgeTable[cubeIdx] & 16)
+        {
+            float val = interpolateLinear(sdf[4], sdf[5]);
+            array[4] = voxelPos + Vec3f(val, 0, 1);
+        }
+        if (edgeTable[cubeIdx] & 32)
+        {
+            float val = interpolateLinear(sdf[5], sdf[6]);
+            array[5] = voxelPos + Vec3f(1, val, 1);
+        }
+        if (edgeTable[cubeIdx] & 64)
+        {
+            float val = interpolateLinear(sdf[6], sdf[7]);
+            array[6] = voxelPos + Vec3f(1 - val, 1, 1);
+        }
+        if (edgeTable[cubeIdx] & 128)
+        {
+            float val = interpolateLinear(sdf[7], sdf[4]);
+            array[7] = voxelPos + Vec3f(0, 1 - val, 1);
+        }
+        if (edgeTable[cubeIdx] & 256)
+        {
+            float val = interpolateLinear(sdf[0], sdf[4]);
+            array[8] = voxelPos + Vec3f(0, 0, val);
+        }
+        if (edgeTable[cubeIdx] & 512)
+        {
+            float val = interpolateLinear(sdf[1], sdf[5]);
+            array[9] = voxelPos + Vec3f(1, 0, val);
+        }
+        if (edgeTable[cubeIdx] & 1024)
+        {
+            float val = interpolateLinear(sdf[2], sdf[6]);
+            array[10] = voxelPos + Vec3f(1, 1, val);
+        }
+        if (edgeTable[cubeIdx] & 2048)
+        {
+            float val = interpolateLinear(sdf[3], sdf[7]);
+            array[11] = voxelPos + Vec3f(0, 1, val);
+        }
+
+        return cubeIdx;
+    }
+
+    __device__ __forceinline__ void operator()() const
+    {
+        int idx = blockIdx.y * gridDim.x + blockIdx.x;
+        if (*numTriangle >= MaxNumTriangle || idx >= numVisibleBlock)
+            return;
+
+        Vec3f array[12];
+        Vec3i voxelPos = visibleEntry[idx].pos * BlockSize;
+
+        for (int voxelIdZ = 0; voxelIdZ < BlockSize; ++voxelIdZ)
+        {
+            Vec3i localPos = Vec3i(threadIdx.x, threadIdx.y, voxelIdZ);
+            int cubeIdx = getVertexArray(array, (voxelPos + localPos).cast<float>());
+            if (cubeIdx <= 0)
+                continue;
+
+            for (int i = 0; triTable[cubeIdx][i] != -1; i += 3)
+            {
+                uint triangleId = atomicAdd(numTriangle, 1);
+                if (triangleId >= MaxNumTriangle)
+                    return;
+
+                triangles[triangleId * 3] = array[triTable[cubeIdx][i]] * voxelSize;
+                triangles[triangleId * 3 + 1] = array[triTable[cubeIdx][i + 1]] * voxelSize;
+                triangles[triangleId * 3 + 2] = array[triTable[cubeIdx][i + 2]] * voxelSize;
+
+                auto v10 = triangles[triangleId * 3 + 1] - triangles[triangleId * 3];
+                auto v20 = triangles[triangleId * 3 + 2] - triangles[triangleId * 3];
+                auto n = v10.cross(v20).normalized();
+                surfaceNormal[triangleId * 3] = n;
+                surfaceNormal[triangleId * 3 + 1] = n;
+                surfaceNormal[triangleId * 3 + 2] = n;
+            }
         }
     }
 };
