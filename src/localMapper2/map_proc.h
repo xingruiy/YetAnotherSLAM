@@ -61,13 +61,13 @@ void raycast_with_colour(
     const Sophus::SE3d &pose,
     const Eigen::Matrix3d &K);
 
-void create_mesh_vertex_only(
-    MapStorage map_struct,
-    MapState state,
-    uint &block_count,
-    HashEntry *block_list,
-    uint &triangle_count,
-    void *vertex_data);
+// void create_mesh_vertex_only(
+//     MapStorage map_struct,
+//     MapState state,
+//     uint &block_count,
+//     HashEntry *block_list,
+//     uint &triangle_count,
+//     void *vertex_data);
 
 void create_mesh_with_normal(
     MapStorage map_struct,
@@ -78,14 +78,14 @@ void create_mesh_with_normal(
     void *vertex_data,
     void *vertex_normal);
 
-void create_mesh_with_colour(
-    MapStorage map_struct,
-    MapState state,
-    uint &block_count,
-    HashEntry *block_list,
-    uint &triangle_count,
-    void *vertex_data,
-    void *vertex_colour);
+// void create_mesh_with_colour(
+//     MapStorage map_struct,
+//     MapState state,
+//     uint &block_count,
+//     HashEntry *block_list,
+//     uint &triangle_count,
+//     void *vertex_data,
+//     void *vertex_colour);
 
 void count_visible_entry(
     const MapStorage map_struct,

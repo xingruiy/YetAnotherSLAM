@@ -137,9 +137,9 @@ __device__ void unlockBucket(int *mutex)
     atomicExch(mutex, 0);
 }
 
-__host__ __device__ int computeHash(const Vector3i &pos, const int &noBuckets)
+__host__ __device__ int computeHash(const Vec3i &pos, const int &noBuckets)
 {
-    int res = (pos.x * 73856093) ^ (pos.y * 19349669) ^ (pos.z * 83492791);
+    int res = (pos(0) * 73856093) ^ (pos(1) * 19349669) ^ (pos(2) * 83492791);
     res %= noBuckets;
     return res < 0 ? res + noBuckets : res;
 }
@@ -179,7 +179,7 @@ __device__ bool deleteHashEntry(int *mem_counter, int *mem, int no_blocks, HashE
 // __device__ HashEntry createHashEntry(
 //     int *memCounter,
 //     int *mem,
-//     const Vector3i &pos,
+//     const Vec3i &pos,
 //     const int &offset)
 // {
 //     const int old_val = atomicSub(memCounter, 1);
@@ -199,7 +199,7 @@ __device__ bool deleteHashEntry(int *mem_counter, int *mem, int no_blocks, HashE
 //     return HashEntry();
 // }
 
-__device__ bool createHashEntry(MapStorage &map, const Vector3i &pos, const int &offset, HashEntry *entry)
+__device__ bool createHashEntry(MapStorage &map, const Vec3i &pos, const int &offset, HashEntry *entry)
 {
     int old = atomicSub(map.heap_mem_counter_, 1);
     if (old >= 0)
@@ -227,7 +227,7 @@ __device__ bool createHashEntry(MapStorage &map, const Vector3i &pos, const int 
 //     int *entryCounter,
 //     const int noExcess,
 //     HashEntry *hashTable,
-//     const Vector3i &blockPos)
+//     const Vec3i &blockPos)
 // {
 //     auto bucketIdx = computeHash(blockPos, noBucket);
 //     int *mutex = &bucketMutex[bucketIdx];
@@ -274,7 +274,7 @@ __device__ bool createHashEntry(MapStorage &map, const Vector3i &pos, const int 
 //     }
 // }
 
-__device__ void createBlock(MapStorage &map, const Vector3i &block_pos, int &bucket_index)
+__device__ void createBlock(MapStorage &map, const Vec3i &block_pos, int &bucket_index)
 {
     bucket_index = computeHash(block_pos, param.num_total_buckets_);
     int *mutex = &map.bucket_mutex_[bucket_index];
@@ -359,7 +359,7 @@ __device__ void deleteBlock(MapStorage &map, HashEntry &current)
     }
 }
 
-__device__ void findEntry(const MapStorage &map, const Vector3i &block_pos, HashEntry *&out)
+__device__ void findEntry(const MapStorage &map, const Vec3i &block_pos, HashEntry *&out)
 {
     uint bucket_idx = computeHash(block_pos, param.num_total_buckets_);
     out = &map.hash_table_[bucket_idx];
@@ -377,7 +377,7 @@ __device__ void findEntry(const MapStorage &map, const Vector3i &block_pos, Hash
     out = nullptr;
 }
 
-__device__ void findVoxel(const MapStorage &map, const Vector3i &voxel_pos, Voxel *&out)
+__device__ void findVoxel(const MapStorage &map, const Vec3i &voxel_pos, Voxel *&out)
 {
     HashEntry *current;
     findEntry(map, voxelPosToBlockPos(voxel_pos), current);
@@ -609,62 +609,64 @@ void MapStruct<Device>::readFromDisk(std::string file_name, const bool binary)
     }
 }
 
-__host__ __device__ Vector3i worldPtToVoxelPos(Vector3f pt, const float &voxelSize)
+__host__ __device__ Vec3i worldPtToVoxelPos(Vec3f pt, const float &voxelSize)
 {
     pt = pt / voxelSize;
-    return ToVector3i(pt);
+    return floor(pt);
 }
 
-__host__ __device__ Vector3f voxelPosToWorldPt(const Vector3i &voxelPos, const float &voxelSize)
+__host__ __device__ Vec3f voxelPosToWorldPt(const Vec3i &voxelPos, const float &voxelSize)
 {
-    return voxelPos * voxelSize;
+    return voxelPos.cast<float>() * voxelSize;
 }
 
-__host__ __device__ Vector3i voxelPosToBlockPos(Vector3i voxelPos)
+__host__ __device__ Vec3i voxelPosToBlockPos(Vec3i voxelPos)
 {
-    if (voxelPos.x < 0)
-        voxelPos.x -= BLOCK_SIZE_SUB_1;
-    if (voxelPos.y < 0)
-        voxelPos.y -= BLOCK_SIZE_SUB_1;
-    if (voxelPos.z < 0)
-        voxelPos.z -= BLOCK_SIZE_SUB_1;
+    if (voxelPos(0) < 0)
+        voxelPos(0) -= BLOCK_SIZE_SUB_1;
+    if (voxelPos(1) < 0)
+        voxelPos(1) -= BLOCK_SIZE_SUB_1;
+    if (voxelPos(2) < 0)
+        voxelPos(2) -= BLOCK_SIZE_SUB_1;
 
     return voxelPos / BLOCK_SIZE;
 }
 
-__host__ __device__ Vector3i blockPosToVoxelPos(const Vector3i &blockPos)
+__host__ __device__ Vec3i blockPosToVoxelPos(const Vec3i &blockPos)
 {
     return blockPos * BLOCK_SIZE;
 }
 
-__host__ __device__ Vector3i voxelPosToLocalPos(Vector3i voxelPos)
+__host__ __device__ Vec3i voxelPosToLocalPos(Vec3i voxelPos)
 {
-    voxelPos = voxelPos % BLOCK_SIZE;
+    int x = voxelPos(0) % BLOCK_SIZE;
+    int y = voxelPos(1) % BLOCK_SIZE;
+    int z = voxelPos(2) % BLOCK_SIZE;
 
-    if (voxelPos.x < 0)
-        voxelPos.x += BLOCK_SIZE;
-    if (voxelPos.y < 0)
-        voxelPos.y += BLOCK_SIZE;
-    if (voxelPos.z < 0)
-        voxelPos.z += BLOCK_SIZE;
+    if (x < 0)
+        x += BLOCK_SIZE;
+    if (y < 0)
+        y += BLOCK_SIZE;
+    if (z < 0)
+        z += BLOCK_SIZE;
 
-    return voxelPos;
+    return Vec3i(x, y, z);
 }
 
-__host__ __device__ int localPosToLocalIdx(const Vector3i &localPos)
+__host__ __device__ int localPosToLocalIdx(const Vec3i &localPos)
 {
-    return localPos.z * BLOCK_SIZE * BLOCK_SIZE + localPos.y * BLOCK_SIZE + localPos.x;
+    return localPos(2) * BLOCK_SIZE * BLOCK_SIZE + localPos(1) * BLOCK_SIZE + localPos(0);
 }
 
-__host__ __device__ Vector3i localIdxToLocalPos(const int &localIdx)
+__host__ __device__ Vec3i localIdxToLocalPos(const int &localIdx)
 {
     uint x = localIdx % BLOCK_SIZE;
     uint y = localIdx % (BLOCK_SIZE * BLOCK_SIZE) / BLOCK_SIZE;
     uint z = localIdx / (BLOCK_SIZE * BLOCK_SIZE);
-    return Vector3i(x, y, z);
+    return Vec3i(x, y, z);
 }
 
-__host__ __device__ int voxelPosToLocalIdx(const Vector3i &voxelPos)
+__host__ __device__ int voxelPosToLocalIdx(const Vec3i &voxelPos)
 {
     return localPosToLocalIdx(voxelPosToLocalPos(voxelPos));
 }

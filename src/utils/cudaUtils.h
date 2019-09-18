@@ -24,6 +24,12 @@ static dim3 getGridConfiguration2D(const dim3 &block, int w, int h)
     return grid;
 }
 
+template <typename NumType1, typename NumType2>
+static inline int div_up(NumType1 dividend, NumType2 divisor)
+{
+    return (int)((dividend + divisor - 1) / divisor);
+}
+
 template <class T>
 __global__ void callDeviceFunctor(const T functor)
 {

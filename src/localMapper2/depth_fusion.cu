@@ -1,26 +1,25 @@
 #include "map_proc.h"
-#include "matrix_type.h"
-#include "vector_type.h"
-#include "safe_call.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/cudaarithm.hpp>
 #include <thrust/device_vector.h>
+#include "utils/numType.h"
+#include "utils/cudaUtils.h"
 
 __device__ inline bool is_vertex_visible(
-    Vector3f pt, Matrix3x4f inv_pose,
+    Vec3f pt, SE3f inv_pose,
     int cols, int rows, float fx,
     float fy, float cx, float cy)
 {
-    pt = inv_pose(pt);
-    Vector2f pt2d = Vector2f(fx * pt.x / pt.z + cx, fy * pt.y / pt.z + cy);
-    return !(pt2d.x < 0 || pt2d.y < 0 ||
-             pt2d.x > cols - 1 || pt2d.y > rows - 1 ||
-             pt.z < param.zmin_update || pt.z > param.zmax_update);
+    pt = inv_pose * (pt);
+    Vec2f pt2d = Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
+    return !(pt2d(0) < 0 || pt2d(1) < 0 ||
+             pt2d(0) > cols - 1 || pt2d(1) > rows - 1 ||
+             pt(2) < param.zmin_update || pt(2) > param.zmax_update);
 }
 
 __device__ inline bool is_block_visible(
-    const Vector3i &block_pos,
-    Matrix3x4f inv_pose,
+    const Vec3i &block_pos,
+    SE3f inv_pose,
     int cols, int rows, float fx,
     float fy, float cx, float cy)
 {
@@ -28,12 +27,12 @@ __device__ inline bool is_block_visible(
 #pragma unroll
     for (int corner = 0; corner < 8; ++corner)
     {
-        Vector3i tmp = block_pos;
-        tmp.x += (corner & 1) ? 1 : 0;
-        tmp.y += (corner & 2) ? 1 : 0;
-        tmp.z += (corner & 4) ? 1 : 0;
+        Vec3i tmp = block_pos;
+        tmp(0) += (corner & 1) ? 1 : 0;
+        tmp(1) += (corner & 2) ? 1 : 0;
+        tmp(2) += (corner & 4) ? 1 : 0;
 
-        if (is_vertex_visible(tmp * scale, inv_pose, cols, rows, fx, fy, cx, cy))
+        if (is_vertex_visible(tmp.cast<float>() * scale, inv_pose, cols, rows, fx, fy, cx, cy))
             return true;
     }
 
@@ -41,7 +40,7 @@ __device__ inline bool is_block_visible(
 }
 
 __global__ void check_visibility_flag_kernel(
-    MapStorage map_struct, uchar *flag, Matrix3x4f inv_pose,
+    MapStorage map_struct, uchar *flag, SE3f inv_pose,
     int cols, int rows, float fx, float fy, float cx, float cy)
 {
     const int idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -86,26 +85,26 @@ __global__ void copy_visible_block_kernel(HashEntry *hash_table, HashEntry *visi
         visible_block[pos[idx]] = hash_table[idx];
 }
 
-__device__ inline Vector2f project(
-    Vector3f pt, float fx, float fy, float cx, float cy)
+__device__ inline Vec2f project(
+    Vec3f pt, float fx, float fy, float cx, float cy)
 {
-    return Vector2f(fx * pt.x / pt.z + cx, fy * pt.y / pt.z + cy);
+    return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
 }
 
-__device__ inline Vector3f unproject(
+__device__ inline Vec3f unproject(
     int x, int y, float z, float invfx, float invfy, float cx, float cy)
 {
-    return Vector3f(invfx * (x - cx) * z, invfy * (y - cy) * z, z);
+    return Vec3f(invfx * (x - cx) * z, invfy * (y - cy) * z, z);
 }
 
-__device__ inline Vector3f unproject_world(
+__device__ inline Vec3f unproject_world(
     int x, int y, float z, float invfx,
-    float invfy, float cx, float cy, Matrix3x4f pose)
+    float invfy, float cx, float cy, SE3f pose)
 {
-    return pose(unproject(x, y, z, invfx, invfy, cx, cy));
+    return pose * (unproject(x, y, z, invfx, invfy, cx, cy));
 }
 
-__device__ inline int create_block(MapStorage &map_struct, const Vector3i block_pos)
+__device__ inline int create_block(MapStorage &map_struct, const Vec3i block_pos)
 {
     int hash_index;
     createBlock(map_struct, block_pos, hash_index);
@@ -114,7 +113,7 @@ __device__ inline int create_block(MapStorage &map_struct, const Vector3i block_
 
 __global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<float> depth,
                                      float invfx, float invfy, float cx, float cy,
-                                     Matrix3x4f pose, uchar *flag)
+                                     SE3f pose, uchar *flag)
 {
     const int x = threadIdx.x + blockDim.x * blockIdx.x;
     const int y = threadIdx.y + blockDim.y * blockIdx.y;
@@ -131,91 +130,91 @@ __global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<
     if (z_near >= z_far)
         return;
 
-    Vector3i block_near = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_near, invfx, invfy, cx, cy, pose), param.voxel_size));
-    Vector3i block_far = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_far, invfx, invfy, cx, cy, pose), param.voxel_size));
+    Vec3i block_near = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_near, invfx, invfy, cx, cy, pose), param.voxel_size));
+    Vec3i block_far = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_far, invfx, invfy, cx, cy, pose), param.voxel_size));
 
-    Vector3i d = block_far - block_near;
-    Vector3i increment = Vector3i(d.x < 0 ? -1 : 1, d.y < 0 ? -1 : 1, d.z < 0 ? -1 : 1);
-    Vector3i incre_abs = Vector3i(abs(d.x), abs(d.y), abs(d.z));
-    Vector3i incre_err = Vector3i(incre_abs.x << 1, incre_abs.y << 1, incre_abs.z << 1);
+    Vec3i d = block_far - block_near;
+    Vec3i increment = Vec3i(d(0) < 0 ? -1 : 1, d(1) < 0 ? -1 : 1, d(2) < 0 ? -1 : 1);
+    Vec3i incre_abs = Vec3i(abs(d(0)), abs(d(1)), abs(d(2)));
+    Vec3i incre_err = Vec3i(incre_abs(0) << 1, incre_abs(1) << 1, incre_abs(2) << 1);
 
     int err_1;
     int err_2;
 
     // Bresenham's line algorithm
     // details see : https://en.m.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-    if ((incre_abs.x >= incre_abs.y) && (incre_abs.x >= incre_abs.z))
+    if ((incre_abs(0) >= incre_abs(1)) && (incre_abs(0) >= incre_abs(2)))
     {
-        err_1 = incre_err.y - 1;
-        err_2 = incre_err.z - 1;
+        err_1 = incre_err(1) - 1;
+        err_2 = incre_err(2) - 1;
         flag[create_block(map_struct, block_near)] = 2;
-        for (int i = 0; i < incre_abs.x; ++i)
+        for (int i = 0; i < incre_abs(0); ++i)
         {
             if (err_1 > 0)
             {
-                block_near.y += increment.y;
-                err_1 -= incre_err.x;
+                block_near(1) += increment(1);
+                err_1 -= incre_err(0);
             }
 
             if (err_2 > 0)
             {
-                block_near.z += increment.z;
-                err_2 -= incre_err.x;
+                block_near(2) += increment(2);
+                err_2 -= incre_err(0);
             }
 
-            err_1 += incre_err.y;
-            err_2 += incre_err.z;
-            block_near.x += increment.x;
+            err_1 += incre_err(1);
+            err_2 += incre_err(2);
+            block_near(0) += increment(0);
             flag[create_block(map_struct, block_near)] = 2;
         }
     }
-    else if ((incre_abs.y >= incre_abs.x) && (incre_abs.y >= incre_abs.z))
+    else if ((incre_abs(1) >= incre_abs(0)) && (incre_abs(1) >= incre_abs(2)))
     {
-        err_1 = incre_err.x - 1;
-        err_2 = incre_err.z - 1;
+        err_1 = incre_err(0) - 1;
+        err_2 = incre_err(2) - 1;
         flag[create_block(map_struct, block_near)] = 2;
-        for (int i = 0; i < incre_abs.y; ++i)
+        for (int i = 0; i < incre_abs(1); ++i)
         {
             if (err_1 > 0)
             {
-                block_near.x += increment.x;
-                err_1 -= incre_err.y;
+                block_near(0) += increment(0);
+                err_1 -= incre_err(1);
             }
 
             if (err_2 > 0)
             {
-                block_near.z += increment.z;
-                err_2 -= incre_err.y;
+                block_near(2) += increment(2);
+                err_2 -= incre_err(1);
             }
 
-            err_1 += incre_err.x;
-            err_2 += incre_err.z;
-            block_near.y += increment.y;
+            err_1 += incre_err(0);
+            err_2 += incre_err(2);
+            block_near(1) += increment(1);
             flag[create_block(map_struct, block_near)] = 2;
         }
     }
     else
     {
-        err_1 = incre_err.y - 1;
-        err_2 = incre_err.x - 1;
+        err_1 = incre_err(1) - 1;
+        err_2 = incre_err(0) - 1;
         flag[create_block(map_struct, block_near)] = 2;
-        for (int i = 0; i < incre_abs.z; ++i)
+        for (int i = 0; i < incre_abs(2); ++i)
         {
             if (err_1 > 0)
             {
-                block_near.y += increment.y;
-                err_1 -= incre_err.z;
+                block_near(1) += increment(1);
+                err_1 -= incre_err(2);
             }
 
             if (err_2 > 0)
             {
-                block_near.x += increment.x;
-                err_2 -= incre_err.z;
+                block_near(0) += increment(0);
+                err_2 -= incre_err(2);
             }
 
-            err_1 += incre_err.y;
-            err_2 += incre_err.x;
-            block_near.z += increment.z;
+            err_1 += incre_err(1);
+            err_2 += incre_err(0);
+            block_near(2) += increment(2);
             flag[create_block(map_struct, block_near)] = 2;
         }
     }
@@ -225,7 +224,7 @@ __global__ void update_map_kernel(MapStorage map_struct,
                                   HashEntry *visible_blocks,
                                   uint count_visible_block,
                                   cv::cuda::PtrStepSz<float> depth,
-                                  Matrix3x4f inv_pose,
+                                  SE3f inv_pose,
                                   float fx, float fy,
                                   float cx, float cy)
 {
@@ -234,18 +233,18 @@ __global__ void update_map_kernel(MapStorage map_struct,
 
     HashEntry &current = visible_blocks[blockIdx.x];
 
-    Vector3i voxel_pos = blockPosToVoxelPos(current.pos_);
+    Vec3i voxel_pos = blockPosToVoxelPos(current.pos_);
     float dist_thresh = param.truncation_dist();
     float inv_dist_thresh = 1.0 / dist_thresh;
 
 #pragma unroll
     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
     {
-        Vector3i local_pos = Vector3i(threadIdx.x, threadIdx.y, block_idx_z);
-        Vector3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
+        Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
+        Vec3f pt = inv_pose * (voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
 
-        int u = __float2int_rd(fx * pt.x / pt.z + cx + 0.5);
-        int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
+        int u = __float2int_rd(fx * pt(0) / pt(2) + cx + 0.5);
+        int v = __float2int_rd(fy * pt(1) / pt(2) + cy + 0.5);
         if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
             continue;
 
@@ -253,7 +252,7 @@ __global__ void update_map_kernel(MapStorage map_struct,
         if (isnan(dist) || dist < 1e-2 || dist > param.zmax_update || dist < param.zmin_update)
             continue;
 
-        float sdf = dist - pt.z;
+        float sdf = dist - pt(2);
         if (sdf < -dist_thresh)
             continue;
 
@@ -279,147 +278,147 @@ __global__ void update_map_kernel(MapStorage map_struct,
     }
 }
 
-__global__ void update_map_with_colour_kernel(MapStorage map_struct,
-                                              HashEntry *visible_blocks,
-                                              uint count_visible_block,
-                                              cv::cuda::PtrStepSz<float> depth,
-                                              cv::cuda::PtrStepSz<Vector3c> image,
-                                              Matrix3x4f inv_pose,
-                                              float fx, float fy,
-                                              float cx, float cy)
-{
-    if (blockIdx.x >= param.num_total_hash_entries_ || blockIdx.x >= count_visible_block)
-        return;
+// __global__ void update_map_with_colour_kernel(MapStorage map_struct,
+//                                               HashEntry *visible_blocks,
+//                                               uint count_visible_block,
+//                                               cv::cuda::PtrStepSz<float> depth,
+//                                               cv::cuda::PtrStepSz<Vec3c> image,
+//                                               SE3f inv_pose,
+//                                               float fx, float fy,
+//                                               float cx, float cy)
+// {
+//     if (blockIdx.x >= param.num_total_hash_entries_ || blockIdx.x >= count_visible_block)
+//         return;
 
-    HashEntry &current = visible_blocks[blockIdx.x];
+//     HashEntry &current = visible_blocks[blockIdx.x];
 
-    Vector3i voxel_pos = blockPosToVoxelPos(current.pos_);
-    float dist_thresh = param.truncation_dist();
-    float inv_dist_thresh = 1.0 / dist_thresh;
+//     Vec3i voxel_pos = blockPosToVoxelPos(current.pos_);
+//     float dist_thresh = param.truncation_dist();
+//     float inv_dist_thresh = 1.0 / dist_thresh;
 
-#pragma unroll
-    for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
-    {
-        Vector3i local_pos = Vector3i(threadIdx.x, threadIdx.y, block_idx_z);
-        Vector3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
+// #pragma unroll
+//     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
+//     {
+//         Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
+//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
 
-        int u = __float2int_rd(fx * pt.x / pt.z + cx + 0.5);
-        int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
-        if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
-            continue;
+//         int u = __float2int_rd(fx * pt.x / pt.z + cx + 0.5);
+//         int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
+//         if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
+//             continue;
 
-        float dist = depth.ptr(v)[u];
-        if (isnan(dist) || dist < 1e-2 || dist > param.zmax_update || dist < param.zmin_update)
-            continue;
+//         float dist = depth.ptr(v)[u];
+//         if (isnan(dist) || dist < 1e-2 || dist > param.zmax_update || dist < param.zmin_update)
+//             continue;
 
-        float sdf = dist - pt.z;
-        if (sdf < -dist_thresh)
-            continue;
+//         float sdf = dist - pt.z;
+//         if (sdf < -dist_thresh)
+//             continue;
 
-        sdf = fmin(1.0f, sdf * inv_dist_thresh);
-        const int local_idx = localPosToLocalIdx(local_pos);
-        Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
+//         sdf = fmin(1.0f, sdf * inv_dist_thresh);
+//         const int local_idx = localPosToLocalIdx(local_pos);
+//         Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
 
-        auto sdf_p = voxel.getSDF();
-        auto weight_p = voxel.getWeight();
-        auto weight = 1 / (dist * dist);
+//         auto sdf_p = voxel.getSDF();
+//         auto weight_p = voxel.getWeight();
+//         auto weight = 1 / (dist * dist);
 
-        // update colour
-        auto colour_new = image.ptr(v)[u];
-        auto colour_p = voxel.rgb;
+//         // update colour
+//         auto colour_new = image.ptr(v)[u];
+//         auto colour_p = voxel.rgb;
 
-        if (voxel.weight == 0)
-        {
-            voxel.setSDF(sdf);
-            voxel.setWeight(weight);
-            voxel.rgb = colour_new;
-            continue;
-        }
+//         if (voxel.weight == 0)
+//         {
+//             voxel.setSDF(sdf);
+//             voxel.setWeight(weight);
+//             voxel.rgb = colour_new;
+//             continue;
+//         }
 
-        // fuse depth
-        sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
-        voxel.setSDF(sdf_p);
-        voxel.setWeight(weight_p + weight);
+//         // fuse depth
+//         sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
+//         voxel.setSDF(sdf_p);
+//         voxel.setWeight(weight_p + weight);
 
-        // fuse colour
-        colour_p = ToVector3c((colour_p * weight_p + colour_new * weight) / (weight_p + weight));
-        voxel.rgb = colour_p;
-    }
-}
+//         // fuse colour
+//         colour_p = ToVec3c((colour_p * weight_p + colour_new * weight) / (weight_p + weight));
+//         voxel.rgb = colour_p;
+//     }
+// }
 
-__global__ void update_map_weighted_kernel(
-    MapStorage map_struct,
-    HashEntry *visible_blocks,
-    uint count_visible_block,
-    cv::cuda::PtrStepSz<float> depth,
-    cv::cuda::PtrStepSz<Vector4f> normal,
-    cv::cuda::PtrStepSz<Vector3c> image,
-    Matrix3x4f inv_pose,
-    float fx, float fy,
-    float cx, float cy)
-{
-    if (blockIdx.x >= param.num_total_hash_entries_ || blockIdx.x >= count_visible_block)
-        return;
+// __global__ void update_map_weighted_kernel(
+//     MapStorage map_struct,
+//     HashEntry *visible_blocks,
+//     uint count_visible_block,
+//     cv::cuda::PtrStepSz<float> depth,
+//     cv::cuda::PtrStepSz<Vec4f> normal,
+//     cv::cuda::PtrStepSz<Vec3c> image,
+//     SE3f inv_pose,
+//     float fx, float fy,
+//     float cx, float cy)
+// {
+//     if (blockIdx.x >= param.num_total_hash_entries_ || blockIdx.x >= count_visible_block)
+//         return;
 
-    HashEntry &current = visible_blocks[blockIdx.x];
+//     HashEntry &current = visible_blocks[blockIdx.x];
 
-    if (current.ptr_ < 0)
-        return;
+//     if (current.ptr_ < 0)
+//         return;
 
-    Vector3i voxel_pos = blockPosToVoxelPos(current.pos_);
-    float dist_thresh = param.truncation_dist();
-    float inv_dist_thresh = 1.0 / dist_thresh;
+//     Vec3i voxel_pos = blockPosToVoxelPos(current.pos_);
+//     float dist_thresh = param.truncation_dist();
+//     float inv_dist_thresh = 1.0 / dist_thresh;
 
-#pragma unroll
-    for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
-    {
-        Vector3i local_pos = Vector3i(threadIdx.x, threadIdx.y, block_idx_z);
-        Vector3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
+// #pragma unroll
+//     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
+//     {
+//         Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
+//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
 
-        int u = __float2int_rd(fx * pt.x / pt.z + cx + 0.5);
-        int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
-        if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
-            continue;
+//         int u = __float2int_rd(fx * pt(0) / pt.z + cx + 0.5);
+//         int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
+//         if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
+//             continue;
 
-        float dist = depth.ptr(v)[u];
-        auto n_c = ToVector3(normal.ptr(v)[u]);
-        if (isnan(dist) || isnan(n_c.x) || dist > param.zmax_update || dist < param.zmin_update)
-            continue;
+//         float dist = depth.ptr(v)[u];
+//         auto n_c = ToVec3(normal.ptr(v)[u]);
+//         if (isnan(dist) || isnan(n_c(0)) || dist > param.zmax_update || dist < param.zmin_update)
+//             continue;
 
-        float sdf = dist - pt.z;
-        if (sdf < -dist_thresh)
-            continue;
+//         float sdf = dist - pt.z;
+//         if (sdf < -dist_thresh)
+//             continue;
 
-        sdf = fmin(1.0f, sdf * inv_dist_thresh);
-        const int local_idx = localPosToLocalIdx(local_pos);
-        Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
+//         sdf = fmin(1.0f, sdf * inv_dist_thresh);
+//         const int local_idx = localPosToLocalIdx(local_pos);
+//         Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
 
-        auto sdf_p = voxel.getSDF();
-        auto weight_p = voxel.getWeight();
-        auto weight = abs(sin(n_c.z)) / (dist * dist);
+//         auto sdf_p = voxel.getSDF();
+//         auto weight_p = voxel.getWeight();
+//         auto weight = abs(sin(n_c.z)) / (dist * dist);
 
-        // update colour
-        auto colour_new = image.ptr(v)[u];
-        auto colour_p = voxel.rgb;
+//         // update colour
+//         auto colour_new = image.ptr(v)[u];
+//         auto colour_p = voxel.rgb;
 
-        if (voxel.weight == 0)
-        {
-            voxel.setSDF(sdf);
-            voxel.setWeight(weight);
-            voxel.rgb = colour_new;
-            continue;
-        }
+//         if (voxel.weight == 0)
+//         {
+//             voxel.setSDF(sdf);
+//             voxel.setWeight(weight);
+//             voxel.rgb = colour_new;
+//             continue;
+//         }
 
-        // fuse depth
-        sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
-        voxel.setSDF(sdf_p);
-        voxel.setWeight(weight_p + weight);
+//         // fuse depth
+//         sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
+//         voxel.setSDF(sdf_p);
+//         voxel.setWeight(weight_p + weight);
 
-        // fuse colour
-        colour_p = ToVector3c((colour_p * weight_p + colour_new * weight) / (weight_p + weight));
-        voxel.rgb = colour_p;
-    }
-}
+//         // fuse colour
+//         colour_p = ToVec3c((colour_p * weight_p + colour_new * weight) / (weight_p + weight));
+//         voxel.rgb = colour_p;
+//     }
+// }
 
 void update(
     MapStorage map_struct,
@@ -460,7 +459,7 @@ void update(
         invfx,
         invfy,
         cx, cy,
-        frame_pose.cast<float>().matrix3x4(),
+        frame_pose.cast<float>(),
         flag.get());
 
     thread = dim3(1024);
@@ -469,7 +468,7 @@ void update(
     check_visibility_flag_kernel<<<block, thread>>>(
         map_struct,
         flag.get(),
-        frame_pose.inverse().cast<float>().matrix3x4(),
+        frame_pose.inverse().cast<float>(),
         cols, rows,
         fx, fy,
         cx, cy);
@@ -503,7 +502,7 @@ void update(
         visible_blocks,
         visible_block_count,
         depth,
-        frame_pose.inverse().cast<float>().matrix3x4(),
+        frame_pose.inverse().cast<float>(),
         fx, fy,
         cx, cy);
 }

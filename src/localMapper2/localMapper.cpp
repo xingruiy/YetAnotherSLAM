@@ -74,20 +74,20 @@ void DenseMapping::reset()
   device_map.reset();
 }
 
-size_t DenseMapping::fetch_mesh_vertex_only(void *vertex)
-{
-  uint count_triangle = 0;
+// size_t DenseMapping::fetch_mesh_vertex_only(void *vertex)
+// {
+//   uint count_triangle = 0;
 
-  ::create_mesh_vertex_only(
-      device_map.map,
-      device_map.state,
-      count_visible_block,
-      visible_blocks,
-      count_triangle,
-      vertex);
+//   ::create_mesh_vertex_only(
+//       device_map.map,
+//       device_map.state,
+//       count_visible_block,
+//       visible_blocks,
+//       count_triangle,
+//       vertex);
 
-  return (size_t)count_triangle;
-}
+//   return (size_t)count_triangle;
+// }
 
 size_t DenseMapping::fetch_mesh_with_normal(void *vertex, void *normal)
 {
@@ -105,18 +105,18 @@ size_t DenseMapping::fetch_mesh_with_normal(void *vertex, void *normal)
   return (size_t)count_triangle;
 }
 
-size_t DenseMapping::fetch_mesh_with_colour(void *vertex, void *colour)
-{
-  uint count_triangle = 0;
+// size_t DenseMapping::fetch_mesh_with_colour(void *vertex, void *colour)
+// {
+//   uint count_triangle = 0;
 
-  ::create_mesh_with_colour(
-      device_map.map,
-      device_map.state,
-      count_visible_block,
-      visible_blocks,
-      count_triangle,
-      vertex,
-      colour);
+//   ::create_mesh_with_colour(
+//       device_map.map,
+//       device_map.state,
+//       count_visible_block,
+//       visible_blocks,
+//       count_triangle,
+//       vertex,
+//       colour);
 
-  return (size_t)count_triangle;
-}
+//   return (size_t)count_triangle;
+// }
