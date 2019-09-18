@@ -1,4 +1,4 @@
-#include "map_struct.h"
+#include "localMapper2/denseMap.h"
 #include "matrix_type.h"
 #include "vector_type.h"
 #include "safe_call.h"

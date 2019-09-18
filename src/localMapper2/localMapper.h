@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
 #include "utils/numType.h"
-#include "map_struct.h"
+#include "localMapper2/denseMap.h"
 
 class DenseMapping
 {

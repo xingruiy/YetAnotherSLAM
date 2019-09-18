@@ -3,7 +3,7 @@
 
 #include <sophus/se3.hpp>
 #include <opencv2/cudaarithm.hpp>
-#include "map_struct.h"
+#include "localMapper2/denseMap.h"
 
 void update(
     MapStorage map_struct,

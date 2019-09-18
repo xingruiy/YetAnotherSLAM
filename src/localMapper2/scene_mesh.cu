@@ -3,7 +3,7 @@
 #include "vector_type.h"
 #include "safe_call.h"
 #include "utils/prefixSum.h"
-#include "localMapper.h"
+#include "localMapper2/localMapper.h"
 #include "utils/triangleTable.h"
 
 struct BuildVertexArray

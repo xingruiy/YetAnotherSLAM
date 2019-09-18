@@ -61,7 +61,7 @@ __global__ void check_visibility_flag_kernel(
             }
             else
             {
-                // map_struct.delete_block(current);
+                current.ptr_ = -1;
                 flag[idx] = 0;
             }
 

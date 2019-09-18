@@ -1,6 +1,5 @@
 #include <cuda_runtime_api.h>
 #include "safe_call.h"
-#include "map_struct.h"
 #include "map_proc.h"
 #include "localMapper.h"
 
