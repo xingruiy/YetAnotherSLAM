@@ -1,132 +1,75 @@
 #pragma once
 #include "utils/numType.h"
-#include <cuda_runtime_api.h>
+#include "utils/cudaUtils.h"
 
-#define BlockSize 8
-#define BlockSize3 512
-#define BlockSizeSubOne 7
+#define BLOCK_SIZE 8
+#define BLOCK_SIZE3 512
+#define BLOCK_SIZE_SUB_1 7
+
+struct HashEntry
+{
+    int ptr_;
+    int offset_;
+    Vec3i pos_;
+};
 
 struct Voxel
 {
     short sdf;
-    uchar wt;
+    float weight;
 };
 
-struct HashEntry
+struct MapSize
 {
-    int ptr;
-    int offset;
-    Vec3i pos;
+    int num_blocks;
+    int num_hash_entries;
+    int num_buckets;
 };
 
 struct RenderingBlock
 {
-    Vec2s upperLeft;
-    Vec2s lowerRight;
+    Vec2s upper_left;
+    Vec2s lower_right;
     Vec2f zrange;
+};
+
+struct MapStorage
+{
+    int *heap_mem_;
+    int *excess_counter_;
+    int *heap_mem_counter_;
+    int *bucket_mutex_;
+    Voxel *voxels_;
+    HashEntry *hash_table_;
 };
 
 struct MapStruct
 {
-    MapStruct();
-    void create(
-        int numEntry, int numBucket, int numBlock,
-        float voxelSize, float truncationDist);
     void release();
     bool empty();
     void reset();
+    void create(
+        int hashTableSize,
+        int bucketSize,
+        int voxelBlockSize,
+        float voxelSize,
+        float truncationDist);
 
-    void resetNumVisibleEntry();
-    void getNumVisibleEntry(uint &hostData);
-
-    int *heap;
-    int *excessPtr;
-    int *heapPtr;
-    int *bucketMutex;
-    Voxel *voxelBlocks;
-    HashEntry *hashTable;
-
-    uint *numVisibleEntry;
-    HashEntry *visibleEntry;
-
-    int numEntry;
-    int numBucket;
-    int numBlock;
+    int bucketSize;
+    int hashTableSize;
+    int voxelBlockSize;
     float voxelSize;
-    float truncDist;
+    float truncationDist;
+
+    int *heap_mem_;
+    int *excess_counter_;
+    int *heap_mem_counter_;
+    int *bucket_mutex_;
+    Voxel *voxels_;
+    HashEntry *hash_table_;
+    HashEntry *visibleTable;
+    uint *visibleBlockNum;
 };
-
-#ifdef __CUDACC__
-
-__host__ __device__ __forceinline__ Vec3i worldPtToVoxelPos(const Vec3f &pt, const float &voxelSize)
-{
-    Vec3i pos((int)floor(pt(0) / voxelSize), (int)floor(pt(1) / voxelSize), (int)floor(pt(2) / voxelSize));
-    // pos(0) = pos(0) > pt(0) ? pos(0) - 1 : pos(0);
-    // pos(1) = pos(1) > pt(1) ? pos(1) - 1 : pos(1);
-    // pos(2) = pos(2) > pt(2) ? pos(2) - 1 : pos(2);
-    return pos;
-}
-
-__host__ __device__ __forceinline__ Vec3f voxelPosToWorldPt(const Vec3i &voxelPos, const float &voxelSize)
-{
-    return voxelPos.cast<float>() * voxelSize;
-}
-
-__host__ __device__ __forceinline__ Vec3i voxelPosToBlockPos(Vec3i voxelPos)
-{
-    if (voxelPos(0) < 0)
-        voxelPos(0) -= BlockSizeSubOne;
-    if (voxelPos(1) < 0)
-        voxelPos(1) -= BlockSizeSubOne;
-    if (voxelPos(2) < 0)
-        voxelPos(2) -= BlockSizeSubOne;
-
-    return voxelPos / BlockSize;
-}
-
-__host__ __device__ __forceinline__ Vec3i worldPtToBlockPos(const Vec3f &pt, const float &voxelSize)
-{
-    return voxelPosToBlockPos(worldPtToVoxelPos(pt, voxelSize));
-}
-
-__host__ __device__ __forceinline__ Vec3i blockPosToVoxelPos(const Vec3i &blockPos)
-{
-    return blockPos * BlockSize;
-}
-
-__host__ __device__ __forceinline__ Vec3i voxelPosToLocalPos(Vec3i voxelPos)
-{
-    int x = voxelPos(0) % BlockSize;
-    int y = voxelPos(1) % BlockSize;
-    int z = voxelPos(2) % BlockSize;
-
-    if (x < 0)
-        x += BlockSize;
-    if (y < 0)
-        y += BlockSize;
-    if (z < 0)
-        z += BlockSize;
-
-    return Vec3i(x, y, z);
-}
-
-__host__ __device__ __forceinline__ int localPosToLocalIdx(const Vec3i &localPos)
-{
-    return localPos(2) * BlockSize * BlockSize + localPos(1) * BlockSize + localPos(0);
-}
-
-__host__ __device__ __forceinline__ Vec3i localIdxToLocalPos(const int &localIdx)
-{
-    uint x = localIdx % BlockSize;
-    uint y = localIdx % (BlockSize * BlockSize) / BlockSize;
-    uint z = localIdx / (BlockSize * BlockSize);
-    return Vec3i(x, y, z);
-}
-
-__host__ __device__ __forceinline__ int voxelPosToLocalIdx(const Vec3i &voxelPos)
-{
-    return localPosToLocalIdx(voxelPosToLocalPos(voxelPos));
-}
 
 /*
     Unpack short into float 
@@ -154,6 +97,74 @@ __host__ __device__ __forceinline__ int hash(const Vec3i &pos, const int &noBuck
     return res < 0 ? res + noBuckets : res;
 }
 
+__host__ __device__ __forceinline__ Vec3i floor(const Vec3f &pt)
+{
+    return Vec3i((int)floor(pt(0)), (int)floor(pt(1)), (int)floor(pt(2)));
+}
+__host__ __device__ __forceinline__ Vec3i worldPtToVoxelPos(Vec3f pt, const float &voxelSize)
+{
+    pt = pt / voxelSize;
+    return floor(pt);
+}
+
+__host__ __device__ __forceinline__ Vec3f voxelPosToWorldPt(const Vec3i &voxelPos, const float &voxelSize)
+{
+    return voxelPos.cast<float>() * voxelSize;
+}
+
+__host__ __device__ __forceinline__ Vec3i voxelPosToBlockPos(Vec3i voxelPos)
+{
+    if (voxelPos(0) < 0)
+        voxelPos(0) -= BLOCK_SIZE_SUB_1;
+    if (voxelPos(1) < 0)
+        voxelPos(1) -= BLOCK_SIZE_SUB_1;
+    if (voxelPos(2) < 0)
+        voxelPos(2) -= BLOCK_SIZE_SUB_1;
+
+    return voxelPos / BLOCK_SIZE;
+}
+
+__host__ __device__ __forceinline__ Vec3i blockPosToVoxelPos(const Vec3i &blockPos)
+{
+    return blockPos * BLOCK_SIZE;
+}
+
+__host__ __device__ __forceinline__ Vec3i voxelPosToLocalPos(Vec3i voxelPos)
+{
+    int x = voxelPos(0) % BLOCK_SIZE;
+    int y = voxelPos(1) % BLOCK_SIZE;
+    int z = voxelPos(2) % BLOCK_SIZE;
+
+    if (x < 0)
+        x += BLOCK_SIZE;
+    if (y < 0)
+        y += BLOCK_SIZE;
+    if (z < 0)
+        z += BLOCK_SIZE;
+
+    return Vec3i(x, y, z);
+}
+
+__host__ __device__ __forceinline__ int localPosToLocalIdx(const Vec3i &localPos)
+{
+    return localPos(2) * BLOCK_SIZE * BLOCK_SIZE + localPos(1) * BLOCK_SIZE + localPos(0);
+}
+
+__host__ __device__ __forceinline__ Vec3i localIdxToLocalPos(const int &localIdx)
+{
+    uint x = localIdx % BLOCK_SIZE;
+    uint y = localIdx % (BLOCK_SIZE * BLOCK_SIZE) / BLOCK_SIZE;
+    uint z = localIdx / (BLOCK_SIZE * BLOCK_SIZE);
+    return Vec3i(x, y, z);
+}
+
+__host__ __device__ __forceinline__ int voxelPosToLocalIdx(const Vec3i &voxelPos)
+{
+    return localPosToLocalIdx(voxelPosToLocalPos(voxelPos));
+}
+
+#ifdef __CUDACC__
+
 /*
     lock hash bucket
 */
@@ -173,58 +184,38 @@ __device__ __forceinline__ void unlockBucket(int *mutex)
     atomicExch(mutex, 0);
 }
 
-/*
-    Remove unused hash entry
-*/
-__device__ __forceinline__ bool removeHashEntry(int *heapPtr, int *heap, int numBlock, HashEntry &entry)
+__device__ __forceinline__ bool deleteHashEntry(int *mem_counter, int *mem, int no_blocks, HashEntry &entry)
 {
-    int old = atomicAdd(heapPtr, 1);
-    if (old < numBlock)
+    int val_old = atomicAdd(mem_counter, 1);
+    if (val_old < no_blocks)
     {
-        heap[old + 1] = entry.ptr / BlockSize3;
-        entry.ptr = -1;
+        mem[val_old + 1] = entry.ptr_ / BLOCK_SIZE3;
+        entry.ptr_ = -1;
         return true;
     }
     else
     {
-        atomicSub(heapPtr, 1);
+        atomicSub(mem_counter, 1);
         return false;
     }
 }
 
-/*
-    create new hash entry
-*/
-__device__ __forceinline__ bool createHashEntry(int *heapPtr, int *heap, const Vec3i &pos, const int &offset, HashEntry *emptyEntry)
+__device__ __forceinline__ bool createHashEntry(
+    int *heap,
+    int *heapPtr,
+    const Vec3i &pos,
+    const int &offset,
+    HashEntry *entry)
 {
-    // if (emptyEntry == NULL)
-    //     return false;
-
-    // int old = atomicSub(heapPtr, 1);
-    // if (old >= 0)
-    // {
-    //     emptyEntry->pos = pos;
-    //     emptyEntry->ptr = heap[old] * BlockSize3;
-    //     emptyEntry->offset = offset;
-    //     return true;
-    // }
-    // else
-    // {
-    //     atomicAdd(heapPtr, 1);
-    //     return false;
-    // }
-
-    // return false;
     int old = atomicSub(heapPtr, 1);
     if (old >= 0)
     {
         int ptr = heap[old];
-        if (ptr != -1 && emptyEntry != nullptr)
+        if (ptr != -1 && entry != nullptr)
         {
-            // *entry = HashEntry(pos, ptr * BlockSize3, offset);
-            emptyEntry->pos = pos;
-            emptyEntry->ptr = ptr * BlockSize3;
-            emptyEntry->offset = offset;
+            entry->pos_ = pos;
+            entry->ptr_ = ptr * BLOCK_SIZE3;
+            entry->offset_ = offset;
             return true;
         }
     }
@@ -236,73 +227,42 @@ __device__ __forceinline__ bool createHashEntry(int *heapPtr, int *heap, const V
     return false;
 }
 
-/*
-    find hash entry based on given block pos
-*/
-__device__ __forceinline__ bool findEntry(HashEntry *hashTable, const Vec3i &blockPos, const int numBucket, HashEntry *&out)
-{
-    auto volatileIdx = hash(blockPos, numBucket);
-    out = &hashTable[volatileIdx];
-    if (out->pos == blockPos && out->ptr != -1)
-        return true;
-
-    while (out->offset >= 0)
-    {
-        volatileIdx = numBucket + out->offset - 1;
-        out = &hashTable[volatileIdx];
-        if (out->pos == blockPos && out->ptr != -1)
-            return true;
-    }
-
-    out = NULL;
-    return false;
-}
-
-/*
-    find voxel based on given voxel pos
-*/
-__device__ __forceinline__ void findVoxel(HashEntry *hashTable, Voxel *blocks, const int &numBucket, const Vec3i &voxelPos, Voxel *&out)
-{
-    HashEntry *current;
-    if (findEntry(hashTable, voxelPosToBlockPos(voxelPos), numBucket, current))
-        out = &blocks[current->ptr + voxelPosToLocalIdx(voxelPos)];
-}
-
-/*
-    create new block and insert into hash table
-*/
 __device__ __forceinline__ void createBlock(
-    HashEntry *hashTable, int *bucketMutex,
-    int *heap, int *heapPtr,
-    int *excessPtr, const int numEntry,
-    const int numBucket, const Vec3i &blockPos)
+    Vec3i &block_pos,
+    int *heap,
+    int *heapPtr,
+    HashEntry *hashTable,
+    int *bucketMutex,
+    int *excessPtr,
+    int hashTableSize,
+    int bucketSize)
 {
-    auto volatileIdx = hash(blockPos, numBucket);
-    int *mutex = &bucketMutex[volatileIdx];
-    HashEntry *lastLookedEntry = &hashTable[volatileIdx];
-    HashEntry *emptyEntry = NULL;
-    if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
+    auto bucket_index = hash(block_pos, bucketSize);
+    int *mutex = &bucketMutex[bucket_index];
+    HashEntry *current = &hashTable[bucket_index];
+    HashEntry *empty_entry = nullptr;
+    if (current->pos_ == block_pos && current->ptr_ != -1)
         return;
 
-    if (lastLookedEntry->ptr == -1)
-        emptyEntry = lastLookedEntry;
+    if (current->ptr_ == -1)
+        empty_entry = current;
 
-    while (lastLookedEntry->offset > 0)
+    while (current->offset_ > 0)
     {
-        volatileIdx = numBucket + lastLookedEntry->offset - 1;
-        lastLookedEntry = &hashTable[volatileIdx];
-        if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
+        bucket_index = bucketSize + current->offset_ - 1;
+        current = &hashTable[bucket_index];
+        if (current->pos_ == block_pos && current->ptr_ != -1)
             return;
 
-        if (lastLookedEntry->ptr == -1 && !emptyEntry)
-            emptyEntry = lastLookedEntry;
+        if (current->ptr_ == -1 && !empty_entry)
+            empty_entry = current;
     }
 
-    if (emptyEntry != NULL)
+    if (empty_entry != nullptr)
     {
         if (lockBucket(mutex))
         {
-            createHashEntry(heapPtr, heap, blockPos, emptyEntry->offset, emptyEntry);
+            createHashEntry(heap, heapPtr, block_pos, current->offset_, empty_entry);
             unlockBucket(mutex);
         }
     }
@@ -310,50 +270,128 @@ __device__ __forceinline__ void createBlock(
     {
         if (lockBucket(mutex))
         {
-            int newOffset = atomicAdd(excessPtr, 1);
-            if ((newOffset + numBucket) < numEntry)
+            int offset = atomicAdd(excessPtr, 1);
+            if ((offset + bucketSize) < hashTableSize)
             {
-                // printf("success: %i, %i, %i, %i, %i\n", offset, numEntry, blockPos(0), blockPos(1), blockPos(2));
-                emptyEntry = &hashTable[numBucket + newOffset - 1];
-                if (createHashEntry(heapPtr, heap, blockPos, -1, emptyEntry))
-                    lastLookedEntry->offset = newOffset;
+                empty_entry = &hashTable[bucketSize + offset - 1];
+                if (createHashEntry(heap, heapPtr, block_pos, 0, empty_entry))
+                    current->offset_ = offset;
             }
             unlockBucket(mutex);
         }
     }
-    // auto volatileIdx = hash(blockPos, numBucket);
-    // auto *mutex = &bucketMutex[volatileIdx];
-    // HashEntry *lastLookedEntry = &hashTable[volatileIdx];
-    // if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
-    //     return;
-    // else if (lastLookedEntry->ptr == -1)
-    // {
-    //     createHashEntry(heapPtr, heap, blockPos, -1, lastLookedEntry);
-    //     return;
-    // }
+}
 
-    // while (lastLookedEntry->offset >= 0)
-    // {
-    //     volatileIdx = numBucket + lastLookedEntry->offset - 1;
-    //     lastLookedEntry = &hashTable[volatileIdx];
-    //     if (lastLookedEntry->pos == blockPos && lastLookedEntry->ptr != -1)
-    //         return;
-    // }
+__device__ __forceinline__ void deleteBlock(
+    HashEntry &current,
+    HashEntry *hashTable,
+    Voxel *listBlocks,
+    int *bucketMutex,
+    int *heap,
+    int *heapPtr,
+    int bucketSize,
+    int voxelBlockSize)
+{
+    memset(&listBlocks[current.ptr_], 0, sizeof(Voxel) * BLOCK_SIZE3);
+    int hash_id = hash(current.pos_, bucketSize);
+    int *mutex = &bucketMutex[hash_id];
+    HashEntry *reference = &hashTable[hash_id];
+    HashEntry *link_entry = nullptr;
 
-    // int newOffset = atomicAdd(excessPtr, 1);
-    // if ((newOffset + numBucket) <= numEntry && lockBucket(mutex))
-    // {
-    //     // printf("success: %i, %i, %i, %i, %i\n", newOffset, numEntry, blockPos(0), blockPos(1), blockPos(2));
-    //     auto *emptyEntry = &hashTable[numBucket + newOffset - 1];
-    //     if (createHashEntry(heapPtr, heap, blockPos, -1, emptyEntry))
-    //         lastLookedEntry->offset = newOffset;
-    //     unlockBucket(mutex);
-    // }
-    // else
-    // {
-    //     atomicSub(excessPtr, 1);
-    //     // printf("failed: %i, %i, %i\n", newOffset, numBucket, numEntry);
-    // }
+    if (reference->pos_ == current.pos_ && reference->ptr_ != -1)
+    {
+        if (lockBucket(mutex))
+        {
+            deleteHashEntry(heapPtr, heap, voxelBlockSize, current);
+            unlockBucket(mutex);
+            return;
+        }
+    }
+    else
+    {
+        while (reference->offset_ > 0)
+        {
+            hash_id = bucketSize + reference->offset_ - 1;
+            link_entry = reference;
+            reference = &hashTable[hash_id];
+            if (reference->pos_ == current.pos_ && reference->ptr_ != -1)
+            {
+                if (lockBucket(mutex))
+                {
+                    link_entry->offset_ = current.offset_;
+                    deleteHashEntry(heapPtr, heap, voxelBlockSize, current);
+                    unlockBucket(mutex);
+                    return;
+                }
+            }
+        }
+    }
+}
+
+// __device__ __forceinline__ void findEntry(
+//     const MapStorage &map,
+//     const Vec3i &block_pos,
+//     HashEntry *&out)
+// {
+//     uint bucket_idx = hash(block_pos, param.num_total_buckets_);
+//     out = &hashTable[bucket_idx];
+//     if (out->ptr_ != -1 && out->pos_ == block_pos)
+//         return;
+
+//     while (out->offset_ > 0)
+//     {
+//         bucket_idx = param.num_total_buckets_ + out->offset_ - 1;
+//         out = &hashTable[bucket_idx];
+//         if (out->ptr_ != -1 && out->pos_ == block_pos)
+//             return;
+//     }
+
+//     out = nullptr;
+// }
+
+// __device__ __forceinline__ void findVoxel(
+//     const MapStorage &map,
+//     const Vec3i &voxelPos, Voxel *&out)
+// {
+//     HashEntry *current;
+//     findEntry(map, voxelPosToBlockPos(voxelPos), current);
+//     if (current != nullptr)
+//         out = &map.voxels_[current->ptr_ + voxelPosToLocalIdx(voxelPos)];
+// }
+
+__device__ __forceinline__ void findEntry(
+    const Vec3i &block_pos,
+    HashEntry *&out,
+    HashEntry *hashTable,
+    int bucketSize)
+{
+    uint bucket_idx = hash(block_pos, bucketSize);
+    out = &hashTable[bucket_idx];
+    if (out->ptr_ != -1 && out->pos_ == block_pos)
+        return;
+
+    while (out->offset_ > 0)
+    {
+        bucket_idx = bucketSize + out->offset_ - 1;
+        out = &hashTable[bucket_idx];
+        if (out->ptr_ != -1 && out->pos_ == block_pos)
+            return;
+    }
+
+    out = nullptr;
+}
+
+__device__ __forceinline__ void findVoxel(
+    const Vec3i &voxelPos,
+    Voxel *&out,
+    HashEntry *hashTable,
+    Voxel *listBlocks,
+    int bucketSize)
+{
+    HashEntry *current;
+    findEntry(voxelPosToBlockPos(voxelPos), current, hashTable, bucketSize);
+    if (current != nullptr)
+        out = &listBlocks[current->ptr_ + voxelPosToLocalIdx(voxelPos)];
 }
 
 #endif

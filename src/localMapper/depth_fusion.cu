@@ -301,173 +301,29 @@ __global__ void update_map_kernel(MapStruct map_struct,
 
         auto sdf_p = unpackFloat(voxel.sdf);
         auto weight_p = voxel.weight;
-        // auto weight = 1 / (dist);
+        auto weight = 1 / (dist);
 
         if (weight_p == 0)
         {
             voxel.sdf = packFloat(sdf);
-            voxel.weight = 1;
+            voxel.weight = weight;
             continue;
         }
 
         // fuse depth
-        sdf_p = (sdf_p * weight_p + sdf) / (weight_p + 1);
+        sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
         voxel.sdf = packFloat(sdf_p);
-        voxel.weight = (weight_p + 1);
+        voxel.weight = (weight_p + weight);
     }
 }
 
-// __global__ void update_map_with_colour_kernel(MapStorage map_struct,
-//                                               HashEntry *visible_blocks,
-//                                               uint count_visible_block,
-//                                               cv::cuda::PtrStepSz<float> depth,
-//                                               cv::cuda::PtrStepSz<Vec3c> image,
-//                                               SE3f inv_pose,
-//                                               float fx, float fy,
-//                                               float cx, float cy)
-// {
-//     if (blockIdx.x >= param.num_total_hash_entries_ || blockIdx.x >= count_visible_block)
-//         return;
-
-//     HashEntry &current = visible_blocks[blockIdx.x];
-
-//     Vec3i voxel_pos = blockPosToVoxelPos(current.pos_);
-//     float dist_thresh = param.truncation_dist();
-//     float inv_dist_thresh = 1.0 / dist_thresh;
-
-// #pragma unroll
-//     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
-//     {
-//         Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
-//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, map_struct.voxelSize));
-
-//         int u = __float2int_rd(fx * pt.x / pt.z + cx + 0.5);
-//         int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
-//         if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
-//             continue;
-
-//         float dist = depth.ptr(v)[u];
-//         if (isnan(dist) || dist < 1e-2 || dist > depthMax || dist < depthMin)
-//             continue;
-
-//         float sdf = dist - pt.z;
-//         if (sdf < -dist_thresh)
-//             continue;
-
-//         sdf = fmin(1.0f, sdf * inv_dist_thresh);
-//         const int local_idx = localPosToLocalIdx(local_pos);
-//         Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
-
-//         auto sdf_p = voxel.getSDF();
-//         auto weight_p = voxel.getWeight();
-//         auto weight = 1 / (dist * dist);
-
-//         // update colour
-//         auto colour_new = image.ptr(v)[u];
-//         auto colour_p = voxel.rgb;
-
-//         if (voxel.weight == 0)
-//         {
-//             voxel.setSDF(sdf);
-//             voxel.setWeight(weight);
-//             voxel.rgb = colour_new;
-//             continue;
-//         }
-
-//         // fuse depth
-//         sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
-//         voxel.setSDF(sdf_p);
-//         voxel.setWeight(weight_p + weight);
-
-//         // fuse colour
-//         colour_p = ToVec3c((colour_p * weight_p + colour_new * weight) / (weight_p + weight));
-//         voxel.rgb = colour_p;
-//     }
-// }
-
-// __global__ void update_map_weighted_kernel(
-//     MapStorage map_struct,
-//     HashEntry *visible_blocks,
-//     uint count_visible_block,
-//     cv::cuda::PtrStepSz<float> depth,
-//     cv::cuda::PtrStepSz<Vec4f> normal,
-//     cv::cuda::PtrStepSz<Vec3c> image,
-//     SE3f inv_pose,
-//     float fx, float fy,
-//     float cx, float cy)
-// {
-//     if (blockIdx.x >= param.num_total_hash_entries_ || blockIdx.x >= count_visible_block)
-//         return;
-
-//     HashEntry &current = visible_blocks[blockIdx.x];
-
-//     if (current.ptr_ < 0)
-//         return;
-
-//     Vec3i voxel_pos = blockPosToVoxelPos(current.pos_);
-//     float dist_thresh = param.truncation_dist();
-//     float inv_dist_thresh = 1.0 / dist_thresh;
-
-// #pragma unroll
-//     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
-//     {
-//         Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
-//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, map_struct.voxelSize));
-
-//         int u = __float2int_rd(fx * pt(0) / pt.z + cx + 0.5);
-//         int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
-//         if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
-//             continue;
-
-//         float dist = depth.ptr(v)[u];
-//         auto n_c = ToVec3(normal.ptr(v)[u]);
-//         if (isnan(dist) || isnan(n_c(0)) || dist > depthMax || dist < depthMin)
-//             continue;
-
-//         float sdf = dist - pt.z;
-//         if (sdf < -dist_thresh)
-//             continue;
-
-//         sdf = fmin(1.0f, sdf * inv_dist_thresh);
-//         const int local_idx = localPosToLocalIdx(local_pos);
-//         Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
-
-//         auto sdf_p = voxel.getSDF();
-//         auto weight_p = voxel.getWeight();
-//         auto weight = abs(sin(n_c.z)) / (dist * dist);
-
-//         // update colour
-//         auto colour_new = image.ptr(v)[u];
-//         auto colour_p = voxel.rgb;
-
-//         if (voxel.weight == 0)
-//         {
-//             voxel.setSDF(sdf);
-//             voxel.setWeight(weight);
-//             voxel.rgb = colour_new;
-//             continue;
-//         }
-
-//         // fuse depth
-//         sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
-//         voxel.setSDF(sdf_p);
-//         voxel.setWeight(weight_p + weight);
-
-//         // fuse colour
-//         colour_p = ToVec3c((colour_p * weight_p + colour_new * weight) / (weight_p + weight));
-//         voxel.rgb = colour_p;
-//     }
-// }
-
 void update(
     MapStruct map_struct,
-    // MapState state,
-    const cv::cuda::GpuMat depth,
-    const cv::cuda::GpuMat image,
-    const Sophus::SE3d &frame_pose,
-    const Eigen::Matrix3d &K,
-    cv::cuda::GpuMat &cv_flag,
-    cv::cuda::GpuMat &cv_pos_array,
+    const GMat depth,
+    const SE3 &frame_pose,
+    const Mat33d &K,
+    GMat &cv_flag,
+    GMat &cv_pos_array,
     HashEntry *visible_blocks,
     uint &visible_block_count)
 {
@@ -534,14 +390,6 @@ void update(
     thread = dim3(8, 8);
     block = dim3(visible_block_count);
 
-    // update_map_with_colour_kernel<<<block, thread>>>(
-    //     map_struct,
-    //     visible_blocks,
-    //     visible_block_count,
-    //     depth, image,
-    //     frame_pose.inverse().cast<float>().matrix3x4(),
-    //     fx, fy,
-    //     cx, cy);
     update_map_kernel<<<block, thread>>>(
         map_struct,
         visible_blocks,

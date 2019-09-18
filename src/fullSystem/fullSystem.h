@@ -2,8 +2,7 @@
 #include <memory>
 #include <iostream>
 #include "utils/numType.h"
-// #include "localMapper/localMapper.h"
-#include "localMapper2/localMapper.h"
+#include "localMapper/localMapper.h"
 #include "denseTracker/denseTracker.h"
 
 class FullSystem
@@ -17,7 +16,6 @@ class FullSystem
     void fuseCurrentFrame(const SE3 &T);
     void updateLocalMapObservation(const SE3 &T);
 
-    // std::shared_ptr<LocalMapper> localMapper;
     std::shared_ptr<DenseMapping> localMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
 

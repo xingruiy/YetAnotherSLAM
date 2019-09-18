@@ -17,13 +17,12 @@ PRIVATE
     src/denseTracker/cudaImageProc.cu
     src/globalMapper/ceresSolver.cpp
     src/globalMapper/globalMap.cpp
-    # src/localMapper/localMapper.cu
-    # src/localMapper/denseMap.cu
-    src/localMapper2/denseMap.cu
-    src/localMapper2/localMapper.cpp
-    src/localMapper2/depth_fusion.cu
-    src/localMapper2/scene_mesh.cu
-    src/localMapper2/ray_tracing.cu
+    src/globalMapper/featureMatcher.cpp
+    src/localMapper/denseMap.cu
+    src/localMapper/localMapper.cpp
+    src/localMapper/depth_fusion.cu
+    src/localMapper/scene_mesh.cu
+    src/localMapper/ray_tracing.cu
 )
 
 target_compile_features(athena

@@ -27,8 +27,6 @@ void DenseMapping::fuseFrame(GMat depth, const SE3 &T)
 
   ::update(
       device_map,
-      // device_map.state,
-      depth,
       depth,
       T,
       cam_params,

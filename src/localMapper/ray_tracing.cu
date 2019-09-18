@@ -1,4 +1,4 @@
-#include "localMapper2/denseMap.h"
+#include "localMapper/denseMap.h"
 #include "utils/cudaUtils.h"
 #include "utils/prefixSum.h"
 
