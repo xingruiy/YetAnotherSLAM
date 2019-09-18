@@ -1,18 +1,26 @@
 #include "map_proc.h"
 #include "utils/prefixSum.h"
 #include "utils/cudaUtils.h"
-#include "localMapper2/localMapper.h"
 #include "utils/triangleTable.h"
+#include "localMapper2/localMapper.h"
+
+#define MAX_NUM_MESH_TRIANGLES 20000000
 
 struct BuildVertexArray
 {
-    MapStorage map_struct;
+    // MapStorage map_struct;
 
     Vec3f *triangles;
     HashEntry *block_array;
     uint *block_count;
     uint *triangle_count;
     Vec3f *surface_normal;
+
+    HashEntry *hashTable;
+    Voxel *listBlocks;
+    int hashTableSize;
+    int bucketSize;
+    float voxelSize;
 
     __device__ __forceinline__ void select_blocks() const
     {
@@ -25,7 +33,7 @@ struct BuildVertexArray
         __syncthreads();
 
         uint val = 0;
-        if (x < param.num_total_hash_entries_ && map_struct.hash_table_[x].ptr_ >= 0)
+        if (x < hashTableSize && hashTable[x].ptr_ >= 0)
         {
             needScan = true;
             val = 1;
@@ -38,7 +46,7 @@ struct BuildVertexArray
             int offset = computeOffset<1024>(val, block_count);
             if (offset != -1)
             {
-                block_array[offset] = map_struct.hash_table_[x];
+                block_array[offset] = hashTable[x];
             }
         }
     }
@@ -46,7 +54,7 @@ struct BuildVertexArray
     __device__ __forceinline__ float read_sdf(Vec3f pt, bool &valid) const
     {
         Voxel *voxel = NULL;
-        findVoxel(map_struct, floor(pt), voxel);
+        findVoxel(floor(pt), voxel, hashTable, listBlocks, bucketSize);
         if (voxel && voxel->weight != 0)
         {
             valid = true;
@@ -108,7 +116,7 @@ struct BuildVertexArray
         return (0 - v1) / (v2 - v1);
     }
 
-    __device__ __forceinline__ int make_vertex(Vec3f *vertex_array, const Vec3f pos)
+    __device__ __forceinline__ int make_vertex(Vec3f *vertex_array, const Vec3f pos) const
     {
         float sdf[8];
 
@@ -200,16 +208,14 @@ struct BuildVertexArray
         return cube_index;
     }
 
-    template <bool compute_normal = false>
-    __device__ __forceinline__ void operator()()
+    __device__ __forceinline__ void operator()() const
     {
         int x = blockIdx.y * gridDim.x + blockIdx.x;
-        if (*triangle_count >= param.num_max_mesh_triangles_ || x >= *block_count)
+        if (*triangle_count >= MAX_NUM_MESH_TRIANGLES || x >= *block_count)
             return;
 
         Vec3f vertex_array[12];
         Vec3i pos = block_array[x].pos_ * BLOCK_SIZE;
-        auto factor = param.voxel_size;
 
         for (int voxel_id = 0; voxel_id < BLOCK_SIZE; ++voxel_id)
         {
@@ -222,17 +228,14 @@ struct BuildVertexArray
             {
                 uint triangleId = atomicAdd(triangle_count, 1);
 
-                if (triangleId < param.num_max_mesh_triangles_)
+                if (triangleId < MAX_NUM_MESH_TRIANGLES)
                 {
-                    triangles[triangleId * 3] = vertex_array[triTable[cube_index][i]] * factor;
-                    triangles[triangleId * 3 + 1] = vertex_array[triTable[cube_index][i + 1]] * factor;
-                    triangles[triangleId * 3 + 2] = vertex_array[triTable[cube_index][i + 2]] * factor;
+                    triangles[triangleId * 3] = vertex_array[triTable[cube_index][i]] * voxelSize;
+                    triangles[triangleId * 3 + 1] = vertex_array[triTable[cube_index][i + 1]] * voxelSize;
+                    triangles[triangleId * 3 + 2] = vertex_array[triTable[cube_index][i + 2]] * voxelSize;
 
-                    if (compute_normal)
-                    {
-                        surface_normal[triangleId * 3] = ((triangles[triangleId * 3 + 1] - triangles[triangleId * 3]).cross(triangles[triangleId * 3 + 2] - triangles[triangleId * 3])).normalized();
-                        surface_normal[triangleId * 3 + 1] = surface_normal[triangleId * 3 + 2] = surface_normal[triangleId * 3];
-                    }
+                    surface_normal[triangleId * 3] = ((triangles[triangleId * 3 + 1] - triangles[triangleId * 3]).cross(triangles[triangleId * 3 + 2] - triangles[triangleId * 3])).normalized();
+                    surface_normal[triangleId * 3 + 1] = surface_normal[triangleId * 3 + 2] = surface_normal[triangleId * 3];
                 }
             }
         }
@@ -292,14 +295,14 @@ __global__ void select_blocks_kernel(BuildVertexArray bva)
 //     (cudaFree(cuda_triangle_count));
 // }
 
-__global__ void generate_vertex_and_normal_array_kernel(BuildVertexArray bva)
-{
-    bva.operator()<true>();
-}
+// __global__ void generate_vertex_and_normal_array_kernel(BuildVertexArray bva)
+// {
+//     bva.operator()<true>();
+// }
 
 void create_mesh_with_normal(
-    MapStorage map_struct,
-    MapState state,
+    MapStruct map_struct,
+    // MapState state,
     uint &block_count,
     HashEntry *block_list,
     uint &triangle_count,
@@ -314,15 +317,20 @@ void create_mesh_with_normal(
     (cudaMemset(cuda_triangle_count, 0, sizeof(uint)));
 
     BuildVertexArray bva;
-    bva.map_struct = map_struct;
+    // bva.map_struct = map_struct;
     bva.block_array = block_list;
     bva.block_count = cuda_block_count;
     bva.triangle_count = cuda_triangle_count;
     bva.triangles = static_cast<Vec3f *>(vertex_data);
     bva.surface_normal = static_cast<Vec3f *>(vertex_normal);
+    bva.hashTable = map_struct.hash_table_;
+    bva.listBlocks = map_struct.voxels_;
+    bva.hashTableSize = map_struct.hashTableSize;
+    bva.bucketSize = map_struct.bucketSize;
+    bva.voxelSize = map_struct.voxelSize;
 
     dim3 thread(1024);
-    dim3 block = dim3(div_up(state.num_total_hash_entries_, thread.x));
+    dim3 block = dim3(div_up(map_struct.hashTableSize, thread.x));
 
     select_blocks_kernel<<<block, thread>>>(bva);
 
@@ -333,10 +341,10 @@ void create_mesh_with_normal(
     thread = dim3(8, 8);
     block = dim3(div_up(block_count, 16), 16);
 
-    generate_vertex_and_normal_array_kernel<<<block, thread>>>(bva);
+    callDeviceFunctor<<<block, thread>>>(bva);
 
     (cudaMemcpy(&triangle_count, cuda_triangle_count, sizeof(uint), cudaMemcpyDeviceToHost));
-    triangle_count = std::min(triangle_count, (uint)state.num_max_mesh_triangles_);
+    triangle_count = std::min(triangle_count, (uint)MAX_NUM_MESH_TRIANGLES);
 
     (cudaFree(cuda_block_count));
     (cudaFree(cuda_triangle_count));

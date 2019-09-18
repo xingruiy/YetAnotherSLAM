@@ -6,8 +6,8 @@
 #include "localMapper2/denseMap.h"
 
 void update(
-    MapStorage map_struct,
-    MapState state,
+    MapStruct map_struct,
+    // MapState state,
     const cv::cuda::GpuMat depth,
     const cv::cuda::GpuMat image,
     const Sophus::SE3d &frame_pose,
@@ -18,8 +18,8 @@ void update(
     uint &visible_block_count);
 
 void update_weighted(
-    MapStorage map_struct,
-    MapState state,
+    MapStruct map_struct,
+    // MapState state,
     const cv::cuda::GpuMat depth,
     const cv::cuda::GpuMat normal,
     const cv::cuda::GpuMat image,
@@ -31,18 +31,20 @@ void update_weighted(
     uint &visible_block_count);
 
 void create_rendering_blocks(
+    MapStruct map_struct,
     uint count_visible_block,
-    uint &count_redering_block,
+    uint &count_rendering_block,
     HashEntry *visible_blocks,
-    cv::cuda::GpuMat &zrange_x,
-    cv::cuda::GpuMat &zrange_y,
-    RenderingBlock *rendering_blocks,
-    const Sophus::SE3d &frame_pose,
-    const Eigen::Matrix3d &K);
+    GMat &zrange_x,
+    GMat &zrange_y,
+    RenderingBlock *listRenderingBlock,
+    const SE3 &frame_pose,
+    const Mat33d &cam_params);
 
 void raycast(
-    MapStorage map_struct,
-    MapState state,
+    MapStruct map_struct,
+    // MapStruct map_struct,
+    // MapState state,
     cv::cuda::GpuMat vmap,
     cv::cuda::GpuMat nmap,
     cv::cuda::GpuMat zrange_x,
@@ -51,8 +53,8 @@ void raycast(
     const Eigen::Matrix3d &K);
 
 void raycast_with_colour(
-    MapStorage map_struct,
-    MapState state,
+    MapStruct map_struct,
+    // MapState state,
     cv::cuda::GpuMat vmap,
     cv::cuda::GpuMat nmap,
     cv::cuda::GpuMat image,
@@ -62,7 +64,7 @@ void raycast_with_colour(
     const Eigen::Matrix3d &K);
 
 // void create_mesh_vertex_only(
-//     MapStorage map_struct,
+//     MapStruct map_struct,
 //     MapState state,
 //     uint &block_count,
 //     HashEntry *block_list,
@@ -70,8 +72,8 @@ void raycast_with_colour(
 //     void *vertex_data);
 
 void create_mesh_with_normal(
-    MapStorage map_struct,
-    MapState state,
+    MapStruct map_struct,
+    // MapState state,
     uint &block_count,
     HashEntry *block_list,
     uint &triangle_count,
@@ -79,7 +81,7 @@ void create_mesh_with_normal(
     void *vertex_normal);
 
 // void create_mesh_with_colour(
-//     MapStorage map_struct,
+//     MapStruct map_struct,
 //     MapState state,
 //     uint &block_count,
 //     HashEntry *block_list,
@@ -88,8 +90,8 @@ void create_mesh_with_normal(
 //     void *vertex_colour);
 
 void count_visible_entry(
-    const MapStorage map_struct,
-    const MapSize map_size,
+    const MapStruct map_struct,
+    // const MapSize map_size,
     const Eigen::Matrix3d &K,
     const Sophus::SE3d frame_pose,
     HashEntry *const visible_entry,

@@ -8,22 +8,24 @@
 __device__ inline bool is_vertex_visible(
     Vec3f pt, SE3f inv_pose,
     int cols, int rows, float fx,
-    float fy, float cx, float cy)
+    float fy, float cx, float cy,
+    float depthMin, float depthMax)
 {
     pt = inv_pose * (pt);
     Vec2f pt2d = Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
     return !(pt2d(0) < 0 || pt2d(1) < 0 ||
              pt2d(0) > cols - 1 || pt2d(1) > rows - 1 ||
-             pt(2) < param.zmin_update || pt(2) > param.zmax_update);
+             pt(2) < depthMin || pt(2) > depthMax);
 }
 
 __device__ inline bool is_block_visible(
     const Vec3i &block_pos,
-    SE3f inv_pose,
+    SE3f inv_pose, const float &voxelSize,
     int cols, int rows, float fx,
-    float fy, float cx, float cy)
+    float fy, float cx, float cy,
+    float depthMin, float depthMax)
 {
-    float scale = param.block_size_metric();
+    float scale = voxelSize * BLOCK_SIZE; //param.block_size_metric();
 #pragma unroll
     for (int corner = 0; corner < 8; ++corner)
     {
@@ -32,7 +34,7 @@ __device__ inline bool is_block_visible(
         tmp(1) += (corner & 2) ? 1 : 0;
         tmp(2) += (corner & 4) ? 1 : 0;
 
-        if (is_vertex_visible(tmp.cast<float>() * scale, inv_pose, cols, rows, fx, fy, cx, cy))
+        if (is_vertex_visible(tmp.cast<float>() * scale, inv_pose, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
             return true;
     }
 
@@ -40,11 +42,12 @@ __device__ inline bool is_block_visible(
 }
 
 __global__ void check_visibility_flag_kernel(
-    MapStorage map_struct, uchar *flag, SE3f inv_pose,
-    int cols, int rows, float fx, float fy, float cx, float cy)
+    MapStruct map_struct, uchar *flag, SE3f inv_pose,
+    int cols, int rows, float fx, float fy, float cx, float cy, float voxelSize,
+    float depthMin, float depthMax)
 {
     const int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if (idx >= param.num_total_hash_entries_)
+    if (idx >= map_struct.hashTableSize)
         return;
 
     HashEntry &current = map_struct.hash_table_[idx];
@@ -54,7 +57,7 @@ __global__ void check_visibility_flag_kernel(
         {
         default:
         {
-            if (is_block_visible(current.pos_, inv_pose, cols, rows, fx, fy, cx, cy))
+            if (is_block_visible(current.pos_, inv_pose, voxelSize, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
             {
                 flag[idx] = 1;
             }
@@ -75,10 +78,10 @@ __global__ void check_visibility_flag_kernel(
     }
 }
 
-__global__ void copy_visible_block_kernel(HashEntry *hash_table, HashEntry *visible_block, const uchar *flag, const int *pos)
+__global__ void copy_visible_block_kernel(HashEntry *hash_table, HashEntry *visible_block, int hashTableSize, const uchar *flag, const int *pos)
 {
     const int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if (idx >= param.num_total_hash_entries_)
+    if (idx >= hashTableSize)
         return;
 
     if (flag[idx] == 1)
@@ -104,16 +107,9 @@ __device__ inline Vec3f unproject_world(
     return pose * (unproject(x, y, z, invfx, invfy, cx, cy));
 }
 
-__device__ inline int create_block(MapStorage &map_struct, const Vec3i block_pos)
-{
-    int hash_index;
-    createBlock(map_struct, block_pos, hash_index);
-    return hash_index;
-}
-
-__global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<float> depth,
+__global__ void create_blocks_kernel(MapStruct map_struct, cv::cuda::PtrStepSz<float> depth,
                                      float invfx, float invfy, float cx, float cy,
-                                     SE3f pose, uchar *flag)
+                                     SE3f pose, uchar *flag, float depthMin, float depthMax)
 {
     const int x = threadIdx.x + blockDim.x * blockIdx.x;
     const int y = threadIdx.y + blockDim.y * blockIdx.y;
@@ -121,17 +117,17 @@ __global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<
         return;
 
     float z = depth.ptr(y)[x];
-    if (isnan(z) || z < param.zmin_update || z > param.zmax_update)
+    if (isnan(z) || z < depthMin || z > depthMax)
         return;
 
-    float z_thresh = param.truncation_dist() * 0.5;
-    float z_near = max(param.zmin_update, z - z_thresh);
-    float z_far = min(param.zmax_update, z + z_thresh);
+    float z_thresh = map_struct.truncationDist * 0.5;
+    float z_near = max(depthMin, z - z_thresh);
+    float z_far = min(depthMax, z + z_thresh);
     if (z_near >= z_far)
         return;
 
-    Vec3i block_near = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_near, invfx, invfy, cx, cy, pose), param.voxel_size));
-    Vec3i block_far = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_far, invfx, invfy, cx, cy, pose), param.voxel_size));
+    Vec3i block_near = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_near, invfx, invfy, cx, cy, pose), map_struct.voxelSize));
+    Vec3i block_far = voxelPosToBlockPos(worldPtToVoxelPos(unproject_world(x, y, z_far, invfx, invfy, cx, cy, pose), map_struct.voxelSize));
 
     Vec3i d = block_far - block_near;
     Vec3i increment = Vec3i(d(0) < 0 ? -1 : 1, d(1) < 0 ? -1 : 1, d(2) < 0 ? -1 : 1);
@@ -147,7 +143,14 @@ __global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<
     {
         err_1 = incre_err(1) - 1;
         err_2 = incre_err(2) - 1;
-        flag[create_block(map_struct, block_near)] = 2;
+        createBlock(block_near,
+                    map_struct.heap_mem_,
+                    map_struct.heap_mem_counter_,
+                    map_struct.hash_table_,
+                    map_struct.bucket_mutex_,
+                    map_struct.excess_counter_,
+                    map_struct.hashTableSize,
+                    map_struct.bucketSize);
         for (int i = 0; i < incre_abs(0); ++i)
         {
             if (err_1 > 0)
@@ -165,14 +168,28 @@ __global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<
             err_1 += incre_err(1);
             err_2 += incre_err(2);
             block_near(0) += increment(0);
-            flag[create_block(map_struct, block_near)] = 2;
+            createBlock(block_near,
+                        map_struct.heap_mem_,
+                        map_struct.heap_mem_counter_,
+                        map_struct.hash_table_,
+                        map_struct.bucket_mutex_,
+                        map_struct.excess_counter_,
+                        map_struct.hashTableSize,
+                        map_struct.bucketSize);
         }
     }
     else if ((incre_abs(1) >= incre_abs(0)) && (incre_abs(1) >= incre_abs(2)))
     {
         err_1 = incre_err(0) - 1;
         err_2 = incre_err(2) - 1;
-        flag[create_block(map_struct, block_near)] = 2;
+        createBlock(block_near,
+                    map_struct.heap_mem_,
+                    map_struct.heap_mem_counter_,
+                    map_struct.hash_table_,
+                    map_struct.bucket_mutex_,
+                    map_struct.excess_counter_,
+                    map_struct.hashTableSize,
+                    map_struct.bucketSize);
         for (int i = 0; i < incre_abs(1); ++i)
         {
             if (err_1 > 0)
@@ -190,14 +207,28 @@ __global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<
             err_1 += incre_err(0);
             err_2 += incre_err(2);
             block_near(1) += increment(1);
-            flag[create_block(map_struct, block_near)] = 2;
+            createBlock(block_near,
+                        map_struct.heap_mem_,
+                        map_struct.heap_mem_counter_,
+                        map_struct.hash_table_,
+                        map_struct.bucket_mutex_,
+                        map_struct.excess_counter_,
+                        map_struct.hashTableSize,
+                        map_struct.bucketSize);
         }
     }
     else
     {
         err_1 = incre_err(1) - 1;
         err_2 = incre_err(0) - 1;
-        flag[create_block(map_struct, block_near)] = 2;
+        createBlock(block_near,
+                    map_struct.heap_mem_,
+                    map_struct.heap_mem_counter_,
+                    map_struct.hash_table_,
+                    map_struct.bucket_mutex_,
+                    map_struct.excess_counter_,
+                    map_struct.hashTableSize,
+                    map_struct.bucketSize);
         for (int i = 0; i < incre_abs(2); ++i)
         {
             if (err_1 > 0)
@@ -215,33 +246,41 @@ __global__ void create_blocks_kernel(MapStorage map_struct, cv::cuda::PtrStepSz<
             err_1 += incre_err(1);
             err_2 += incre_err(0);
             block_near(2) += increment(2);
-            flag[create_block(map_struct, block_near)] = 2;
+            createBlock(block_near,
+                        map_struct.heap_mem_,
+                        map_struct.heap_mem_counter_,
+                        map_struct.hash_table_,
+                        map_struct.bucket_mutex_,
+                        map_struct.excess_counter_,
+                        map_struct.hashTableSize,
+                        map_struct.bucketSize);
         }
     }
 }
 
-__global__ void update_map_kernel(MapStorage map_struct,
+__global__ void update_map_kernel(MapStruct map_struct,
                                   HashEntry *visible_blocks,
                                   uint count_visible_block,
                                   cv::cuda::PtrStepSz<float> depth,
                                   SE3f inv_pose,
                                   float fx, float fy,
-                                  float cx, float cy)
+                                  float cx, float cy,
+                                  float depthMin, float depthMax)
 {
-    if (blockIdx.x >= param.num_total_hash_entries_ || blockIdx.x >= count_visible_block)
+    if (blockIdx.x >= map_struct.hashTableSize || blockIdx.x >= count_visible_block)
         return;
 
     HashEntry &current = visible_blocks[blockIdx.x];
 
     Vec3i voxel_pos = blockPosToVoxelPos(current.pos_);
-    float dist_thresh = param.truncation_dist();
+    float dist_thresh = map_struct.truncationDist;
     float inv_dist_thresh = 1.0 / dist_thresh;
 
 #pragma unroll
     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
     {
         Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
-        Vec3f pt = inv_pose * (voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
+        Vec3f pt = inv_pose * (voxelPosToWorldPt(voxel_pos + local_pos, map_struct.voxelSize));
 
         int u = __float2int_rd(fx * pt(0) / pt(2) + cx + 0.5);
         int v = __float2int_rd(fy * pt(1) / pt(2) + cy + 0.5);
@@ -249,7 +288,7 @@ __global__ void update_map_kernel(MapStorage map_struct,
             continue;
 
         float dist = depth.ptr(v)[u];
-        if (isnan(dist) || dist < 1e-2 || dist > param.zmax_update || dist < param.zmin_update)
+        if (isnan(dist) || dist < 1e-2 || dist > depthMax || dist < depthMin)
             continue;
 
         float sdf = dist - pt(2);
@@ -300,7 +339,7 @@ __global__ void update_map_kernel(MapStorage map_struct,
 //     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
 //     {
 //         Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
-//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
+//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, map_struct.voxelSize));
 
 //         int u = __float2int_rd(fx * pt.x / pt.z + cx + 0.5);
 //         int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
@@ -308,7 +347,7 @@ __global__ void update_map_kernel(MapStorage map_struct,
 //             continue;
 
 //         float dist = depth.ptr(v)[u];
-//         if (isnan(dist) || dist < 1e-2 || dist > param.zmax_update || dist < param.zmin_update)
+//         if (isnan(dist) || dist < 1e-2 || dist > depthMax || dist < depthMin)
 //             continue;
 
 //         float sdf = dist - pt.z;
@@ -373,7 +412,7 @@ __global__ void update_map_kernel(MapStorage map_struct,
 //     for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
 //     {
 //         Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
-//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, param.voxel_size));
+//         Vec3f pt = inv_pose(voxelPosToWorldPt(voxel_pos + local_pos, map_struct.voxelSize));
 
 //         int u = __float2int_rd(fx * pt(0) / pt.z + cx + 0.5);
 //         int v = __float2int_rd(fy * pt.y / pt.z + cy + 0.5);
@@ -382,7 +421,7 @@ __global__ void update_map_kernel(MapStorage map_struct,
 
 //         float dist = depth.ptr(v)[u];
 //         auto n_c = ToVec3(normal.ptr(v)[u]);
-//         if (isnan(dist) || isnan(n_c(0)) || dist > param.zmax_update || dist < param.zmin_update)
+//         if (isnan(dist) || isnan(n_c(0)) || dist > depthMax || dist < depthMin)
 //             continue;
 
 //         float sdf = dist - pt.z;
@@ -421,8 +460,8 @@ __global__ void update_map_kernel(MapStorage map_struct,
 // }
 
 void update(
-    MapStorage map_struct,
-    MapState state,
+    MapStruct map_struct,
+    // MapState state,
     const cv::cuda::GpuMat depth,
     const cv::cuda::GpuMat image,
     const Sophus::SE3d &frame_pose,
@@ -433,9 +472,9 @@ void update(
     uint &visible_block_count)
 {
     if (cv_flag.empty())
-        cv_flag.create(1, state.num_total_hash_entries_, CV_8UC1);
+        cv_flag.create(1, map_struct.hashTableSize, CV_8UC1);
     if (cv_pos_array.empty())
-        cv_pos_array.create(1, state.num_total_hash_entries_, CV_32SC1);
+        cv_pos_array.create(1, map_struct.hashTableSize, CV_32SC1);
 
     thrust::device_ptr<uchar> flag(cv_flag.ptr<uchar>());
     thrust::device_ptr<int> pos_array(cv_pos_array.ptr<int>());
@@ -460,10 +499,12 @@ void update(
         invfy,
         cx, cy,
         frame_pose.cast<float>(),
-        flag.get());
+        flag.get(),
+        0.1f,
+        3.0f);
 
     thread = dim3(1024);
-    block = dim3(div_up(state.num_total_hash_entries_, thread.x));
+    block = dim3(div_up(map_struct.hashTableSize, thread.x));
 
     check_visibility_flag_kernel<<<block, thread>>>(
         map_struct,
@@ -471,17 +512,21 @@ void update(
         frame_pose.inverse().cast<float>(),
         cols, rows,
         fx, fy,
-        cx, cy);
+        cx, cy,
+        map_struct.voxelSize,
+        0.1f,
+        3.0f);
 
-    thrust::exclusive_scan(flag, flag + state.num_total_hash_entries_, pos_array);
+    thrust::exclusive_scan(flag, flag + map_struct.hashTableSize, pos_array);
 
     copy_visible_block_kernel<<<block, thread>>>(
         map_struct.hash_table_,
         visible_blocks,
+        map_struct.hashTableSize,
         flag.get(),
         pos_array.get());
 
-    visible_block_count = pos_array[state.num_total_hash_entries_ - 1];
+    visible_block_count = pos_array[map_struct.hashTableSize - 1];
 
     if (visible_block_count == 0)
         return;
@@ -504,5 +549,7 @@ void update(
         depth,
         frame_pose.inverse().cast<float>(),
         fx, fy,
-        cx, cy);
+        cx, cy,
+        0.1f,
+        3.0f);
 }

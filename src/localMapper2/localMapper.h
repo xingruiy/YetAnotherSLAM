@@ -19,7 +19,7 @@ public:
 
 private:
   Eigen::Matrix3d cam_params;
-  MapStruct<true> device_map;
+  MapStruct device_map;
 
   // for map udate
   cv::cuda::GpuMat flag;

@@ -1,11 +1,11 @@
 #include "localMapper2/denseMap.h"
 #include "utils/cudaUtils.h"
 #include "utils/prefixSum.h"
-#include <opencv2/opencv.hpp>
 
 #define RENDERING_BLOCK_SIZE_X 16
 #define RENDERING_BLOCK_SIZE_Y 16
 #define RENDERING_BLOCK_SUBSAMPLE 8
+#define MAX_NUM_RENDERING_BLOCK 100000
 
 struct RenderingBlockDelegate
 {
@@ -20,6 +20,9 @@ struct RenderingBlockDelegate
     mutable cv::cuda::PtrStepSz<float> zrange_x;
     mutable cv::cuda::PtrStep<float> zrange_y;
     RenderingBlock *rendering_blocks;
+
+    float depthMin, depthMax;
+    float voxelSize;
 
     __device__ __forceinline__ Vec2f project(const Vec3f &pt) const
     {
@@ -56,8 +59,9 @@ struct RenderingBlockDelegate
     {
         block.upper_left = Vec2s(zrange_x.cols, zrange_x.rows);
         block.lower_right = Vec2s(-1, -1);
-        block.zrange = Vec2f(param.zmax_raycast, param.zmin_raycast);
+        block.zrange = Vec2f(depthMax, depthMin);
 
+        float scale = voxelSize * BLOCK_SIZE;
 #pragma unroll
         for (int corner = 0; corner < 8; ++corner)
         {
@@ -66,8 +70,7 @@ struct RenderingBlockDelegate
             tmp(1) += (corner & 2) ? 1 : 0;
             tmp(2) += (corner & 4) ? 1 : 0;
 
-            Vec3f pt3d = tmp.cast<float>() * param.block_size_metric();
-            pt3d = inv_pose * (pt3d);
+            auto pt3d = inv_pose * (tmp.cast<float>() * scale);
 
             Vec2f pt2d = project(pt3d) / RENDERING_BLOCK_SUBSAMPLE;
 
@@ -108,10 +111,10 @@ struct RenderingBlockDelegate
         if (block.upper_left(1) > block.lower_right(1))
             return false;
 
-        if (block.zrange(0) < param.zmin_raycast)
-            block.zrange(0) = param.zmin_raycast;
+        if (block.zrange(0) < depthMin)
+            block.zrange(0) = depthMin;
 
-        if (block.zrange(1) < param.zmin_raycast)
+        if (block.zrange(1) < depthMin)
             return false;
 
         return true;
@@ -123,7 +126,7 @@ struct RenderingBlockDelegate
         {
             for (int x = 0; x < nx; ++x)
             {
-                if (offset < param.num_max_rendering_blocks_)
+                if (offset < MAX_NUM_RENDERING_BLOCK)
                 {
                     RenderingBlock &b(rendering_blocks[offset++]);
                     b.upper_left(0) = block.upper_left(0) + x * RENDERING_BLOCK_SIZE_X;
@@ -164,7 +167,7 @@ struct RenderingBlockDelegate
             {
                 requiredNoBlocks = nx * ny;
                 uint totalNoBlocks = *rendering_block_count + requiredNoBlocks;
-                if (totalNoBlocks >= param.num_max_rendering_blocks_)
+                if (totalNoBlocks >= MAX_NUM_RENDERING_BLOCK)
                 {
                     requiredNoBlocks = 0;
                 }
@@ -172,7 +175,7 @@ struct RenderingBlockDelegate
         }
 
         int offset = computeOffset<1024>(requiredNoBlocks, rendering_block_count);
-        if (valid && offset != -1 && (offset + requiredNoBlocks) < param.num_max_rendering_blocks_)
+        if (valid && offset != -1 && (offset + requiredNoBlocks) < MAX_NUM_RENDERING_BLOCK)
             create_rendering_block_list(offset, block, nx, ny);
     }
 
@@ -182,7 +185,7 @@ struct RenderingBlockDelegate
         int y = threadIdx.y;
 
         int block = blockIdx.x * 4 + blockIdx.y;
-        if (block >= param.num_max_rendering_blocks_)
+        if (block >= MAX_NUM_RENDERING_BLOCK)
             return;
 
         RenderingBlock &b(rendering_blocks[block]);
@@ -202,25 +205,16 @@ struct RenderingBlockDelegate
     }
 };
 
-__global__ void create_rendering_blocks_kernel(const RenderingBlockDelegate delegate)
-{
-    delegate();
-}
-
-__global__ void split_and_fill_rendering_blocks_kernel(const RenderingBlockDelegate delegate)
-{
-    delegate.fill_rendering_blocks();
-}
-
 void create_rendering_blocks(
+    MapStruct map_struct,
     uint count_visible_block,
     uint &count_rendering_block,
     HashEntry *visible_blocks,
-    cv::cuda::GpuMat &zrange_x,
-    cv::cuda::GpuMat &zrange_y,
-    RenderingBlock *rendering_blocks,
-    const Sophus::SE3d &frame_pose,
-    const Eigen::Matrix3d &cam_params)
+    GMat &zrange_x,
+    GMat &zrange_y,
+    RenderingBlock *listRenderingBlock,
+    const SE3 &frame_pose,
+    const Mat33d &cam_params)
 {
     if (count_visible_block == 0)
         return;
@@ -250,7 +244,10 @@ void create_rendering_blocks(
     delegate.visible_block_pos = visible_blocks;
     delegate.visible_block_count = count_visible_block;
     delegate.rendering_block_count = count_device;
-    delegate.rendering_blocks = rendering_blocks;
+    delegate.rendering_blocks = listRenderingBlock;
+    delegate.depthMax = 3.0f;
+    delegate.depthMin = 0.1f;
+    delegate.voxelSize = map_struct.voxelSize;
 
     dim3 thread = dim3(1024);
     dim3 block = dim3(div_up(count_visible_block, thread.x));
@@ -264,26 +261,30 @@ void create_rendering_blocks(
     thread = dim3(RENDERING_BLOCK_SIZE_X, RENDERING_BLOCK_SIZE_Y);
     block = dim3((uint)ceil((float)count_rendering_block / 4), 4);
 
-    split_and_fill_rendering_blocks_kernel<<<block, thread>>>(delegate);
+    callDeviceFunctor<<<block, thread>>>(delegate);
     (cudaFree((void *)count_device));
 }
 
 struct MapRenderingDelegate
 {
     int width, height;
-    MapStorage map_struct;
+    // MapStruct map_struct;
     mutable cv::cuda::PtrStep<Vec4f> vmap;
-    mutable cv::cuda::PtrStep<Vec4f> nmap;
-    mutable cv::cuda::PtrStep<Vec3b> image;
     cv::cuda::PtrStepSz<float> zrange_x;
     cv::cuda::PtrStepSz<float> zrange_y;
     float invfx, invfy, cx, cy;
     SE3f pose, inv_pose;
 
+    HashEntry *hashTable;
+    Voxel *listBlock;
+    int bucketSize;
+    float voxelSizeInv;
+    float raytraceStep;
+
     __device__ __forceinline__ float read_sdf(const Vec3f &pt3d, bool &valid) const
     {
         Voxel *voxel = NULL;
-        findVoxel(map_struct, floor(pt3d), voxel);
+        findVoxel(floor(pt3d), voxel, hashTable, listBlock, bucketSize);
         if (voxel && voxel->weight != 0)
         {
             valid = true;
@@ -292,7 +293,7 @@ struct MapRenderingDelegate
         else
         {
             valid = false;
-            return nanf("0x7fffff");
+            return 1.0;
         }
     }
 
@@ -359,12 +360,12 @@ struct MapRenderingDelegate
         float last_sdf;
 
         Vec3f pt = unproject(x, y, zrange(0));
-        float dist_s = pt.norm() * param.inverse_voxel_size();
-        Vec3f block_s = pose * (pt)*param.inverse_voxel_size();
+        float dist_s = pt.norm() * voxelSizeInv;
+        Vec3f block_s = pose * (pt)*voxelSizeInv;
 
         pt = unproject(x, y, zrange(1));
-        float dist_e = pt.norm() * param.inverse_voxel_size();
-        Vec3f block_e = pose * (pt)*param.inverse_voxel_size();
+        float dist_e = pt.norm() * voxelSizeInv;
+        Vec3f block_e = pose * (pt)*voxelSizeInv;
 
         Vec3f dir = (block_e - block_s).normalized();
         Vec3f result = block_s;
@@ -388,7 +389,7 @@ struct MapRenderingDelegate
                 return;
 
             if (valid_sdf)
-                step = max(sdf * param.raycast_step_scale(), 1.0f);
+                step = max(sdf * raytraceStep, 1.0f);
             else
                 step = 2;
 
@@ -398,12 +399,12 @@ struct MapRenderingDelegate
 
         if (sdf <= 0.0f)
         {
-            step = sdf * param.raycast_step_scale();
+            step = sdf * raytraceStep;
             result += step * dir;
 
             sdf = read_sdf_interped(result, valid_sdf);
 
-            step = sdf * param.raycast_step_scale();
+            step = sdf * raytraceStep;
             result += step * dir;
 
             if (valid_sdf)
@@ -412,30 +413,20 @@ struct MapRenderingDelegate
 
         if (found_pt)
         {
-            result = inv_pose * (result * param.voxel_size);
+            result = inv_pose * (result / voxelSizeInv);
             vmap.ptr(y)[x] = Vec4f(result(0), result(1), result(2), 1.0);
         }
     }
 };
 
-// __global__ void __launch_bounds__(32, 16) raycast_kernel(MapRenderingDelegate delegate)
-// {
-//     delegate();
-// }
-
-// __global__ void __launch_bounds__(32, 16) raycast_with_colour_kernel(MapRenderingDelegate delegate)
-// {
-//     delegate.raycast_with_colour();
-// }
-
-void raycast(MapStorage map_struct,
-             MapState state,
-             cv::cuda::GpuMat vmap,
-             cv::cuda::GpuMat nmap,
-             cv::cuda::GpuMat zrange_x,
-             cv::cuda::GpuMat zrange_y,
-             const Sophus::SE3d &pose,
-             const Eigen::Matrix3d &intrinsic_matrix)
+void raycast(MapStruct map_struct,
+             // MapState state,
+             GMat vmap,
+             GMat nmap,
+             GMat zrange_x,
+             GMat zrange_y,
+             const SE3 &pose,
+             const Mat33d &K)
 {
     const int cols = vmap.cols;
     const int rows = vmap.rows;
@@ -444,91 +435,25 @@ void raycast(MapStorage map_struct,
 
     delegate.width = cols;
     delegate.height = rows;
-    delegate.map_struct = map_struct;
+    // delegate.map_struct = map_struct;
     delegate.vmap = vmap;
-    delegate.nmap = nmap;
+    // delegate.nmap = nmap;
     delegate.zrange_x = zrange_x;
     delegate.zrange_y = zrange_y;
-    delegate.invfx = 1.0 / intrinsic_matrix(0, 0);
-    delegate.invfy = 1.0 / intrinsic_matrix(1, 1);
-    delegate.cx = intrinsic_matrix(0, 2);
-    delegate.cy = intrinsic_matrix(1, 2);
+    delegate.invfx = 1.0 / K(0, 0);
+    delegate.invfy = 1.0 / K(1, 1);
+    delegate.cx = K(0, 2);
+    delegate.cy = K(1, 2);
     delegate.pose = pose.cast<float>();
     delegate.inv_pose = pose.inverse().cast<float>();
+    delegate.hashTable = map_struct.hash_table_;
+    delegate.listBlock = map_struct.voxels_;
+    delegate.bucketSize = map_struct.bucketSize;
+    delegate.voxelSizeInv = 1.0 / map_struct.voxelSize;
+    delegate.raytraceStep = map_struct.truncationDist / map_struct.voxelSize;
 
     dim3 thread(4, 8);
     dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
 
     callDeviceFunctor<<<block, thread>>>(delegate);
 }
-
-// void raycast_with_colour(MapStorage map_struct,
-//                          MapState state,
-//                          cv::cuda::GpuMat vmap,
-//                          cv::cuda::GpuMat nmap,
-//                          cv::cuda::GpuMat image,
-//                          cv::cuda::GpuMat zrange_x,
-//                          cv::cuda::GpuMat zrange_y,
-//                          const Sophus::SE3d &pose,
-//                          const Eigen::Matrix3d &intrinsic_matrix)
-// {
-//     const int cols = vmap.cols;
-//     const int rows = vmap.rows;
-
-//     MapRenderingDelegate delegate;
-
-//     delegate.width = cols;
-//     delegate.height = rows;
-//     delegate.map_struct = map_struct;
-//     delegate.vmap = vmap;
-//     delegate.nmap = nmap;
-//     delegate.image = image;
-//     delegate.zrange_x = zrange_x;
-//     delegate.zrange_y = zrange_y;
-//     delegate.invfx = 1.0 / intrinsic_matrix(0, 0);
-//     delegate.invfy = 1.0 / intrinsic_matrix(1, 1);
-//     delegate.cx = intrinsic_matrix(0, 2);
-//     delegate.cy = intrinsic_matrix(1, 2);
-//     delegate.pose = pose.cast<float>().matrix3x4();
-//     delegate.inv_pose = pose.inverse().cast<float>().matrix3x4();
-
-//     dim3 thread(4, 8);
-//     dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
-
-//     callDeviceFunctor<<<block, thread>>>(delegate);
-// }
-
-// __device__ __forceinline__ bool is_vertex_visible(
-//     const Vec3f &pt, SE3f Tinv,
-//     int cols, int rows, float fx,
-//     float fy, float cx, float cy)
-// {
-//     auto ptTransformed = Tinv * pt;
-//     Vec2f pt2d = Vec2f(fx * ptTransformed(0) / ptTransformed(2) + cx, fy * ptTransformed(1) / ptTransformed(2) + cy);
-//     return !(pt2d(0) < 0 || pt2d(1) < 0 ||
-//              pt2d(0) > cols - 1 || pt2d(1) > rows - 1 ||
-//              ptTransformed(2) < param.zmin_update ||
-//              ptTransformed(2) > param.zmax_update);
-// }
-
-// __device__ __forceinline__ bool is_block_visible(
-//     const Vec3i &block_pos,
-//     const Matrix3x4f &inv_pose,
-//     int cols, int rows, float fx,
-//     float fy, float cx, float cy)
-// {
-//     float scale = param.block_size_metric();
-// #pragma unroll
-//     for (int corner = 0; corner < 8; ++corner)
-//     {
-//         Vec3i tmp = block_pos;
-//         tmp(0) += (corner & 1) ? 1 : 0;
-//         tmp(1) += (corner & 2) ? 1 : 0;
-//         tmp(2) += (corner & 4) ? 1 : 0;
-
-//         if (is_vertex_visible(tmp * scale, inv_pose, cols, rows, fx, fy, cx, cy))
-//             return true;
-//     }
-
-//     return false;
-// }
