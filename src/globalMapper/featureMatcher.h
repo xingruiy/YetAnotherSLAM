@@ -18,10 +18,20 @@ class FeatureMatcher
     cv::Ptr<cv::ORB> orbDetector;
     cv::Ptr<cv::FastFeatureDetector> fastDetector;
 
+    void computePatch3x3(
+        Mat image,
+        std::vector<cv::KeyPoint> &points,
+        std::vector<Vec9f> &patches);
+
+    void extractDepth(
+        Mat depth,
+        std::vector<cv::KeyPoint> &points,
+        std::vector<float> &depthVec);
+
 public:
     FeatureMatcher(PointType pType);
     void detect(
-        Mat image, Mat depth,
+        Mat image, Mat depth, Mat intensity,
         std::vector<cv::KeyPoint> &keyPoints,
         std::vector<Vec9f> &patch3x3,
         std::vector<float> &depthVec);

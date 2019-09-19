@@ -2,144 +2,139 @@
 #include "utils/cudaUtils.h"
 #include "utils/prefixSum.h"
 
-#define RENDERING_BLOCK_SIZE_X 16
-#define RENDERING_BLOCK_SIZE_Y 16
-#define RENDERING_BLOCK_SUBSAMPLE 8
-#define MAX_NUM_RENDERING_BLOCK 100000
+#define RenderingBlockSizeX 16
+#define RenderingBlockSizeY 16
+#define RenderingBlockSubSample 8
+#define MaxNumRenderingBlock 100000
+
+__device__ __forceinline__ Vec2f project(
+    const Vec3f &pt,
+    const float &fx, const float &fy,
+    const float &cx, const float &cy)
+{
+    return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
+}
+
+__device__ __forceinline__ Vec3f unproject(
+    const int &x, const int &y, const float &z,
+    const float &invfx, const float &invfy,
+    const float &cx, const float &cy)
+{
+    return Vec3f((x - cx) * invfx * z, (y - cy) * invfy * z, z);
+}
+
+// compare val with the old value stored in *add
+// and write the bigger one to *add
+__device__ __forceinline__ void atomicMax(float *add, float val)
+{
+    int *address_as_i = (int *)add;
+    int old = *address_as_i, assumed;
+    do
+    {
+        assumed = old;
+        old = atomicCAS(address_as_i, assumed, __float_as_int(fmaxf(val, __int_as_float(assumed))));
+    } while (assumed != old);
+}
+
+// compare val with the old value stored in *add
+// and write the smaller one to *add
+__device__ __forceinline__ void atomicMin(float *add, float val)
+{
+    int *address_as_i = (int *)add;
+    int old = *address_as_i, assumed;
+    do
+    {
+        assumed = old;
+        old = atomicCAS(address_as_i, assumed, __float_as_int(fminf(val, __int_as_float(assumed))));
+    } while (assumed != old);
+}
 
 struct RenderingBlockDelegate
 {
+    SE3f Tinv;
     int width, height;
-    SE3f inv_pose;
     float fx, fy, cx, cy;
+    float depthMin, depthMax;
+    float voxelSize;
 
     uint *rendering_block_count;
     uint visible_block_count;
 
-    HashEntry *visible_block_pos;
-    mutable cv::cuda::PtrStepSz<float> zrange_x;
-    mutable cv::cuda::PtrStep<float> zrange_y;
-    RenderingBlock *rendering_blocks;
+    HashEntry *visibleEntry;
+    RenderingBlock *listRenderingBlock;
 
-    float depthMin, depthMax;
-    float voxelSize;
+    mutable cv::cuda::PtrStepSz<float> zRangeX;
+    mutable cv::cuda::PtrStep<float> zRangeY;
 
-    __device__ __forceinline__ Vec2f project(const Vec3f &pt) const
+    __device__ __forceinline__ bool createRenderingBlock(const Vec3i &blockPos, RenderingBlock &block) const
     {
-        return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
-    }
-
-    // compare val with the old value stored in *add
-    // and write the bigger one to *add
-    __device__ __forceinline__ void atomic_max(float *add, float val) const
-    {
-        int *address_as_i = (int *)add;
-        int old = *address_as_i, assumed;
-        do
-        {
-            assumed = old;
-            old = atomicCAS(address_as_i, assumed, __float_as_int(fmaxf(val, __int_as_float(assumed))));
-        } while (assumed != old);
-    }
-
-    // compare val with the old value stored in *add
-    // and write the smaller one to *add
-    __device__ __forceinline__ void atomic_min(float *add, float val) const
-    {
-        int *address_as_i = (int *)add;
-        int old = *address_as_i, assumed;
-        do
-        {
-            assumed = old;
-            old = atomicCAS(address_as_i, assumed, __float_as_int(fminf(val, __int_as_float(assumed))));
-        } while (assumed != old);
-    }
-
-    __device__ __forceinline__ bool create_rendering_block(const Vec3i &block_pos, RenderingBlock &block) const
-    {
-        block.upper_left = Vec2s(zrange_x.cols, zrange_x.rows);
+        block.upper_left = Vec2s(zRangeX.cols, zRangeX.rows);
         block.lower_right = Vec2s(-1, -1);
         block.zrange = Vec2f(depthMax, depthMin);
 
-        float scale = voxelSize * BLOCK_SIZE;
+        float scale = voxelSize * BlockSize;
 #pragma unroll
         for (int corner = 0; corner < 8; ++corner)
         {
-            Vec3i tmp = block_pos;
+            Vec3i tmp = blockPos;
             tmp(0) += (corner & 1) ? 1 : 0;
             tmp(1) += (corner & 2) ? 1 : 0;
             tmp(2) += (corner & 4) ? 1 : 0;
 
-            auto pt3d = inv_pose * (tmp.cast<float>() * scale);
-
-            Vec2f pt2d = project(pt3d) / RENDERING_BLOCK_SUBSAMPLE;
+            auto pt3d = Tinv * (tmp.cast<float>() * scale);
+            Vec2f pt2d = project(pt3d, fx, fy, cx, cy) / RenderingBlockSubSample;
 
             if (block.upper_left(0) > std::floor(pt2d(0)))
                 block.upper_left(0) = (int)std::floor(pt2d(0));
-
             if (block.lower_right(0) < ceil(pt2d(0)))
                 block.lower_right(0) = (int)ceil(pt2d(0));
-
             if (block.upper_left(1) > std::floor(pt2d(1)))
                 block.upper_left(1) = (int)std::floor(pt2d(1));
-
             if (block.lower_right(1) < ceil(pt2d(1)))
                 block.lower_right(1) = (int)ceil(pt2d(1));
-
             if (block.zrange(0) > pt3d(2))
                 block.zrange(0) = pt3d(2);
-
             if (block.zrange(1) < pt3d(2))
                 block.zrange(1) = pt3d(2);
         }
 
         if (block.upper_left(0) < 0)
             block.upper_left(0) = 0;
-
         if (block.upper_left(1) < 0)
             block.upper_left(1) = 0;
-
-        if (block.lower_right(0) >= zrange_x.cols)
-            block.lower_right(0) = zrange_x.cols - 1;
-
-        if (block.lower_right(1) >= zrange_x.rows)
-            block.lower_right(1) = zrange_x.rows - 1;
-
+        if (block.lower_right(0) >= zRangeX.cols)
+            block.lower_right(0) = zRangeX.cols - 1;
+        if (block.lower_right(1) >= zRangeX.rows)
+            block.lower_right(1) = zRangeX.rows - 1;
         if (block.upper_left(0) > block.lower_right(0))
             return false;
-
         if (block.upper_left(1) > block.lower_right(1))
             return false;
-
         if (block.zrange(0) < depthMin)
             block.zrange(0) = depthMin;
-
         if (block.zrange(1) < depthMin)
             return false;
 
         return true;
     }
 
-    __device__ __forceinline__ void create_rendering_block_list(int offset, const RenderingBlock &block, int &nx, int &ny) const
+    __device__ __forceinline__ void splitRenderingBlock(int offset, const RenderingBlock &block, int &nx, int &ny) const
     {
         for (int y = 0; y < ny; ++y)
         {
             for (int x = 0; x < nx; ++x)
             {
-                if (offset < MAX_NUM_RENDERING_BLOCK)
+                if (offset < MaxNumRenderingBlock)
                 {
-                    RenderingBlock &b(rendering_blocks[offset++]);
-                    b.upper_left(0) = block.upper_left(0) + x * RENDERING_BLOCK_SIZE_X;
-                    b.upper_left(1) = block.upper_left(1) + y * RENDERING_BLOCK_SIZE_Y;
-                    b.lower_right(0) = block.upper_left(0) + (x + 1) * RENDERING_BLOCK_SIZE_X;
-                    b.lower_right(1) = block.upper_left(1) + (y + 1) * RENDERING_BLOCK_SIZE_Y;
-
+                    RenderingBlock &b(listRenderingBlock[offset++]);
+                    b.upper_left(0) = block.upper_left(0) + x * RenderingBlockSizeX;
+                    b.upper_left(1) = block.upper_left(1) + y * RenderingBlockSizeY;
+                    b.lower_right(0) = block.upper_left(0) + (x + 1) * RenderingBlockSizeX;
+                    b.lower_right(1) = block.upper_left(1) + (y + 1) * RenderingBlockSizeY;
                     if (b.lower_right(0) > block.lower_right(0))
                         b.lower_right(0) = block.lower_right(0);
-
                     if (b.lower_right(1) > block.lower_right(1))
                         b.lower_right(1) = block.lower_right(1);
-
                     b.zrange = block.zrange;
                 }
             }
@@ -155,19 +150,19 @@ struct RenderingBlockDelegate
         RenderingBlock block;
         int nx, ny;
 
-        if (x < visible_block_count && visible_block_pos[x].ptr_ != -1)
+        if (x < visible_block_count && visibleEntry[x].ptr != -1)
         {
-            valid = create_rendering_block(visible_block_pos[x].pos_, block);
+            valid = createRenderingBlock(visibleEntry[x].pos, block);
             float dx = (float)block.lower_right(0) - block.upper_left(0) + 1;
             float dy = (float)block.lower_right(1) - block.upper_left(1) + 1;
-            nx = __float2int_ru(dx / RENDERING_BLOCK_SIZE_X);
-            ny = __float2int_ru(dy / RENDERING_BLOCK_SIZE_Y);
+            nx = __float2int_ru(dx / RenderingBlockSizeX);
+            ny = __float2int_ru(dy / RenderingBlockSizeY);
 
             if (valid)
             {
                 requiredNoBlocks = nx * ny;
                 uint totalNoBlocks = *rendering_block_count + requiredNoBlocks;
-                if (totalNoBlocks >= MAX_NUM_RENDERING_BLOCK)
+                if (totalNoBlocks >= MaxNumRenderingBlock)
                 {
                     requiredNoBlocks = 0;
                 }
@@ -175,31 +170,38 @@ struct RenderingBlockDelegate
         }
 
         int offset = computeOffset<1024>(requiredNoBlocks, rendering_block_count);
-        if (valid && offset != -1 && (offset + requiredNoBlocks) < MAX_NUM_RENDERING_BLOCK)
-            create_rendering_block_list(offset, block, nx, ny);
+        if (valid && offset != -1 && (offset + requiredNoBlocks) < MaxNumRenderingBlock)
+            splitRenderingBlock(offset, block, nx, ny);
     }
+};
 
-    __device__ __forceinline__ void fill_rendering_blocks() const
+struct FillRenderingBlockFunctor
+{
+    mutable cv::cuda::PtrStepSz<float> zRangeX;
+    mutable cv::cuda::PtrStep<float> zRangeY;
+    RenderingBlock *listRenderingBlock;
+
+    __device__ __forceinline__ void operator()() const
     {
         int x = threadIdx.x;
         int y = threadIdx.y;
 
         int block = blockIdx.x * 4 + blockIdx.y;
-        if (block >= MAX_NUM_RENDERING_BLOCK)
+        if (block >= MaxNumRenderingBlock)
             return;
 
-        RenderingBlock &b(rendering_blocks[block]);
+        RenderingBlock &b(listRenderingBlock[block]);
 
         int xpos = b.upper_left(0) + x;
-        if (xpos > b.lower_right(0) || xpos >= zrange_x.cols)
+        if (xpos > b.lower_right(0) || xpos >= zRangeX.cols)
             return;
 
         int ypos = b.upper_left(1) + y;
-        if (ypos > b.lower_right(1) || ypos >= zrange_x.rows)
+        if (ypos > b.lower_right(1) || ypos >= zRangeX.rows)
             return;
 
-        atomic_min(&zrange_x.ptr(ypos)[xpos], b.zrange(0));
-        atomic_max(&zrange_y.ptr(ypos)[xpos], b.zrange(1));
+        atomicMin(&zRangeX.ptr(ypos)[xpos], b.zrange(0));
+        atomicMax(&zRangeY.ptr(ypos)[xpos], b.zrange(1));
 
         return;
     }
@@ -210,20 +212,20 @@ void create_rendering_blocks(
     uint count_visible_block,
     uint &count_rendering_block,
     HashEntry *visible_blocks,
-    GMat &zrange_x,
-    GMat &zrange_y,
+    GMat &zRangeX,
+    GMat &zRangeY,
     RenderingBlock *listRenderingBlock,
-    const SE3 &frame_pose,
-    const Mat33d &cam_params)
+    const SE3 &T,
+    const Mat33d &K)
 {
     if (count_visible_block == 0)
         return;
 
-    const int cols = zrange_x.cols;
-    const int rows = zrange_y.rows;
+    const int cols = zRangeX.cols;
+    const int rows = zRangeY.rows;
 
-    zrange_x.setTo(cv::Scalar(100.f));
-    zrange_y.setTo(cv::Scalar(0));
+    zRangeX.setTo(cv::Scalar(100.f));
+    zRangeY.setTo(cv::Scalar(0));
 
     uint *count_device;
     count_rendering_block = 0;
@@ -234,17 +236,17 @@ void create_rendering_blocks(
 
     delegate.width = cols;
     delegate.height = rows;
-    delegate.inv_pose = frame_pose.inverse().cast<float>();
-    delegate.zrange_x = zrange_x;
-    delegate.zrange_y = zrange_y;
-    delegate.fx = cam_params(0, 0);
-    delegate.fy = cam_params(1, 1);
-    delegate.cx = cam_params(0, 2);
-    delegate.cy = cam_params(1, 2);
-    delegate.visible_block_pos = visible_blocks;
+    delegate.Tinv = T.inverse().cast<float>();
+    delegate.zRangeX = zRangeX;
+    delegate.zRangeY = zRangeY;
+    delegate.fx = K(0, 0);
+    delegate.fy = K(1, 1);
+    delegate.cx = K(0, 2);
+    delegate.cy = K(1, 2);
+    delegate.visibleEntry = visible_blocks;
     delegate.visible_block_count = count_visible_block;
     delegate.rendering_block_count = count_device;
-    delegate.rendering_blocks = listRenderingBlock;
+    delegate.listRenderingBlock = listRenderingBlock;
     delegate.depthMax = 3.0f;
     delegate.depthMin = 0.1f;
     delegate.voxelSize = map_struct.voxelSize;
@@ -258,10 +260,15 @@ void create_rendering_blocks(
     if (count_rendering_block == 0)
         return;
 
-    thread = dim3(RENDERING_BLOCK_SIZE_X, RENDERING_BLOCK_SIZE_Y);
+    thread = dim3(RenderingBlockSizeX, RenderingBlockSizeY);
     block = dim3((uint)ceil((float)count_rendering_block / 4), 4);
 
-    callDeviceFunctor<<<block, thread>>>(delegate);
+    FillRenderingBlockFunctor functor;
+    functor.listRenderingBlock = listRenderingBlock;
+    functor.zRangeX = zRangeX;
+    functor.zRangeY = zRangeY;
+
+    callDeviceFunctor<<<block, thread>>>(functor);
     (cudaFree((void *)count_device));
 }
 
@@ -270,10 +277,10 @@ struct MapRenderingDelegate
     int width, height;
     // MapStruct map_struct;
     mutable cv::cuda::PtrStep<Vec4f> vmap;
-    cv::cuda::PtrStepSz<float> zrange_x;
-    cv::cuda::PtrStepSz<float> zrange_y;
+    cv::cuda::PtrStepSz<float> zRangeX;
+    cv::cuda::PtrStepSz<float> zRangeY;
     float invfx, invfy, cx, cy;
-    SE3f pose, inv_pose;
+    SE3f pose, Tinv;
 
     HashEntry *hashTable;
     Voxel *listBlock;
@@ -285,7 +292,7 @@ struct MapRenderingDelegate
     {
         Voxel *voxel = NULL;
         findVoxel(floor(pt3d), voxel, hashTable, listBlock, bucketSize);
-        if (voxel && voxel->weight != 0)
+        if (voxel && voxel->wt != 0)
         {
             valid = true;
             return unpackFloat(voxel->sdf);
@@ -332,11 +339,6 @@ struct MapRenderingDelegate
         return (1.0f - xyz(2)) * result[2] + xyz(2) * result[3];
     }
 
-    __device__ __forceinline__ Vec3f unproject(const int &x, const int &y, const float &z) const
-    {
-        return Vec3f((x - cx) * invfx * z, (y - cy) * invfy * z, z);
-    }
-
     __device__ __forceinline__ void operator()() const
     {
         const int x = threadIdx.x + blockDim.x * blockIdx.x;
@@ -346,49 +348,45 @@ struct MapRenderingDelegate
 
         vmap.ptr(y)[x](0) = __int_as_float(0x7fffffff);
 
-        Vec2i local_id;
-        local_id(0) = __float2int_rd((float)x / 8);
-        local_id(1) = __float2int_rd((float)y / 8);
+        int u = __float2int_rd((float)x / 8);
+        int v = __float2int_rd((float)y / 8);
 
-        Vec2f zrange;
-        zrange(0) = zrange_x.ptr(local_id(1))[local_id(0)];
-        zrange(1) = zrange_y.ptr(local_id(1))[local_id(0)];
-        if (zrange(1) < 1e-3 || zrange(0) < 1e-3 || isnan(zrange(0)) || isnan(zrange(1)))
+        auto zNear = zRangeX.ptr(v)[u];
+        auto zFar = zRangeY.ptr(v)[u];
+        if (zNear < FLT_EPSILON || zFar < FLT_EPSILON ||
+            isnan(zNear) || isnan(zFar))
             return;
 
         float sdf = 1.0f;
-        float last_sdf;
+        float lastReadSDF;
 
-        Vec3f pt = unproject(x, y, zrange(0));
+        Vec3f pt = unproject(x, y, zNear, invfx, invfy, cx, cy);
         float dist_s = pt.norm() * voxelSizeInv;
-        Vec3f block_s = pose * (pt)*voxelSizeInv;
+        Vec3f blockStart = pose * (pt)*voxelSizeInv;
 
-        pt = unproject(x, y, zrange(1));
-        float dist_e = pt.norm() * voxelSizeInv;
-        Vec3f block_e = pose * (pt)*voxelSizeInv;
+        pt = unproject(x, y, zFar, invfx, invfy, cx, cy);
+        float distEnd = pt.norm() * voxelSizeInv;
+        Vec3f blockEnd = pose * (pt)*voxelSizeInv;
 
-        Vec3f dir = (block_e - block_s).normalized();
-        Vec3f result = block_s;
+        Vec3f dir = (blockEnd - blockStart).normalized();
+        Vec3f result = blockStart;
 
-        bool valid_sdf = false;
-        bool found_pt = false;
+        bool sdfValid = false;
+        bool ptFound = false;
         float step;
 
-        while (dist_s < dist_e)
+        while (dist_s < distEnd)
         {
-            last_sdf = sdf;
-            sdf = read_sdf(result, valid_sdf);
+            lastReadSDF = sdf;
+            sdf = read_sdf(result, sdfValid);
 
             if (sdf <= 0.5f && sdf >= -0.5f)
-                sdf = read_sdf_interped(result, valid_sdf);
-
+                sdf = read_sdf_interped(result, sdfValid);
             if (sdf <= 0.0f)
                 break;
-
-            if (sdf >= 0.f && last_sdf < 0.f)
+            if (sdf >= 0.f && lastReadSDF < 0.f)
                 return;
-
-            if (valid_sdf)
+            if (sdfValid)
                 step = max(sdf * raytraceStep, 1.0f);
             else
                 step = 2;
@@ -402,19 +400,19 @@ struct MapRenderingDelegate
             step = sdf * raytraceStep;
             result += step * dir;
 
-            sdf = read_sdf_interped(result, valid_sdf);
+            sdf = read_sdf_interped(result, sdfValid);
 
             step = sdf * raytraceStep;
             result += step * dir;
 
-            if (valid_sdf)
-                found_pt = true;
+            if (sdfValid)
+                ptFound = true;
         }
 
-        if (found_pt)
+        if (ptFound)
         {
-            result = inv_pose * (result / voxelSizeInv);
-            vmap.ptr(y)[x] = Vec4f(result(0), result(1), result(2), 1.0);
+            result = Tinv * (result / voxelSizeInv);
+            vmap.ptr(y)[x] = Vec4f(result(0), result(1), result(2), 1.0f);
         }
     }
 };
@@ -423,9 +421,9 @@ void raycast(MapStruct map_struct,
              // MapState state,
              GMat vmap,
              GMat nmap,
-             GMat zrange_x,
-             GMat zrange_y,
-             const SE3 &pose,
+             GMat zRangeX,
+             GMat zRangeY,
+             const SE3 &T,
              const Mat33d &K)
 {
     const int cols = vmap.cols;
@@ -435,17 +433,15 @@ void raycast(MapStruct map_struct,
 
     delegate.width = cols;
     delegate.height = rows;
-    // delegate.map_struct = map_struct;
     delegate.vmap = vmap;
-    // delegate.nmap = nmap;
-    delegate.zrange_x = zrange_x;
-    delegate.zrange_y = zrange_y;
+    delegate.zRangeX = zRangeX;
+    delegate.zRangeY = zRangeY;
     delegate.invfx = 1.0 / K(0, 0);
     delegate.invfy = 1.0 / K(1, 1);
     delegate.cx = K(0, 2);
     delegate.cy = K(1, 2);
-    delegate.pose = pose.cast<float>();
-    delegate.inv_pose = pose.inverse().cast<float>();
+    delegate.pose = T.cast<float>();
+    delegate.Tinv = T.inverse().cast<float>();
     delegate.hashTable = map_struct.hash_table_;
     delegate.listBlock = map_struct.voxels_;
     delegate.bucketSize = map_struct.bucketSize;

@@ -28,6 +28,7 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> displayModelBox;
     std::shared_ptr<pangolin::Var<bool>> enableMappingBox;
     std::shared_ptr<pangolin::Var<bool>> displayFrameHistoryBox;
+    std::shared_ptr<pangolin::Var<bool>> displayActivePointsBox;
 
     GLuint vaoPhong;
     GLuint vaoColour;
@@ -49,6 +50,7 @@ class MapViewer
     void setupKeyBindings();
     void checkButtonsAndBoxes();
 
+    std::vector<Vec3f> activePoints;
     std::vector<Vec3f> rawFrameHistory;
     std::vector<Mat44f> rawKeyFrameHistory;
     std::vector<Vec3f> frameHistory;
@@ -69,6 +71,7 @@ public:
     void setRawKeyFrameHistory(const std::vector<SE3> &history);
     void setFrameHistory(const std::vector<SE3> &history);
     void setKeyFrameHistory(const std::vector<SE3> &history);
+    void setActivePoints(const std::vector<Vec3f> &points);
 
     bool isResetRequested();
     bool isSystemPaused() const;

@@ -34,9 +34,32 @@ class DenseTracker
     std::vector<GMat> intensityGradientY;
     std::vector<GMat> referencePointTransformed;
 
+    std::vector<GMat> currentInvDepth;
+    std::vector<GMat> referenceInvDepth;
+    std::vector<GMat> invDepthGradientX;
+    std::vector<GMat> invDepthGradientY;
+
     void computeSE3StepRGB(
         const int lvl,
-        SE3 &estimate,
+        const SE3 &T,
+        float *hessian,
+        float *residual);
+
+    void computeSE3StepRGBDLinear(
+        const int lvl,
+        const SE3 &T,
+        float *hessian,
+        float *residual);
+
+    void computeSE3StepRGBD(
+        const int lvl,
+        const SE3 &T,
+        float *hessian,
+        float *residual);
+
+    void computeSE3StepD(
+        const int lvl,
+        const SE3 &T,
         float *hessian,
         float *residual);
 

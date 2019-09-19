@@ -6,12 +6,12 @@
 #include "utils/cudaUtils.h"
 
 __device__ inline bool is_vertex_visible(
-    Vec3f pt, SE3f inv_pose,
+    Vec3f pt, const SE3f &Tinv,
     int cols, int rows, float fx,
     float fy, float cx, float cy,
     float depthMin, float depthMax)
 {
-    pt = inv_pose * (pt);
+    pt = Tinv * pt;
     Vec2f pt2d = Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
     return !(pt2d(0) < 0 || pt2d(1) < 0 ||
              pt2d(0) > cols - 1 || pt2d(1) > rows - 1 ||
@@ -20,12 +20,13 @@ __device__ inline bool is_vertex_visible(
 
 __device__ inline bool is_block_visible(
     const Vec3i &block_pos,
-    SE3f inv_pose, const float &voxelSize,
+    const SE3f &Tinv,
+    const float &voxelSize,
     int cols, int rows, float fx,
     float fy, float cx, float cy,
     float depthMin, float depthMax)
 {
-    float scale = voxelSize * BLOCK_SIZE; //param.block_size_metric();
+    float scale = voxelSize * BlockSize; //param.block_size_metric();
 #pragma unroll
     for (int corner = 0; corner < 8; ++corner)
     {
@@ -34,7 +35,7 @@ __device__ inline bool is_block_visible(
         tmp(1) += (corner & 2) ? 1 : 0;
         tmp(2) += (corner & 4) ? 1 : 0;
 
-        if (is_vertex_visible(tmp.cast<float>() * scale, inv_pose, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
+        if (is_vertex_visible(tmp.cast<float>() * scale, Tinv, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
             return true;
     }
 
@@ -42,7 +43,7 @@ __device__ inline bool is_block_visible(
 }
 
 __global__ void check_visibility_flag_kernel(
-    MapStruct map_struct, uchar *flag, SE3f inv_pose,
+    MapStruct map_struct, uchar *flag, SE3f Tinv,
     int cols, int rows, float fx, float fy, float cx, float cy, float voxelSize,
     float depthMin, float depthMax)
 {
@@ -51,19 +52,19 @@ __global__ void check_visibility_flag_kernel(
         return;
 
     HashEntry &current = map_struct.hash_table_[idx];
-    if (current.ptr_ != -1)
+    if (current.ptr != -1)
     {
         switch (flag[idx])
         {
         default:
         {
-            if (is_block_visible(current.pos_, inv_pose, voxelSize, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
+            if (is_block_visible(current.pos, Tinv, voxelSize, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
             {
                 flag[idx] = 1;
             }
             else
             {
-                current.ptr_ = -1;
+                current.ptr = -1;
                 flag[idx] = 0;
             }
 
@@ -262,7 +263,7 @@ __global__ void update_map_kernel(MapStruct map_struct,
                                   HashEntry *visible_blocks,
                                   uint count_visible_block,
                                   cv::cuda::PtrStepSz<float> depth,
-                                  SE3f inv_pose,
+                                  SE3f Tinv,
                                   float fx, float fy,
                                   float cx, float cy,
                                   float depthMin, float depthMax)
@@ -272,15 +273,15 @@ __global__ void update_map_kernel(MapStruct map_struct,
 
     HashEntry &current = visible_blocks[blockIdx.x];
 
-    Vec3i voxel_pos = blockPosToVoxelPos(current.pos_);
+    Vec3i voxelPos = blockPosToVoxelPos(current.pos);
     float dist_thresh = map_struct.truncationDist;
     float inv_dist_thresh = 1.0 / dist_thresh;
 
 #pragma unroll
-    for (int block_idx_z = 0; block_idx_z < 8; ++block_idx_z)
+    for (int blockIdxZ = 0; blockIdxZ < 8; ++blockIdxZ)
     {
-        Vec3i local_pos = Vec3i(threadIdx.x, threadIdx.y, block_idx_z);
-        Vec3f pt = inv_pose * (voxelPosToWorldPt(voxel_pos + local_pos, map_struct.voxelSize));
+        Vec3i localPos = Vec3i(threadIdx.x, threadIdx.y, blockIdxZ);
+        Vec3f pt = Tinv * (voxelPosToWorldPt(voxelPos + localPos, map_struct.voxelSize));
 
         int u = __float2int_rd(fx * pt(0) / pt(2) + cx + 0.5);
         int v = __float2int_rd(fy * pt(1) / pt(2) + cy + 0.5);
@@ -296,26 +297,97 @@ __global__ void update_map_kernel(MapStruct map_struct,
             continue;
 
         sdf = fmin(1.0f, sdf * inv_dist_thresh);
-        const int local_idx = localPosToLocalIdx(local_pos);
-        Voxel &voxel = map_struct.voxels_[current.ptr_ + local_idx];
+        const int local_idx = localPosToLocalIdx(localPos);
+        Voxel &voxel = map_struct.voxels_[current.ptr + local_idx];
 
-        auto sdf_p = unpackFloat(voxel.sdf);
-        auto weight_p = voxel.weight;
+        auto oldSDF = unpackFloat(voxel.sdf);
+        auto oldWT = voxel.wt;
         auto weight = 1 / (dist);
 
-        if (weight_p == 0)
+        if (oldWT == 0)
         {
             voxel.sdf = packFloat(sdf);
-            voxel.weight = weight;
+            voxel.wt = weight;
             continue;
         }
 
         // fuse depth
-        sdf_p = (sdf_p * weight_p + sdf * weight) / (weight_p + weight);
-        voxel.sdf = packFloat(sdf_p);
-        voxel.weight = (weight_p + weight);
+        oldSDF = (oldSDF * oldWT + sdf * weight) / (oldWT + weight);
+        voxel.sdf = packFloat(oldSDF);
+        voxel.wt = (oldWT + weight);
     }
 }
+
+struct DepthFusionFunctor
+{
+
+    Voxel *listBlock;
+    HashEntry *visible_blocks;
+
+    SE3f Tinv;
+    float fx, fy;
+    float cx, cy;
+    float depthMin;
+    float depthMax;
+
+    float truncationDist;
+    int hashTableSize;
+    float voxelSize;
+    uint count_visible_block;
+
+    cv::cuda::PtrStepSz<float> depth;
+
+    __device__ __forceinline__ void operator()() const
+    {
+        if (blockIdx.x >= hashTableSize || blockIdx.x >= count_visible_block)
+            return;
+
+        HashEntry &current = visible_blocks[blockIdx.x];
+        if (current.ptr == -1)
+            return;
+
+        Vec3i voxelPos = blockPosToVoxelPos(current.pos);
+
+#pragma unroll
+        for (int blockIdxZ = 0; blockIdxZ < 8; ++blockIdxZ)
+        {
+            Vec3i localPos = Vec3i(threadIdx.x, threadIdx.y, blockIdxZ);
+            Vec3f pt = Tinv * voxelPosToWorldPt(voxelPos + localPos, voxelSize);
+
+            int u = __float2int_rd(fx * pt(0) / pt(2) + cx + 0.5);
+            int v = __float2int_rd(fy * pt(1) / pt(2) + cy + 0.5);
+            if (u < 0 || v < 0 || u > depth.cols - 1 || v > depth.rows - 1)
+                continue;
+
+            float dist = depth.ptr(v)[u];
+            if (isnan(dist) || dist > depthMax || dist < depthMin)
+                continue;
+
+            float sdf = dist - pt(2);
+            if (sdf < -truncationDist)
+                continue;
+
+            sdf = fmin(1.0f, sdf / truncationDist);
+            const int localIdx = localPosToLocalIdx(localPos);
+            Voxel &voxel = listBlock[current.ptr + localIdx];
+
+            auto oldSDF = unpackFloat(voxel.sdf);
+            auto oldWT = voxel.wt;
+            auto weight = 1 / dist;
+
+            if (oldWT == 0)
+            {
+                voxel.sdf = packFloat(sdf);
+                voxel.wt = weight;
+                continue;
+            }
+
+            oldSDF = (oldSDF * oldWT + sdf * weight) / (oldWT + weight);
+            voxel.sdf = packFloat(oldSDF);
+            voxel.wt = (oldWT + weight);
+        }
+    }
+};
 
 void update(
     MapStruct map_struct,
@@ -323,24 +395,24 @@ void update(
     const SE3 &frame_pose,
     const Mat33d &K,
     GMat &cv_flag,
-    GMat &cv_pos_array,
+    GMat &cv_posarray,
     HashEntry *visible_blocks,
     uint &visible_block_count)
 {
     if (cv_flag.empty())
         cv_flag.create(1, map_struct.hashTableSize, CV_8UC1);
-    if (cv_pos_array.empty())
-        cv_pos_array.create(1, map_struct.hashTableSize, CV_32SC1);
+    if (cv_posarray.empty())
+        cv_posarray.create(1, map_struct.hashTableSize, CV_32SC1);
 
     thrust::device_ptr<uchar> flag(cv_flag.ptr<uchar>());
-    thrust::device_ptr<int> pos_array(cv_pos_array.ptr<int>());
+    thrust::device_ptr<int> posarray(cv_posarray.ptr<int>());
 
     float fx = K(0, 0);
     float fy = K(1, 1);
     float cx = K(0, 2);
     float cy = K(1, 2);
-    float invfx = 1.0 / fx;
-    float invfy = 1.0 / fy;
+    float invfx = 1.0 / K(0, 0);
+    float invfy = 1.0 / K(1, 1);
 
     const int cols = depth.cols;
     const int rows = depth.rows;
@@ -373,31 +445,49 @@ void update(
         0.1f,
         3.0f);
 
-    thrust::exclusive_scan(flag, flag + map_struct.hashTableSize, pos_array);
+    thrust::exclusive_scan(flag, flag + map_struct.hashTableSize, posarray);
 
     copy_visible_block_kernel<<<block, thread>>>(
         map_struct.hash_table_,
         visible_blocks,
         map_struct.hashTableSize,
         flag.get(),
-        pos_array.get());
+        posarray.get());
 
-    visible_block_count = pos_array[map_struct.hashTableSize - 1];
+    visible_block_count = posarray[map_struct.hashTableSize - 1];
 
     if (visible_block_count == 0)
         return;
 
+    DepthFusionFunctor functor;
+    functor.listBlock = map_struct.voxels_;
+    functor.visible_blocks = visible_blocks;
+    functor.Tinv = frame_pose.inverse().cast<float>();
+    functor.fx = fx;
+    functor.fy = fy;
+    functor.cx = cx;
+    functor.cy = cy;
+    functor.depthMin = 0.1f;
+    functor.depthMax = 3.0f;
+    functor.truncationDist = map_struct.truncationDist;
+    functor.hashTableSize = map_struct.hashTableSize;
+    functor.voxelSize = map_struct.voxelSize;
+    functor.count_visible_block = visible_block_count;
+    functor.depth = depth;
+
     thread = dim3(8, 8);
     block = dim3(visible_block_count);
 
-    update_map_kernel<<<block, thread>>>(
-        map_struct,
-        visible_blocks,
-        visible_block_count,
-        depth,
-        frame_pose.inverse().cast<float>(),
-        fx, fy,
-        cx, cy,
-        0.1f,
-        3.0f);
+    callDeviceFunctor<<<block, thread>>>(functor);
+
+    // update_map_kernel<<<block, thread>>>(
+    //     map_struct,
+    //     visible_blocks,
+    //     visible_block_count,
+    //     depth,
+    //     frame_pose.inverse().cast<float>(),
+    //     fx, fy,
+    //     cx, cy,
+    //     0.1f,
+    //     3.0f);
 }

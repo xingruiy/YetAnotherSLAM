@@ -4,10 +4,11 @@ Frame::Frame()
 {
 }
 
-Frame::Frame(Mat rawImage, Mat rawDepth)
+Frame::Frame(Mat rawImage, Mat rawDepth, Mat rawIntensity)
 {
     rawImage.copyTo(this->rawImage);
     rawDepth.copyTo(this->rawDepth);
+    rawIntensity.copyTo(this->rawIntensity);
 }
 
 Mat Frame::getDepth()
@@ -28,4 +29,9 @@ Mat Frame::getIntensity()
 SE3 Frame::getPose()
 {
     return framePose;
+}
+
+void Frame::setPose(const SE3 &T)
+{
+    framePose = T;
 }

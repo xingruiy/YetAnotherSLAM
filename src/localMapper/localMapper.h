@@ -7,29 +7,26 @@ class DenseMapping
 {
 public:
   ~DenseMapping();
-  DenseMapping(int w, int h, const Eigen::Matrix3d &K);
+  DenseMapping(int w, int h, Mat33d &K);
 
-  size_t fetch_mesh_vertex_only(void *vertex);
   size_t fetch_mesh_with_normal(void *vertex, void *normal);
-  size_t fetch_mesh_with_colour(void *vertex, void *normal);
-
   void fuseFrame(GMat depth, const SE3 &T);
   void raytrace(GMat &vertex, const SE3 &T);
   void reset();
 
 private:
-  Eigen::Matrix3d cam_params;
-  MapStruct device_map;
+  Mat33d intrinsics;
+  MapStruct deviceMap;
 
   // for map udate
-  cv::cuda::GpuMat flag;
-  cv::cuda::GpuMat pos_array;
+  GMat flag;
+  GMat pos_array;
   uint count_visible_block;
   HashEntry *visible_blocks;
 
   // for raycast
-  cv::cuda::GpuMat zrange_x;
-  cv::cuda::GpuMat zrange_y;
+  GMat zrange_x;
+  GMat zrange_y;
   uint count_rendering_block;
   RenderingBlock *rendering_blocks;
 };

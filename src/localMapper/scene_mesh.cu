@@ -31,7 +31,7 @@ struct BuildVertexArray
         __syncthreads();
 
         uint val = 0;
-        if (x < hashTableSize && hashTable[x].ptr_ >= 0)
+        if (x < hashTableSize && hashTable[x].ptr >= 0)
         {
             needScan = true;
             val = 1;
@@ -53,7 +53,7 @@ struct BuildVertexArray
     {
         Voxel *voxel = NULL;
         findVoxel(floor(pt), voxel, hashTable, listBlocks, bucketSize);
-        if (voxel && voxel->weight != 0)
+        if (voxel && voxel->wt != 0)
         {
             valid = true;
             return unpackFloat(voxel->sdf);
@@ -213,9 +213,9 @@ struct BuildVertexArray
             return;
 
         Vec3f verts[12];
-        Vec3i pos = block_array[x].pos_ * BLOCK_SIZE;
+        Vec3i pos = block_array[x].pos * BlockSize;
 
-        for (int voxelIdxZ = 0; voxelIdxZ < BLOCK_SIZE; ++voxelIdxZ)
+        for (int voxelIdxZ = 0; voxelIdxZ < BlockSize; ++voxelIdxZ)
         {
             Vec3i localPos = Vec3i(threadIdx.x, threadIdx.y, voxelIdxZ);
             int cubeIdx = make_vertex(verts, (pos + localPos).cast<float>());

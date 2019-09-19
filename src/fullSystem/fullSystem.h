@@ -3,6 +3,7 @@
 #include <iostream>
 #include "utils/numType.h"
 #include "localMapper/localMapper.h"
+#include "globalMapper/globalMapper.h"
 #include "denseTracker/denseTracker.h"
 
 class FullSystem
@@ -16,6 +17,7 @@ class FullSystem
     void fuseCurrentFrame(const SE3 &T);
     void updateLocalMapObservation(const SE3 &T);
 
+    std::shared_ptr<GlobalMapper> globalMapper;
     std::shared_ptr<DenseMapping> localMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
 
@@ -23,9 +25,13 @@ class FullSystem
     std::shared_ptr<Frame> referenceFrame;
 
     std::vector<SE3> rawFramePoseHistory;
+    std::vector<SE3> rawKeyFramePoseHistory;
 
     SE3 lastTrackedPose;
     SE3 lastReferencePose;
+
+    GMat bufferFloatwxh;
+    GMat bufferVec4wxh;
 
 public:
     FullSystem(const char *configFile);
@@ -33,6 +39,9 @@ public:
     void resetSystem();
     void processFrame(Mat rawImage, Mat rawDepth);
 
-    size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
+    std::vector<Vec3f> getActiveKeyPoints();
+    std::vector<Vec3f> getStableKeyPoints();
     std::vector<SE3> getRawFramePoseHistory() const;
+    std::vector<SE3> getRawKeyFramePoseHistory() const;
+    size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 };

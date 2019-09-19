@@ -44,9 +44,10 @@ __global__ void transformReferencePointKernel(
     if (x >= depth.cols || y >= depth.rows)
         return;
 
-    const auto &z = depth.ptr(y)[x];
-    if (z > FLT_EPSILON)
+    const float &zInv = depth.ptr(y)[x];
+    if (zInv > FLT_EPSILON)
     {
+        float z = 1.0 / zInv;
         Vec3f pt = RKinv * Vec3f(x, y, 1.0f) * z + t;
         ptTransformed.ptr(y)[x] = Vec4f(pt(0), pt(1), pt(2), 1.0f);
     }
@@ -151,12 +152,6 @@ __global__ void computeNormalKernel(cv::cuda::PtrStepSz<Vec4f> vmap, cv::cuda::P
     int y10 = max(y - 1, 0);
     int y01 = min(y + 1, vmap.rows);
 
-    if (vmap.ptr(y)[x10](3) < 0 || vmap.ptr(y)[x01](3) < 0 || vmap.ptr(y10)[x](3) < 0 || vmap.ptr(y01)[x](3) < 0)
-    {
-        nmap.ptr(y)[x](3) = -1.f;
-        return;
-    }
-
     Vec3f v00 = vmap.ptr(y)[x10].head<3>();
     Vec3f v01 = vmap.ptr(y)[x01].head<3>();
     Vec3f v10 = vmap.ptr(y10)[x].head<3>();
@@ -175,5 +170,93 @@ void computeNormal(const GMat vmap, GMat &nmap)
     dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
 
     computeNormalKernel<<<grid, block>>>(vmap, nmap);
+    cudaCheckError();
+}
+
+__global__ void convertDepthToInvDepthKernel(
+    cv::cuda::PtrStep<float> depth,
+    cv::cuda::PtrStepSz<float> invDepth)
+{
+    const int x = threadIdx.x + blockDim.x * blockIdx.x;
+    const int y = threadIdx.y + blockDim.y * blockIdx.y;
+    if (x >= invDepth.cols - 1 || y >= invDepth.rows - 1)
+        return;
+
+    const float z = depth.ptr(y)[x];
+    if (z == z && z > FLT_EPSILON)
+    {
+        invDepth.ptr(y)[x] = 1.0 / z;
+    }
+    else
+    {
+        invDepth.ptr(y)[x] = 0;
+    }
+}
+
+void convertDepthToInvDepth(const GMat depth, GMat &invDepth)
+{
+    if (invDepth.empty())
+        invDepth.create(depth.size(), depth.type());
+
+    dim3 block(8, 8);
+    dim3 grid = getGridConfiguration2D(block, depth.cols, depth.rows);
+
+    convertDepthToInvDepthKernel<<<grid, block>>>(depth, invDepth);
+    cudaCheckError();
+}
+
+__global__ void convertVMapToInvDepthKernel(
+    cv::cuda::PtrStep<Vec4f> vmap,
+    cv::cuda::PtrStepSz<float> invDepth)
+{
+    const int x = threadIdx.x + blockDim.x * blockIdx.x;
+    const int y = threadIdx.y + blockDim.y * blockIdx.y;
+    if (x >= invDepth.cols - 1 || y >= invDepth.rows - 1)
+        return;
+
+    const auto pt = vmap.ptr(y)[x];
+    if (pt(3) > 0)
+    {
+        invDepth.ptr(y)[x] = 1.0 / pt(2);
+    }
+    else
+    {
+        invDepth.ptr(y)[x] = 0;
+    }
+}
+
+void convertVMapToInvDepth(const GMat vmap, GMat &invDepth)
+{
+    if (invDepth.empty())
+        invDepth.create(vmap.size(), CV_32FC1);
+
+    dim3 block(8, 8);
+    dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
+
+    convertVMapToInvDepthKernel<<<grid, block>>>(vmap, invDepth);
+    cudaCheckError();
+}
+
+__global__ void pyrdownInvDepthKernel(
+    cv::cuda::PtrStep<float> src,
+    cv::cuda::PtrStepSz<float> dst)
+{
+    const int x = threadIdx.x + blockDim.x * blockIdx.x;
+    const int y = threadIdx.y + blockDim.y * blockIdx.y;
+    if (x >= dst.cols - 1 || y >= dst.rows - 1)
+        return;
+
+    dst.ptr(y)[x] = src.ptr(2 * y)[2 * x];
+}
+
+void pyrdownInvDepth(const GMat src, GMat &dst)
+{
+    if (dst.empty())
+        dst.create(src.size(), CV_32FC1);
+
+    dim3 block(8, 8);
+    dim3 grid = getGridConfiguration2D(block, src.cols, src.rows);
+
+    pyrdownInvDepthKernel<<<grid, block>>>(src, dst);
     cudaCheckError();
 }

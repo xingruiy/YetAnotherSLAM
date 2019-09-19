@@ -2,11 +2,11 @@
 #include "map_proc.h"
 #include "localMapper.h"
 
-DenseMapping::DenseMapping(int w, int h, const Eigen::Matrix3d &K) : cam_params(K)
+DenseMapping::DenseMapping(int w, int h, Mat33d &K)
+    : intrinsics(K)
 {
-  // device_map.create();#
-  device_map.create(100000, 80000, 120000, 0.005f, 0.02f);
-  device_map.reset();
+  deviceMap.create(100000, 80000, 120000, 0.005f, 0.02f);
+  deviceMap.reset();
   zrange_x.create(h / 8, w / 8, CV_32FC1);
   zrange_y.create(h / 8, w / 8, CV_32FC1);
 
@@ -16,7 +16,7 @@ DenseMapping::DenseMapping(int w, int h, const Eigen::Matrix3d &K) : cam_params(
 
 DenseMapping::~DenseMapping()
 {
-  device_map.release();
+  deviceMap.release();
   cudaFree((void **)&visible_blocks);
   cudaFree((void **)&rendering_blocks);
 }
@@ -26,10 +26,10 @@ void DenseMapping::fuseFrame(GMat depth, const SE3 &T)
   count_visible_block = 0;
 
   ::update(
-      device_map,
+      deviceMap,
       depth,
       T,
-      cam_params,
+      intrinsics,
       flag,
       pos_array,
       visible_blocks,
@@ -42,7 +42,7 @@ void DenseMapping::raytrace(GMat &vertex, const SE3 &T)
     return;
 
   ::create_rendering_blocks(
-      device_map,
+      deviceMap,
       count_visible_block,
       count_rendering_block,
       visible_blocks,
@@ -50,50 +50,35 @@ void DenseMapping::raytrace(GMat &vertex, const SE3 &T)
       zrange_y,
       rendering_blocks,
       T,
-      cam_params);
+      intrinsics);
 
   if (count_rendering_block != 0)
   {
 
     ::raycast(
-        device_map,
-        // device_map.state,
+        deviceMap,
+        // deviceMap.state,
         vertex,
         vertex,
         zrange_x,
         zrange_y,
         T,
-        cam_params);
+        intrinsics);
   }
 }
 
 void DenseMapping::reset()
 {
-  device_map.reset();
+  deviceMap.reset();
 }
-
-// size_t DenseMapping::fetch_mesh_vertex_only(void *vertex)
-// {
-//   uint count_triangle = 0;
-
-//   ::create_mesh_vertex_only(
-//       device_map
-//       device_map.state,
-//       count_visible_block,
-//       visible_blocks,
-//       count_triangle,
-//       vertex);
-
-//   return (size_t)count_triangle;
-// }
 
 size_t DenseMapping::fetch_mesh_with_normal(void *vertex, void *normal)
 {
   uint count_triangle = 0;
 
   ::create_mesh_with_normal(
-      device_map,
-      // device_map.state,
+      deviceMap,
+      // deviceMap.state,
       count_visible_block,
       visible_blocks,
       count_triangle,
@@ -102,19 +87,3 @@ size_t DenseMapping::fetch_mesh_with_normal(void *vertex, void *normal)
 
   return (size_t)count_triangle;
 }
-
-// size_t DenseMapping::fetch_mesh_with_colour(void *vertex, void *colour)
-// {
-//   uint count_triangle = 0;
-
-//   ::create_mesh_with_colour(
-//       device_map
-//       device_map.state,
-//       count_visible_block,
-//       visible_blocks,
-//       count_triangle,
-//       vertex,
-//       colour);
-
-//   return (size_t)count_triangle;
-// }

@@ -58,6 +58,7 @@ void MapViewer::setupDisplay()
     displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Mesh", true, true);
     enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Camera", false, true);
     displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Trajectory", true, true);
+    displayActivePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Active Points", true, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -177,28 +178,42 @@ void MapViewer::renderView()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.f, 0.f, 0.f, 1.f);
 
-    if (*displayColourBox)
+    checkButtonsAndBoxes();
+
+    if (*displayColourBox && colourView)
     {
         colourView->Activate();
         colourImage.RenderToViewportFlipY();
     }
 
-    if (*displayDepthBox)
+    if (*displayDepthBox && depthView)
     {
         depthView->Activate();
         depthImage.RenderToViewportFlipY();
     }
 
-    if (*displayLocalMapBox)
+    if (*displayLocalMapBox && modelView)
     {
-        modelView->Activate();
+        modelView->Activate(*mainCamera);
         drawLocalMap();
     }
 
-    if (*displayFrameHistoryBox)
+    if (*displayFrameHistoryBox && modelView)
     {
-        modelView->Activate();
+        modelView->Activate(*mainCamera);
+        glColor3f(1.f, 0.f, 0.f);
         pangolin::glDrawLineStrip(rawFrameHistory);
+        glColor4f(1.f, 1.f, 1.f, 1.f);
+    }
+
+    if (*displayActivePointsBox && modelView)
+    {
+        modelView->Activate(*mainCamera);
+        glColor3f(0.f, 1.f, 0.f);
+        glPointSize(3.f);
+        pangolin::glDrawPoints(activePoints);
+        glPointSize(1.f);
+        glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
     pangolin::FinishFrame();
@@ -248,6 +263,9 @@ void MapViewer::setRawFrameHistory(const std::vector<SE3> &history)
 
 void MapViewer::setRawKeyFrameHistory(const std::vector<SE3> &history)
 {
+    rawKeyFrameHistory.clear();
+    for (auto T : history)
+        rawKeyFrameHistory.push_back(T.matrix().cast<float>());
 }
 
 void MapViewer::setFrameHistory(const std::vector<SE3> &history)
@@ -268,4 +286,9 @@ void MapViewer::getMeshBuffer(float *&vbuffer, float *&nbuffer, size_t &bufferSi
 void MapViewer::setMeshSizeToRender(size_t size)
 {
     numTriangles = size;
+}
+
+void MapViewer::setActivePoints(const std::vector<Vec3f> &points)
+{
+    activePoints = points;
 }

@@ -1,28 +1,26 @@
 #include "localMapper/denseMap.h"
 #include <fstream>
 
-__global__ void resetHashKernel(HashEntry *hash_table, int numEntry)
+__global__ void resetHashKernel(HashEntry *hashTable, int numEntry)
 {
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     if (index >= numEntry)
         return;
 
-    hash_table[index].ptr_ = -1;
-    hash_table[index].offset_ = -1;
+    hashTable[index].ptr = -1;
+    hashTable[index].offset = -1;
 }
 
-__global__ void resetHeapKernel(int *heap, int *heap_counter, int numBlock)
+__global__ void resetHeapKernel(int *heap, int *heapPtr, int numBlock)
 {
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     if (index >= numBlock)
         return;
 
-    heap[index] = numBlock - index - 1;
-
     if (index == 0)
-    {
-        heap_counter[0] = numBlock - 1;
-    }
+        heapPtr[0] = numBlock - 1;
+
+    heap[index] = numBlock - index - 1;
 }
 
 void MapStruct::reset()
@@ -53,7 +51,7 @@ void MapStruct::create(
     cudaMalloc((void **)&heap_mem_, sizeof(int) * voxelBlockSize);
     cudaMalloc((void **)&hash_table_, sizeof(HashEntry) * hashTableSize);
     cudaMalloc((void **)&visibleTable, sizeof(HashEntry) * hashTableSize);
-    cudaMalloc((void **)&voxels_, sizeof(Voxel) * voxelBlockSize * BLOCK_SIZE3);
+    cudaMalloc((void **)&voxels_, sizeof(Voxel) * voxelBlockSize * BlockSize3);
 
     this->hashTableSize = hashTableSize;
     this->bucketSize = bucketSize;
