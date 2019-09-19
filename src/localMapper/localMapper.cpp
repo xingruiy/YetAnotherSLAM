@@ -4,7 +4,7 @@
 DenseMapping::DenseMapping(int w, int h, Mat33d &K)
     : intrinsics(K)
 {
-  deviceMap.create(50000, 40000, 40000, 0.007f, 0.02f);
+  deviceMap.create(80000, 40000, 40000, 0.006f, 0.02f);
   deviceMap.reset();
   zRangeX.create(h / 8, w / 8, CV_32FC1);
   zRangeY.create(h / 8, w / 8, CV_32FC1);

@@ -272,10 +272,8 @@ __device__ __forceinline__ bool deleteHashEntry(int *heapPtr, int *heap, int vox
     int val_old = atomicAdd(heapPtr, 1);
     if (val_old < voxelBlockSize)
     {
-        printf("%i\n", val_old);
         heap[val_old + 1] = entry->ptr / BlockSize3;
         entry->ptr = -1;
-        entry->offset = -1;
         return true;
     }
     else
@@ -362,6 +360,11 @@ __device__ __forceinline__ void createBlock(
                 if (createHashEntry(heap, heapPtr, blockPos, 0, empty_entry))
                     current->offset = offset;
             }
+            else
+            {
+                atomicSub(excessPtr, 1);
+            }
+
             unlockBucket(mutex);
         }
     }

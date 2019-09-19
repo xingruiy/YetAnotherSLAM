@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <thread>
 #include <iostream>
 #include "utils/numType.h"
 #include "localMapper/localMapper.h"
@@ -33,7 +34,10 @@ class FullSystem
     GMat bufferFloatwxh;
     GMat bufferVec4wxh;
 
+    std::thread optThread;
+
 public:
+    ~FullSystem();
     FullSystem(const char *configFile);
     FullSystem(int w, int h, Mat33d K, int numLvl, bool view);
     void resetSystem();

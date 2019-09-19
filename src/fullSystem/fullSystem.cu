@@ -5,7 +5,7 @@ FullSystem::FullSystem(const char *configFile)
 {
 }
 
-FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool view)
+FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool optimize)
     : currentState(-1)
 {
     localMapper = std::make_shared<DenseMapping>(w, h, K);
@@ -17,6 +17,14 @@ FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool view)
 
     bufferVec4wxh.create(h, w, CV_32FC4);
     bufferFloatwxh.create(h, w, CV_32FC1);
+
+    optThread = std::thread(&GlobalMapper::optimizationLoop, globalMapper.get());
+}
+
+FullSystem::~FullSystem()
+{
+    globalMapper->setShouldQuit();
+    optThread.join();
 }
 
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)

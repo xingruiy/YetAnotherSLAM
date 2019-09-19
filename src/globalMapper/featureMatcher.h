@@ -39,5 +39,6 @@ public:
         std::shared_ptr<Frame> reference,
         std::shared_ptr<Frame> current,
         SE3 &Transform,
-        std::vector<cv::DMatch> &matches);
+        std::vector<cv::DMatch> &matches,
+        std::vector<bool> *mask = NULL);
 };

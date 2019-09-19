@@ -262,12 +262,10 @@ struct DepthFusionFunctor
 
             auto oldSDF = unpackFloat(voxel.sdf);
             auto oldWT = voxel.wt;
-            // auto weight = 1 / dist;
 
             if (oldWT == 0)
             {
                 voxel.sdf = packFloat(sdf);
-                // voxel.wt = weight;
                 voxel.wt = 1;
                 continue;
             }
@@ -275,9 +273,6 @@ struct DepthFusionFunctor
             oldSDF = (oldSDF * oldWT + sdf * 1) / (oldWT + 1);
             voxel.sdf = packFloat(oldSDF);
             voxel.wt = min(255, oldWT + 1);
-            //   oldSDF = (oldSDF * oldWT + sdf * weight) / (oldWT + weight);
-            // voxel.sdf = packFloat(oldSDF);
-            // voxel.wt = (oldWT + weight);
         }
     }
 };

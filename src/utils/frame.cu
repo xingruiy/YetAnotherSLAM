@@ -41,3 +41,18 @@ void Frame::minimizeFootPrint()
     rawDepth.release();
     rawIntensity.release();
 }
+
+size_t Frame::getKeyPointSize() const
+{
+    return worldPoints.size();
+}
+
+std::vector<std::shared_ptr<PointWorld>> Frame::getWorldPoints() const
+{
+    return worldPoints;
+}
+
+void Frame::setWorldPoints(const std::vector<std::shared_ptr<PointWorld>> &pt)
+{
+    worldPoints = pt;
+}
