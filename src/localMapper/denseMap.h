@@ -38,6 +38,9 @@ struct MapStruct
         float voxelSize,
         float truncationDist);
 
+    void getVisibleBlockCount(uint &hostData);
+    void resetVisibleBlockCount();
+
     int bucketSize;
     int hashTableSize;
     int voxelBlockSize;
@@ -212,7 +215,7 @@ __device__ __forceinline__ bool createHashEntry(
 }
 
 __device__ __forceinline__ void createBlock(
-    Vec3i &blockPos,
+    const Vec3i &blockPos,
     int *heap,
     int *heapPtr,
     HashEntry *hashTable,

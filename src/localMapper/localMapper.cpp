@@ -1,38 +1,32 @@
-#include <cuda_runtime_api.h>
-#include "map_proc.h"
-#include "localMapper.h"
+#include "localMapper/mapFunctors.h"
+#include "localMapper/localMapper.h"
 
 DenseMapping::DenseMapping(int w, int h, Mat33d &K)
     : intrinsics(K)
 {
   deviceMap.create(100000, 80000, 120000, 0.005f, 0.02f);
   deviceMap.reset();
-  zrange_x.create(h / 8, w / 8, CV_32FC1);
-  zrange_y.create(h / 8, w / 8, CV_32FC1);
+  zRangeX.create(h / 8, w / 8, CV_32FC1);
+  zRangeY.create(h / 8, w / 8, CV_32FC1);
 
-  cudaMalloc((void **)&visible_blocks, sizeof(HashEntry) * 100000);
-  cudaMalloc((void **)&rendering_blocks, sizeof(RenderingBlock) * 100000);
+  cudaMalloc((void **)&listRenderingBlock, sizeof(RenderingBlock) * 100000);
 }
 
 DenseMapping::~DenseMapping()
 {
   deviceMap.release();
-  cudaFree((void **)&visible_blocks);
-  cudaFree((void **)&rendering_blocks);
+  cudaFree((void **)&listRenderingBlock);
 }
 
 void DenseMapping::fuseFrame(GMat depth, const SE3 &T)
 {
   count_visible_block = 0;
 
-  ::update(
+  ::fuseDepth(
       deviceMap,
       depth,
       T,
       intrinsics,
-      flag,
-      pos_array,
-      visible_blocks,
       count_visible_block);
 }
 
@@ -45,10 +39,9 @@ void DenseMapping::raytrace(GMat &vertex, const SE3 &T)
       deviceMap,
       count_visible_block,
       count_rendering_block,
-      visible_blocks,
-      zrange_x,
-      zrange_y,
-      rendering_blocks,
+      zRangeX,
+      zRangeY,
+      listRenderingBlock,
       T,
       intrinsics);
 
@@ -57,11 +50,9 @@ void DenseMapping::raytrace(GMat &vertex, const SE3 &T)
 
     ::raycast(
         deviceMap,
-        // deviceMap.state,
         vertex,
-        vertex,
-        zrange_x,
-        zrange_y,
+        zRangeX,
+        zRangeY,
         T,
         intrinsics);
   }
@@ -78,9 +69,7 @@ size_t DenseMapping::fetch_mesh_with_normal(void *vertex, void *normal)
 
   ::create_mesh_with_normal(
       deviceMap,
-      // deviceMap.state,
       count_visible_block,
-      visible_blocks,
       count_triangle,
       vertex,
       normal);

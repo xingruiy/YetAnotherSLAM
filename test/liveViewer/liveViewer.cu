@@ -20,14 +20,11 @@ int main(int argc, char **argv)
     {
         if (camera.getNextImages(depth, image))
         {
-            // image.convertTo(imageFloat, CV_32FC3);
-            // cv::cvtColor(imageFloat, intensity, cv::COLOR_RGB2GRAY);
             depth.convertTo(depthFloat, CV_32FC1, 1.0 / 1000);
-
             viewer.setColourImage(image);
             // viewer.setDepthImage(image);
 
-            if (!viewer.isSystemPaused())
+            if (!viewer.paused())
                 fullsystem.processFrame(image, depthFloat);
 
             if (viewer.isResetRequested())
@@ -36,7 +33,7 @@ int main(int argc, char **argv)
             viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
             viewer.setKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
-            if (!viewer.isSystemPaused())
+            if (!viewer.paused())
             {
                 float *vbuffer;
                 float *nbuffer;

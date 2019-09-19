@@ -236,7 +236,7 @@ bool MapViewer::isResetRequested()
         return false;
 }
 
-bool MapViewer::isSystemPaused() const
+bool MapViewer::paused() const
 {
     return *pauseSystemBox;
 }

@@ -74,7 +74,7 @@ public:
     void setActivePoints(const std::vector<Vec3f> &points);
 
     bool isResetRequested();
-    bool isSystemPaused() const;
+    bool paused() const;
 
     void setColourImage(Mat image);
     void setDepthImage(Mat image);

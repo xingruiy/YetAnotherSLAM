@@ -1,5 +1,6 @@
 #pragma once
 #include <cuda_runtime_api.h>
+#include <opencv2/opencv.hpp>
 
 #define cudaCheckError()                                                                     \
     {                                                                                        \

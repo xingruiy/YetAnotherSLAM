@@ -8,7 +8,6 @@ FullSystem::FullSystem(const char *configFile)
 FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool view)
     : currentState(-1)
 {
-    // localMapper = std::make_shared<LocalMapper>(w, h, K);
     localMapper = std::make_shared<DenseMapping>(w, h, K);
     globalMapper = std::make_shared<GlobalMapper>(K, 5);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);

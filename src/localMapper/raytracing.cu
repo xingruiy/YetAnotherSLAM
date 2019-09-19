@@ -1,6 +1,7 @@
 #include "localMapper/denseMap.h"
 #include "utils/cudaUtils.h"
 #include "utils/prefixSum.h"
+#include "localMapper/mapFunctors.h"
 
 #define RenderingBlockSizeX 16
 #define RenderingBlockSizeY 16
@@ -211,7 +212,6 @@ void create_rendering_blocks(
     MapStruct map_struct,
     uint count_visible_block,
     uint &count_rendering_block,
-    HashEntry *visible_blocks,
     GMat &zRangeX,
     GMat &zRangeY,
     RenderingBlock *listRenderingBlock,
@@ -243,7 +243,7 @@ void create_rendering_blocks(
     delegate.fy = K(1, 1);
     delegate.cx = K(0, 2);
     delegate.cy = K(1, 2);
-    delegate.visibleEntry = visible_blocks;
+    delegate.visibleEntry = map_struct.visibleTable;
     delegate.visible_block_count = count_visible_block;
     delegate.rendering_block_count = count_device;
     delegate.listRenderingBlock = listRenderingBlock;
@@ -418,9 +418,7 @@ struct MapRenderingDelegate
 };
 
 void raycast(MapStruct map_struct,
-             // MapState state,
              GMat vmap,
-             GMat nmap,
              GMat zRangeX,
              GMat zRangeY,
              const SE3 &T,

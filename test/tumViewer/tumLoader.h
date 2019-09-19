@@ -1,7 +1,7 @@
 #pragma once
 #include <iostream>
 #include <fstream>
-#include "NumType.h"
+#include "utils/numType.h"
 
 void TUMLoad(
     const std::string &baseDir,
@@ -29,7 +29,7 @@ void TUMLoad(
 void TUMSave(
     const std::string &path,
     std::vector<double> listTimeStamp,
-    std::vector<SE3d> trajectory)
+    std::vector<SE3> trajectory)
 {
     std::ofstream file(path + "result.txt", std::ios_base::out);
 

@@ -20,9 +20,9 @@ PRIVATE
     src/globalMapper/featureMatcher.cpp
     src/localMapper/denseMap.cu
     src/localMapper/localMapper.cpp
-    src/localMapper/depth_fusion.cu
-    src/localMapper/scene_mesh.cu
-    src/localMapper/ray_tracing.cu
+    src/localMapper/depthFusion.cu
+    src/localMapper/meshScene.cu
+    src/localMapper/raytracing.cu
 )
 
 target_compile_features(athena

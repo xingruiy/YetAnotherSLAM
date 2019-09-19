@@ -72,6 +72,16 @@ void MapStruct::release()
     cudaFree((void *)visibleTable);
 }
 
+void MapStruct::getVisibleBlockCount(uint &hostData)
+{
+    cudaMemcpy(&hostData, visibleBlockNum, sizeof(uint), cudaMemcpyDeviceToHost);
+}
+
+void MapStruct::resetVisibleBlockCount()
+{
+    cudaMemset(visibleBlockNum, 0, sizeof(uint));
+}
+
 bool MapStruct::empty()
 {
     return bucketSize == 0;

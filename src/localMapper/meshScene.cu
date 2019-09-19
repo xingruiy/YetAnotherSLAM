@@ -1,8 +1,8 @@
-#include "map_proc.h"
 #include "utils/prefixSum.h"
 #include "utils/cudaUtils.h"
 #include "utils/triangleTable.h"
 #include "localMapper/localMapper.h"
+#include "localMapper/mapFunctors.h"
 
 #define MAX_NUM_MESH_TRIANGLES 20000000
 
@@ -251,7 +251,6 @@ void create_mesh_with_normal(
     MapStruct map_struct,
     // MapState state,
     uint &block_count,
-    HashEntry *block_list,
     uint &triangle_count,
     void *vertex_data,
     void *vertex_normal)
@@ -265,7 +264,7 @@ void create_mesh_with_normal(
 
     BuildVertexArray bva;
     // bva.map_struct = map_struct;
-    bva.block_array = block_list;
+    bva.block_array = map_struct.visibleTable;
     bva.block_count = cuda_block_count;
     bva.triangle_count = cuda_triangle_count;
     bva.triangles = static_cast<Vec3f *>(vertex_data);

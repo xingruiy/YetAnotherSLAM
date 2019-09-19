@@ -4,7 +4,7 @@ add_executable(liveViewer)
 
 target_sources(liveViewer 
 PRIVATE
-    liveViewer/liveViewer.cpp
+    liveViewer/liveViewer.cu
     liveViewer/oniCamera.cpp
 )
 
@@ -17,4 +17,18 @@ target_link_libraries(liveViewer
 PRIVATE
     athena
     OpenNI2
+)
+
+# tum viewer
+
+add_executable(tumViewer)
+
+target_sources(tumViewer 
+PRIVATE
+    tumViewer/tumViewer.cpp
+)
+
+target_link_libraries(tumViewer
+PRIVATE
+    athena
 )
