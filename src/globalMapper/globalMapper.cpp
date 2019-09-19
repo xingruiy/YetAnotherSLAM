@@ -12,6 +12,7 @@ void GlobalMapper::reset()
     frameHistory.clear();
     keyframeOptWin.clear();
     keyframeHistory.clear();
+    salientPointHistory.clear();
 }
 
 void GlobalMapper::addFrameHistory(const SE3 &T)

@@ -35,3 +35,9 @@ void Frame::setPose(const SE3 &T)
 {
     framePose = T;
 }
+
+void Frame::minimizeFootPrint()
+{
+    rawDepth.release();
+    rawIntensity.release();
+}

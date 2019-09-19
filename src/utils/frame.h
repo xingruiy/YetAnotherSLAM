@@ -16,4 +16,5 @@ public:
     Mat getIntensity();
     SE3 getPose();
     void setPose(const SE3 &T);
+    void minimizeFootPrint();
 };

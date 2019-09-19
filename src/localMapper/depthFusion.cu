@@ -5,268 +5,6 @@
 #include "utils/cudaUtils.h"
 #include "localMapper/mapFunctors.h"
 
-__device__ __forceinline__ bool checkVertexVisible(
-    Vec3f pt, const SE3f &Tinv,
-    const int &cols, const int &rows,
-    const float &fx, const float &fy,
-    const float &cx, const float &cy,
-    const float &depthMin, const float &depthMax)
-{
-    pt = Tinv * pt;
-    Vec2f pt2d = Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
-    return !(pt2d(0) < 0 || pt2d(1) < 0 ||
-             pt2d(0) > cols - 1 || pt2d(1) > rows - 1 ||
-             pt(2) < depthMin || pt(2) > depthMax);
-}
-
-__device__ __forceinline__ bool checkBlockVisible(
-    const Vec3i &block_pos,
-    const SE3f &Tinv,
-    const float &voxelSize,
-    const int &cols, const int &rows,
-    const float &fx, const float &fy,
-    const float &cx, const float &cy,
-    const float &depthMin, const float &depthMax)
-{
-    float scale = voxelSize * BlockSize;
-#pragma unroll
-    for (int corner = 0; corner < 8; ++corner)
-    {
-        Vec3i tmp = block_pos;
-        tmp(0) += (corner & 1) ? 1 : 0;
-        tmp(1) += (corner & 2) ? 1 : 0;
-        tmp(2) += (corner & 4) ? 1 : 0;
-
-        if (checkVertexVisible(
-                tmp.cast<float>() * scale,
-                Tinv,
-                cols, rows,
-                fx, fy,
-                cx, cy,
-                depthMin, depthMax))
-            return true;
-    }
-
-    return false;
-}
-
-__global__ void check_visibility_flag_kernel(
-    MapStruct map_struct, uchar *flag, SE3f Tinv,
-    int cols, int rows, float fx, float fy, float cx, float cy, float voxelSize,
-    float depthMin, float depthMax)
-{
-    const int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if (idx >= map_struct.hashTableSize)
-        return;
-
-    HashEntry &current = map_struct.hash_table_[idx];
-    if (current.ptr != -1)
-    {
-        switch (flag[idx])
-        {
-        default:
-        {
-            if (checkBlockVisible(current.pos, Tinv, voxelSize, cols, rows, fx, fy, cx, cy, depthMin, depthMax))
-            {
-                flag[idx] = 1;
-            }
-            else
-            {
-                current.ptr = -1;
-                flag[idx] = 0;
-            }
-
-            return;
-        }
-        case 2:
-        {
-            flag[idx] = 1;
-            return;
-        }
-        }
-    }
-}
-
-__global__ void copy_visible_block_kernel(HashEntry *hash_table, HashEntry *visible_block, int hashTableSize, const uchar *flag, const int *pos)
-{
-    const int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if (idx >= hashTableSize)
-        return;
-
-    if (flag[idx] == 1)
-        visible_block[pos[idx]] = hash_table[idx];
-}
-
-__device__ inline Vec2f project(
-    Vec3f pt, float fx, float fy, float cx, float cy)
-{
-    return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
-}
-
-__device__ inline Vec3f unproject(
-    int x, int y, float z, float invfx, float invfy, float cx, float cy)
-{
-    return Vec3f(invfx * (x - cx) * z, invfy * (y - cy) * z, z);
-}
-
-__device__ inline Vec3f unprojectWorld(
-    int x, int y, float z, float invfx,
-    float invfy, float cx, float cy, SE3f pose)
-{
-    return pose * (unproject(x, y, z, invfx, invfy, cx, cy));
-}
-
-__global__ void create_blocks_kernel(MapStruct map_struct, cv::cuda::PtrStepSz<float> depth,
-                                     float invfx, float invfy, float cx, float cy,
-                                     SE3f pose, uchar *flag, float depthMin, float depthMax)
-{
-    const int x = threadIdx.x + blockDim.x * blockIdx.x;
-    const int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= depth.cols || y >= depth.rows)
-        return;
-
-    float z = depth.ptr(y)[x];
-    if (isnan(z) || z < depthMin || z > depthMax)
-        return;
-
-    float z_thresh = map_struct.truncationDist * 0.5;
-    float z_near = max(depthMin, z - z_thresh);
-    float z_far = min(depthMax, z + z_thresh);
-    if (z_near >= z_far)
-        return;
-
-    Vec3i block_near = voxelPosToBlockPos(worldPtToVoxelPos(unprojectWorld(x, y, z_near, invfx, invfy, cx, cy, pose), map_struct.voxelSize));
-    Vec3i block_far = voxelPosToBlockPos(worldPtToVoxelPos(unprojectWorld(x, y, z_far, invfx, invfy, cx, cy, pose), map_struct.voxelSize));
-
-    Vec3i d = block_far - block_near;
-    Vec3i increment = Vec3i(d(0) < 0 ? -1 : 1, d(1) < 0 ? -1 : 1, d(2) < 0 ? -1 : 1);
-    Vec3i absIncrement = Vec3i(abs(d(0)), abs(d(1)), abs(d(2)));
-    Vec3i incrementErr = Vec3i(absIncrement(0) << 1, absIncrement(1) << 1, absIncrement(2) << 1);
-
-    int err1;
-    int err2;
-
-    // Bresenham's line algorithm
-    // details see : https://en.m.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-    if ((absIncrement(0) >= absIncrement(1)) && (absIncrement(0) >= absIncrement(2)))
-    {
-        err1 = incrementErr(1) - 1;
-        err2 = incrementErr(2) - 1;
-        createBlock(block_near,
-                    map_struct.heap_mem_,
-                    map_struct.heap_mem_counter_,
-                    map_struct.hash_table_,
-                    map_struct.bucket_mutex_,
-                    map_struct.excess_counter_,
-                    map_struct.hashTableSize,
-                    map_struct.bucketSize);
-        for (int i = 0; i < absIncrement(0); ++i)
-        {
-            if (err1 > 0)
-            {
-                block_near(1) += increment(1);
-                err1 -= incrementErr(0);
-            }
-
-            if (err2 > 0)
-            {
-                block_near(2) += increment(2);
-                err2 -= incrementErr(0);
-            }
-
-            err1 += incrementErr(1);
-            err2 += incrementErr(2);
-            block_near(0) += increment(0);
-            createBlock(block_near,
-                        map_struct.heap_mem_,
-                        map_struct.heap_mem_counter_,
-                        map_struct.hash_table_,
-                        map_struct.bucket_mutex_,
-                        map_struct.excess_counter_,
-                        map_struct.hashTableSize,
-                        map_struct.bucketSize);
-        }
-    }
-    else if ((absIncrement(1) >= absIncrement(0)) && (absIncrement(1) >= absIncrement(2)))
-    {
-        err1 = incrementErr(0) - 1;
-        err2 = incrementErr(2) - 1;
-        createBlock(block_near,
-                    map_struct.heap_mem_,
-                    map_struct.heap_mem_counter_,
-                    map_struct.hash_table_,
-                    map_struct.bucket_mutex_,
-                    map_struct.excess_counter_,
-                    map_struct.hashTableSize,
-                    map_struct.bucketSize);
-        for (int i = 0; i < absIncrement(1); ++i)
-        {
-            if (err1 > 0)
-            {
-                block_near(0) += increment(0);
-                err1 -= incrementErr(1);
-            }
-
-            if (err2 > 0)
-            {
-                block_near(2) += increment(2);
-                err2 -= incrementErr(1);
-            }
-
-            err1 += incrementErr(0);
-            err2 += incrementErr(2);
-            block_near(1) += increment(1);
-            createBlock(block_near,
-                        map_struct.heap_mem_,
-                        map_struct.heap_mem_counter_,
-                        map_struct.hash_table_,
-                        map_struct.bucket_mutex_,
-                        map_struct.excess_counter_,
-                        map_struct.hashTableSize,
-                        map_struct.bucketSize);
-        }
-    }
-    else
-    {
-        err1 = incrementErr(1) - 1;
-        err2 = incrementErr(0) - 1;
-        createBlock(block_near,
-                    map_struct.heap_mem_,
-                    map_struct.heap_mem_counter_,
-                    map_struct.hash_table_,
-                    map_struct.bucket_mutex_,
-                    map_struct.excess_counter_,
-                    map_struct.hashTableSize,
-                    map_struct.bucketSize);
-        for (int i = 0; i < absIncrement(2); ++i)
-        {
-            if (err1 > 0)
-            {
-                block_near(1) += increment(1);
-                err1 -= incrementErr(2);
-            }
-
-            if (err2 > 0)
-            {
-                block_near(0) += increment(0);
-                err2 -= incrementErr(2);
-            }
-
-            err1 += incrementErr(1);
-            err2 += incrementErr(0);
-            block_near(2) += increment(2);
-            createBlock(block_near,
-                        map_struct.heap_mem_,
-                        map_struct.heap_mem_counter_,
-                        map_struct.hash_table_,
-                        map_struct.bucket_mutex_,
-                        map_struct.excess_counter_,
-                        map_struct.hashTableSize,
-                        map_struct.bucketSize);
-        }
-    }
-}
-
 struct CreateBlockLineTracingFunctor
 {
     int *heap;
@@ -404,6 +142,10 @@ struct CheckEntryVisibilityFunctor
     HashEntry *visibleEntry;
     uint *visibleEntryCount;
     SE3f Tinv;
+
+    int *heap;
+    int *heapPtr;
+    Voxel *voxelBlock;
     int cols, rows;
     float fx, fy;
     float cx, cy;
@@ -411,6 +153,7 @@ struct CheckEntryVisibilityFunctor
     float depthMax;
     float voxelSize;
     int hashTableSize;
+    int voxelBlockSize;
 
     __device__ __forceinline__ void operator()() const
     {
@@ -443,6 +186,12 @@ struct CheckEntryVisibilityFunctor
                 {
                     needScan = true;
                     increment = 1;
+                }
+                else
+                {
+                    int voxelPtr = current->ptr;
+                    memset(&voxelBlock[voxelPtr], 0, sizeof(Voxel) * BlockSize3);
+                    deleteHashEntry(heapPtr, heap, voxelBlockSize, current);
                 }
             }
         }
@@ -513,18 +262,22 @@ struct DepthFusionFunctor
 
             auto oldSDF = unpackFloat(voxel.sdf);
             auto oldWT = voxel.wt;
-            auto weight = 1 / dist;
+            // auto weight = 1 / dist;
 
             if (oldWT == 0)
             {
                 voxel.sdf = packFloat(sdf);
-                voxel.wt = weight;
+                // voxel.wt = weight;
+                voxel.wt = 1;
                 continue;
             }
 
-            oldSDF = (oldSDF * oldWT + sdf * weight) / (oldWT + weight);
+            oldSDF = (oldSDF * oldWT + sdf * 1) / (oldWT + 1);
             voxel.sdf = packFloat(oldSDF);
-            voxel.wt = (oldWT + weight);
+            voxel.wt = min(255, oldWT + 1);
+            //   oldSDF = (oldSDF * oldWT + sdf * weight) / (oldWT + weight);
+            // voxel.sdf = packFloat(oldSDF);
+            // voxel.wt = (oldWT + weight);
         }
     }
 };
@@ -574,8 +327,12 @@ void fuseDepth(
 
     CheckEntryVisibilityFunctor cfunctor;
     cfunctor.hashTable = map_struct.hash_table_;
+    cfunctor.voxelBlock = map_struct.voxels_;
     cfunctor.visibleEntry = map_struct.visibleTable;
     cfunctor.visibleEntryCount = map_struct.visibleBlockNum;
+    cfunctor.heap = map_struct.heap_mem_;
+    cfunctor.heapPtr = map_struct.heap_mem_counter_;
+    cfunctor.voxelBlockSize = map_struct.voxelBlockSize;
     cfunctor.Tinv = T.inverse().cast<float>();
     cfunctor.cols = cols;
     cfunctor.rows = rows;

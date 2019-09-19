@@ -8,48 +8,6 @@
 #define RenderingBlockSubSample 8
 #define MaxNumRenderingBlock 100000
 
-__device__ __forceinline__ Vec2f project(
-    const Vec3f &pt,
-    const float &fx, const float &fy,
-    const float &cx, const float &cy)
-{
-    return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
-}
-
-__device__ __forceinline__ Vec3f unproject(
-    const int &x, const int &y, const float &z,
-    const float &invfx, const float &invfy,
-    const float &cx, const float &cy)
-{
-    return Vec3f((x - cx) * invfx * z, (y - cy) * invfy * z, z);
-}
-
-// compare val with the old value stored in *add
-// and write the bigger one to *add
-__device__ __forceinline__ void atomicMax(float *add, float val)
-{
-    int *address_as_i = (int *)add;
-    int old = *address_as_i, assumed;
-    do
-    {
-        assumed = old;
-        old = atomicCAS(address_as_i, assumed, __float_as_int(fmaxf(val, __int_as_float(assumed))));
-    } while (assumed != old);
-}
-
-// compare val with the old value stored in *add
-// and write the smaller one to *add
-__device__ __forceinline__ void atomicMin(float *add, float val)
-{
-    int *address_as_i = (int *)add;
-    int old = *address_as_i, assumed;
-    do
-    {
-        assumed = old;
-        old = atomicCAS(address_as_i, assumed, __float_as_int(fminf(val, __int_as_float(assumed))));
-    } while (assumed != old);
-}
-
 struct RenderingBlockDelegate
 {
     SE3f Tinv;
@@ -389,7 +347,7 @@ struct MapRenderingDelegate
             if (sdfValid)
                 step = max(sdf * raytraceStep, 1.0f);
             else
-                step = 2;
+                step = BlockSize;
 
             result += step * dir;
             dist_s += step;
