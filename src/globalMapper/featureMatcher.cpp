@@ -1,7 +1,7 @@
 #include "featureMatcher.h"
 
 #define MatchWindowDist 5
-#define MatchMinScore 5
+#define MatchMinScore 4
 
 inline float interpolateBiLinear(Mat map, const float &x, const float &y)
 {
@@ -19,7 +19,7 @@ FeatureMatcher::FeatureMatcher(PointType pType)
     switch (pType)
     {
     case PointType::ORB:
-        orbDetector = cv::ORB::create(1000);
+        orbDetector = cv::ORB::create(1500);
         break;
     case PointType::FAST:
         fastDetector = cv::FastFeatureDetector::create();

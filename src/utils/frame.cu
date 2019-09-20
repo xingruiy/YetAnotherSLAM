@@ -1,6 +1,7 @@
 #include "utils/frame.h"
 
 size_t Frame::nextKFId = 0;
+size_t Point3D::nextPtId = 0;
 
 Frame::Frame()
 {

@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < listOfTimeStamp.size(); ++i)
         {
-            printf("processing: %i / %lu \r", i, listOfTimeStamp.size());
+            // printf("processing: %i / %lu \r", i, listOfTimeStamp.size());
             depth = cv::imread(listOfDepthPath[i], cv::IMREAD_UNCHANGED);
             image = cv::imread(listOfImagePath[i], cv::IMREAD_UNCHANGED);
             depth.convertTo(depthFloat, CV_32FC1, 1 / 5000.f);
@@ -54,7 +54,8 @@ int main(int argc, char **argv)
                 fullsystem.resetSystem();
 
             viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
-            viewer.setKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
+            viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+            viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
             float *vbuffer;
             float *nbuffer;
@@ -62,7 +63,6 @@ int main(int argc, char **argv)
             viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
             size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
             viewer.setMeshSizeToRender(size);
-            fullsystem.resetPointVisitFlag();
             viewer.setActivePoints(fullsystem.getActiveKeyPoints());
             viewer.setStablePoints(fullsystem.getStableKeyPoints());
 
@@ -71,6 +71,9 @@ int main(int argc, char **argv)
 
             viewer.renderView();
         }
+
+        while (!pangolin::ShouldQuit())
+            viewer.renderView();
 
         TUMSave(baseDir + *iter, listOfTimeStamp, fullsystem.getRawFramePoseHistory());
         printf("Saved: %s...\n", iter->c_str());

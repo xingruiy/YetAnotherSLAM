@@ -55,12 +55,12 @@ void MapViewer::setupDisplay()
     pauseSystemBox = std::make_shared<pangolin::Var<bool>>("Menu.PAUSE", true, true);
     displayColourBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Image", true, true);
     displayDepthBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Depth", true, true);
-    displayLocalMapBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Scene", true, true);
-    displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Mesh", true, true);
-    enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Camera", false, true);
-    displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Trajectory", true, true);
-    displayActivePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Active Points", true, true);
-    displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Key Frame", true, true);
+    displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.View Model", true, true);
+    enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Current Camera", false, true);
+    displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Trajectory", true, true);
+    displayActivePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Active Points", true, true);
+    displayStablePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Stable Points", true, true);
+    displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Key Frame Frustum", true, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -194,7 +194,7 @@ void MapViewer::renderView()
         depthImage.RenderToViewportFlipY();
     }
 
-    if (*displayLocalMapBox && modelView)
+    if (*displayModelBox && modelView)
     {
         modelView->Activate(*mainCamera);
         drawLocalMap();
@@ -214,6 +214,14 @@ void MapViewer::renderView()
         glPointSize(3.f);
         glColor3f(0.f, 1.f, 0.f);
         pangolin::glDrawPoints(activePoints);
+        glPointSize(1.f);
+        glColor4f(1.f, 1.f, 1.f, 1.f);
+    }
+
+    if (*displayStablePointsBox && modelView)
+    {
+        modelView->Activate(*mainCamera);
+        glPointSize(3.f);
         glColor3f(1.f, 0.f, 0.f);
         pangolin::glDrawPoints(stablePoints);
         glPointSize(1.f);
@@ -225,11 +233,11 @@ void MapViewer::renderView()
         modelView->Activate(*mainCamera);
         glColor3f(1.f, 0.f, 0.f);
         for (auto T : rawKeyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.01f);
 
         glColor3f(0.f, 1.f, 0.f);
         for (auto T : keyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.01f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
@@ -294,6 +302,7 @@ void MapViewer::setFrameHistory(const std::vector<SE3> &history)
 
 void MapViewer::setKeyFrameHistory(const std::vector<SE3> &history)
 {
+    // std::cout << history.size() << std::endl;
     keyFrameHistory.clear();
     for (auto T : history)
         keyFrameHistory.push_back(T.matrix().cast<float>());

@@ -6,11 +6,15 @@ class Frame;
 
 struct Point3D
 {
+    Point3D() : ptId(nextPtId++), inOptimizer(false) {}
+    size_t ptId;
+    static size_t nextPtId;
     bool visited;
+    bool inOptimizer;
     Vec3d position;
     Vec9f descriptor;
     std::shared_ptr<Frame> hostKF;
-    std::vector<std::pair<std::shared_ptr<Frame>, Vec2d>> observations;
+    std::vector<std::shared_ptr<Frame>> frameHistory;
 };
 
 class Frame
@@ -34,7 +38,8 @@ public:
     void setPose(const SE3 &T);
 
     size_t kfId;
-
+    SE3 Tr2c;
+    std::shared_ptr<Frame> referenceKF;
     std::vector<Vec9f> pointDesc;
     std::vector<cv::KeyPoint> cvKeyPoints;
     std::vector<std::shared_ptr<Point3D>> mapPoints;

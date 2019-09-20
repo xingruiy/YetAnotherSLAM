@@ -19,7 +19,13 @@ void create_rendering_blocks(
     const SE3 &T,
     const Mat33d &K);
 
-void raycast(MapStruct map, GMat vmap, GMat zRangeX, GMat zRangeY, const SE3 &T, const Mat33d &K);
+void raycast(
+    MapStruct map,
+    GMat vmap,
+    GMat zRangeX,
+    GMat zRangeY,
+    const SE3 &T,
+    const Mat33d &K);
 
 void create_mesh_with_normal(
     MapStruct map,

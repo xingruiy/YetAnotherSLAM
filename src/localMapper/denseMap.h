@@ -152,6 +152,29 @@ __host__ __device__ __forceinline__ int voxelPosToLocalIdx(const Vec3i &voxelPos
 
 #ifdef __CUDACC__
 
+__device__ __forceinline__ Vec2f project(
+    const Vec3f &pt,
+    const float &fx, const float &fy,
+    const float &cx, const float &cy)
+{
+    return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
+}
+
+__device__ __forceinline__ Vec3f unproject(
+    const int &x, const int &y, const float &z,
+    const float &invfx, const float &invfy,
+    const float &cx, const float &cy)
+{
+    return Vec3f(invfx * (x - cx) * z, invfy * (y - cy) * z, z);
+}
+
+__device__ __forceinline__ Vec3f unprojectWorld(
+    const int &x, const int &y, const float &z, const float &invfx,
+    const float &invfy, const float &cx, const float &cy, const SE3f &T)
+{
+    return T * unproject(x, y, z, invfx, invfy, cx, cy);
+}
+
 __device__ __forceinline__ bool checkVertexVisible(
     Vec3f pt, const SE3f &Tinv,
     const int &cols, const int &rows,
@@ -160,7 +183,7 @@ __device__ __forceinline__ bool checkVertexVisible(
     const float &depthMin, const float &depthMax)
 {
     pt = Tinv * pt;
-    Vec2f pt2d = Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
+    Vec2f pt2d = project(pt, fx, fy, cx, cy);
     return !(pt2d(0) < 0 || pt2d(1) < 0 ||
              pt2d(0) > cols - 1 || pt2d(1) > rows - 1 ||
              pt(2) < depthMin || pt(2) > depthMax);
@@ -197,29 +220,6 @@ __device__ __forceinline__ bool checkBlockVisible(
     }
 
     return false;
-}
-
-__device__ __forceinline__ Vec2f project(
-    const Vec3f &pt,
-    const float &fx, const float &fy,
-    const float &cx, const float &cy)
-{
-    return Vec2f(fx * pt(0) / pt(2) + cx, fy * pt(1) / pt(2) + cy);
-}
-
-__device__ __forceinline__ Vec3f unproject(
-    const int &x, const int &y, const float &z,
-    const float &invfx, const float &invfy,
-    const float &cx, const float &cy)
-{
-    return Vec3f(invfx * (x - cx) * z, invfy * (y - cy) * z, z);
-}
-
-__device__ __forceinline__ Vec3f unprojectWorld(
-    const int &x, const int &y, const float &z, const float &invfx,
-    const float &invfy, const float &cx, const float &cy, const SE3f &T)
-{
-    return T * unproject(x, y, z, invfx, invfy, cx, cy);
 }
 
 // compare val with the old value stored in *add
@@ -320,32 +320,32 @@ __device__ __forceinline__ void createBlock(
     int hashTableSize,
     int bucketSize)
 {
-    auto bucket_index = hash(blockPos, bucketSize);
-    int *mutex = &bucketMutex[bucket_index];
-    HashEntry *current = &hashTable[bucket_index];
-    HashEntry *empty_entry = nullptr;
+    auto volatileIdx = hash(blockPos, bucketSize);
+    int *mutex = &bucketMutex[volatileIdx];
+    HashEntry *current = &hashTable[volatileIdx];
+    HashEntry *emptyEntry = nullptr;
     if (current->pos == blockPos && current->ptr != -1)
         return;
 
     if (current->ptr == -1)
-        empty_entry = current;
+        emptyEntry = current;
 
-    while (current->offset > 0)
+    while (current->offset >= 0)
     {
-        bucket_index = bucketSize + current->offset - 1;
-        current = &hashTable[bucket_index];
+        volatileIdx = bucketSize + current->offset - 1;
+        current = &hashTable[volatileIdx];
         if (current->pos == blockPos && current->ptr != -1)
             return;
 
-        if (current->ptr == -1 && !empty_entry)
-            empty_entry = current;
+        if (current->ptr == -1 && !emptyEntry)
+            emptyEntry = current;
     }
 
-    if (empty_entry != nullptr)
+    if (emptyEntry != nullptr)
     {
         if (lockBucket(mutex))
         {
-            createHashEntry(heap, heapPtr, blockPos, current->offset, empty_entry);
+            createHashEntry(heap, heapPtr, blockPos, current->offset, emptyEntry);
             unlockBucket(mutex);
         }
     }
@@ -356,40 +356,39 @@ __device__ __forceinline__ void createBlock(
             int offset = atomicAdd(excessPtr, 1);
             if ((offset + bucketSize) < hashTableSize)
             {
-                empty_entry = &hashTable[bucketSize + offset - 1];
-                if (createHashEntry(heap, heapPtr, blockPos, 0, empty_entry))
+                emptyEntry = &hashTable[bucketSize + offset - 1];
+                if (createHashEntry(heap, heapPtr, blockPos, -1, emptyEntry))
                     current->offset = offset;
             }
             else
-            {
                 atomicSub(excessPtr, 1);
-            }
 
             unlockBucket(mutex);
         }
     }
 }
 
-__device__ __forceinline__ void findEntry(
+__device__ __forceinline__ bool findEntry(
     const Vec3i &blockPos,
     HashEntry *&out,
     HashEntry *hashTable,
     int bucketSize)
 {
-    uint bucket_idx = hash(blockPos, bucketSize);
-    out = &hashTable[bucket_idx];
+    uint volatileIdx = hash(blockPos, bucketSize);
+    out = &hashTable[volatileIdx];
     if (out->ptr != -1 && out->pos == blockPos)
-        return;
+        return true;
 
-    while (out->offset > 0)
+    while (out->offset >= 0)
     {
-        bucket_idx = bucketSize + out->offset - 1;
-        out = &hashTable[bucket_idx];
+        volatileIdx = bucketSize + out->offset - 1;
+        out = &hashTable[volatileIdx];
         if (out->ptr != -1 && out->pos == blockPos)
-            return;
+            return true;
     }
 
-    out = nullptr;
+    out = NULL;
+    return false;
 }
 
 __device__ __forceinline__ void findVoxel(
@@ -400,8 +399,7 @@ __device__ __forceinline__ void findVoxel(
     int bucketSize)
 {
     HashEntry *current;
-    findEntry(voxelPosToBlockPos(voxelPos), current, hashTable, bucketSize);
-    if (current != nullptr)
+    if (findEntry(voxelPosToBlockPos(voxelPos), current, hashTable, bucketSize))
         out = &listBlocks[current->ptr + voxelPosToLocalIdx(voxelPos)];
 }
 

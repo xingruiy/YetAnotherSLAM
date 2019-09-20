@@ -289,9 +289,9 @@ void create_mesh_with_normal(
 
     callDeviceFunctor<<<block, thread>>>(bva);
 
-    (cudaMemcpy(&triangle_count, cuda_triangle_count, sizeof(uint), cudaMemcpyDeviceToHost));
+    cudaMemcpy(&triangle_count, cuda_triangle_count, sizeof(uint), cudaMemcpyDeviceToHost);
     triangle_count = std::min(triangle_count, (uint)MAX_NUM_MESH_TRIANGLES);
 
-    (cudaFree(cuda_block_count));
-    (cudaFree(cuda_triangle_count));
+    cudaFree(cuda_block_count);
+    cudaFree(cuda_triangle_count);
 }

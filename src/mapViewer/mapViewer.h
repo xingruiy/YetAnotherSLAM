@@ -24,12 +24,12 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> pauseSystemBox;
     std::shared_ptr<pangolin::Var<bool>> displayColourBox;
     std::shared_ptr<pangolin::Var<bool>> displayDepthBox;
-    std::shared_ptr<pangolin::Var<bool>> displayLocalMapBox;
     std::shared_ptr<pangolin::Var<bool>> displayModelBox;
     std::shared_ptr<pangolin::Var<bool>> enableMappingBox;
     std::shared_ptr<pangolin::Var<bool>> displayKFHistoryBox;
     std::shared_ptr<pangolin::Var<bool>> displayFrameHistoryBox;
     std::shared_ptr<pangolin::Var<bool>> displayActivePointsBox;
+    std::shared_ptr<pangolin::Var<bool>> displayStablePointsBox;
 
     GLuint vaoPhong;
     GLuint vaoColour;

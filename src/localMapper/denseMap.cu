@@ -34,7 +34,7 @@ void MapStruct::reset()
 
     cudaMemset(excess_counter_, 0, sizeof(int));
     cudaMemset(bucket_mutex_, 0, sizeof(int) * bucketSize);
-    cudaMemset(voxels_, 0, sizeof(Voxel) * voxelBlockSize);
+    cudaMemset(voxels_, 0, sizeof(Voxel) * BlockSize3 * voxelBlockSize);
 }
 
 void MapStruct::create(

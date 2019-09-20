@@ -43,9 +43,9 @@ public:
     void resetSystem();
     void processFrame(Mat rawImage, Mat rawDepth);
 
-    void resetPointVisitFlag();
     std::vector<Vec3f> getActiveKeyPoints();
     std::vector<Vec3f> getStableKeyPoints();
+    std::vector<SE3> getKeyFramePoseHistory();
     std::vector<SE3> getRawFramePoseHistory() const;
     std::vector<SE3> getRawKeyFramePoseHistory() const;
     size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
