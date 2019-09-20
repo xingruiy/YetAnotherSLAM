@@ -17,7 +17,6 @@ int main(int argc, char **argv)
 
     for (auto iter = listOfFilePath.begin(); iter != listOfFilePath.end() && *iter != ""; ++iter)
     {
-        MapViewer viewer(1920, 920);
 
         Mat33d K = Mat33d::Identity();
         K(0, 0) = K(1, 1) = 525.0;
@@ -26,6 +25,7 @@ int main(int argc, char **argv)
 
         Mat depth, image;
         Mat depthFloat;
+        MapViewer viewer(1920, 920, 640, 480, K);
         FullSystem fullsystem(640, 480, K, 5, true);
 
         printf("Trying: %s...\n", iter->c_str());
@@ -62,7 +62,9 @@ int main(int argc, char **argv)
             viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
             size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
             viewer.setMeshSizeToRender(size);
+            fullsystem.resetPointVisitFlag();
             viewer.setActivePoints(fullsystem.getActiveKeyPoints());
+            viewer.setStablePoints(fullsystem.getStableKeyPoints());
 
             if (pangolin::ShouldQuit())
                 break;

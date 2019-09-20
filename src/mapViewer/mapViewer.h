@@ -27,6 +27,7 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> displayLocalMapBox;
     std::shared_ptr<pangolin::Var<bool>> displayModelBox;
     std::shared_ptr<pangolin::Var<bool>> enableMappingBox;
+    std::shared_ptr<pangolin::Var<bool>> displayKFHistoryBox;
     std::shared_ptr<pangolin::Var<bool>> displayFrameHistoryBox;
     std::shared_ptr<pangolin::Var<bool>> displayActivePointsBox;
 
@@ -51,6 +52,7 @@ class MapViewer
     void checkButtonsAndBoxes();
 
     std::vector<Vec3f> activePoints;
+    std::vector<Vec3f> stablePoints;
     std::vector<Vec3f> rawFrameHistory;
     std::vector<Mat44f> rawKeyFrameHistory;
     std::vector<Vec3f> frameHistory;
@@ -61,8 +63,11 @@ class MapViewer
     // draw calls
     void drawLocalMap();
 
+    Mat33d K, Kinv;
+    int frameWidth, frameHeight;
+
 public:
-    MapViewer(int w, int h);
+    MapViewer(int w, int h, int fW, int fH, Mat33d &K);
     ~MapViewer();
     void resetViewer();
     void renderView();
@@ -72,6 +77,7 @@ public:
     void setFrameHistory(const std::vector<SE3> &history);
     void setKeyFrameHistory(const std::vector<SE3> &history);
     void setActivePoints(const std::vector<Vec3f> &points);
+    void setStablePoints(const std::vector<Vec3f> &points);
 
     bool isResetRequested();
     bool paused() const;

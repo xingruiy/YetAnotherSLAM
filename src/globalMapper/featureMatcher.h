@@ -35,10 +35,18 @@ public:
         std::vector<cv::KeyPoint> &keyPoints,
         std::vector<Vec9f> &patch3x3,
         std::vector<float> &depthVec);
+
     void matchByProjection(
-        std::shared_ptr<Frame> reference,
-        std::shared_ptr<Frame> current,
-        SE3 &Transform,
+        const std::shared_ptr<Frame> frame,
+        std::vector<bool> &matchesFound,
+        const std::shared_ptr<Frame> kf,
+        const Mat33d &K,
+        std::vector<cv::DMatch> &matches);
+
+    void matchByProjection(
+        const std::shared_ptr<Frame> kf,
+        const std::shared_ptr<Frame> frame,
+        const Mat33d &K,
         std::vector<cv::DMatch> &matches,
-        std::vector<bool> *mask = NULL);
+        std::vector<bool> *matchesFound = NULL);
 };

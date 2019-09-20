@@ -134,9 +134,14 @@ size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
     return localMapper->fetch_mesh_with_normal(vbuffer, nbuffer);
 }
 
+void FullSystem::resetPointVisitFlag()
+{
+    globalMapper->resetPointVisitFlag();
+}
+
 std::vector<Vec3f> FullSystem::getActiveKeyPoints()
 {
-    return globalMapper->getPointHistory();
+    return globalMapper->getActivePoints();
 }
 
 std::vector<Vec3f> FullSystem::getStableKeyPoints()

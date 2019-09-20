@@ -5,8 +5,9 @@
 #define ZMAX 1000
 #define ENTER_KEY 13
 
-MapViewer::MapViewer(int w, int h)
-    : numTriangles(0), maxNumTriangles(20000000)
+MapViewer::MapViewer(int w, int h, int fW, int fH, Mat33d &K)
+    : numTriangles(0), maxNumTriangles(20000000), K(K), Kinv(K.inverse()),
+      frameWidth(fW), frameHeight(fH)
 {
     pangolin::CreateWindowAndBind("MAP VIEWER", w, h);
 
@@ -59,6 +60,7 @@ void MapViewer::setupDisplay()
     enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Camera", false, true);
     displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Trajectory", true, true);
     displayActivePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Active Points", true, true);
+    displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Key Frame", true, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -209,10 +211,25 @@ void MapViewer::renderView()
     if (*displayActivePointsBox && modelView)
     {
         modelView->Activate(*mainCamera);
-        glColor3f(0.f, 1.f, 0.f);
         glPointSize(3.f);
+        glColor3f(0.f, 1.f, 0.f);
         pangolin::glDrawPoints(activePoints);
+        glColor3f(1.f, 0.f, 0.f);
+        pangolin::glDrawPoints(stablePoints);
         glPointSize(1.f);
+        glColor4f(1.f, 1.f, 1.f, 1.f);
+    }
+
+    if (*displayKFHistoryBox && modelView)
+    {
+        modelView->Activate(*mainCamera);
+        glColor3f(1.f, 0.f, 0.f);
+        for (auto T : rawKeyFrameHistory)
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+
+        glColor3f(0.f, 1.f, 0.f);
+        for (auto T : keyFrameHistory)
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
@@ -270,10 +287,16 @@ void MapViewer::setRawKeyFrameHistory(const std::vector<SE3> &history)
 
 void MapViewer::setFrameHistory(const std::vector<SE3> &history)
 {
+    frameHistory.clear();
+    for (auto T : history)
+        frameHistory.push_back(T.translation().cast<float>());
 }
 
 void MapViewer::setKeyFrameHistory(const std::vector<SE3> &history)
 {
+    keyFrameHistory.clear();
+    for (auto T : history)
+        keyFrameHistory.push_back(T.matrix().cast<float>());
 }
 
 void MapViewer::getMeshBuffer(float *&vbuffer, float *&nbuffer, size_t &bufferSize)
@@ -291,4 +314,9 @@ void MapViewer::setMeshSizeToRender(size_t size)
 void MapViewer::setActivePoints(const std::vector<Vec3f> &points)
 {
     activePoints = points;
+}
+
+void MapViewer::setStablePoints(const std::vector<Vec3f> &points)
+{
+    stablePoints = points;
 }

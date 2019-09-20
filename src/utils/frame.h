@@ -4,7 +4,7 @@
 
 class Frame;
 
-struct PointWorld
+struct Point3D
 {
     bool visited;
     Vec3d position;
@@ -19,8 +19,9 @@ class Frame
     Mat rawImage;
     Mat rawIntensity;
     SE3 framePose;
+    static size_t nextKFId;
 
-    std::vector<std::shared_ptr<PointWorld>> worldPoints;
+    std::vector<std::shared_ptr<Point3D>> worldPoints;
 
 public:
     Frame();
@@ -29,9 +30,12 @@ public:
     Mat getImage();
     Mat getIntensity();
     SE3 getPose();
+    void flagKeyFrame();
     void setPose(const SE3 &T);
-    void minimizeFootPrint();
-    size_t getKeyPointSize() const;
-    std::vector<std::shared_ptr<PointWorld>> getWorldPoints() const;
-    void setWorldPoints(const std::vector<std::shared_ptr<PointWorld>> &pt);
+
+    size_t kfId;
+
+    std::vector<Vec9f> pointDesc;
+    std::vector<cv::KeyPoint> cvKeyPoints;
+    std::vector<std::shared_ptr<Point3D>> mapPoints;
 };

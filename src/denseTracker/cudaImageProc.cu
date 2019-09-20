@@ -137,7 +137,6 @@ void renderScene(const GMat vmap, const GMat nmap, GMat &image)
     dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
 
     renderSceneKernel<<<grid, block>>>(vmap, nmap, Vec3f(5, 5, 5), image);
-    cudaCheckError();
 }
 
 __global__ void computeNormalKernel(cv::cuda::PtrStepSz<Vec4f> vmap, cv::cuda::PtrStep<Vec4f> nmap)

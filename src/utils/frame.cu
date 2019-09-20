@@ -1,10 +1,13 @@
 #include "utils/frame.h"
 
+size_t Frame::nextKFId = 0;
+
 Frame::Frame()
 {
 }
 
 Frame::Frame(Mat rawImage, Mat rawDepth, Mat rawIntensity)
+    : kfId(0)
 {
     rawImage.copyTo(this->rawImage);
     rawDepth.copyTo(this->rawDepth);
@@ -36,23 +39,7 @@ void Frame::setPose(const SE3 &T)
     framePose = T;
 }
 
-void Frame::minimizeFootPrint()
+void Frame::flagKeyFrame()
 {
-    rawDepth.release();
-    rawIntensity.release();
-}
-
-size_t Frame::getKeyPointSize() const
-{
-    return worldPoints.size();
-}
-
-std::vector<std::shared_ptr<PointWorld>> Frame::getWorldPoints() const
-{
-    return worldPoints;
-}
-
-void Frame::setWorldPoints(const std::vector<std::shared_ptr<PointWorld>> &pt)
-{
-    worldPoints = pt;
+    kfId = nextKFId++;
 }
