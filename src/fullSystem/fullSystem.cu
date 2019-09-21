@@ -14,6 +14,7 @@ FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool optimize)
 
     lastTrackedPose = SE3(Mat44d::Identity());
     lastReferencePose = SE3(Mat44d::Identity());
+    accumulateTransform = SE3(Mat44d::Identity());
 
     bufferVec4wxh.create(h, w, CV_32FC4);
     bufferFloatwxh.create(h, w, CV_32FC1);
@@ -39,8 +40,8 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
     case -1:
     {
         coarseTracker->setReferenceFrame(currentFrame);
-        fuseCurrentFrame(lastTrackedPose);
         createNewKF();
+        fuseCurrentFrame(lastTrackedPose);
         currentState = 0;
         break;
     }
@@ -51,12 +52,12 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         {
             fuseCurrentFrame(lastTrackedPose);
             updateLocalMapObservation(lastTrackedPose);
-            rawFramePoseHistory.push_back(lastTrackedPose);
 
             if (needNewKF())
                 createNewKF();
             else
                 globalMapper->addFrameHistory(currentFrame);
+            rawFramePoseHistory.push_back(currentFrame->getPoseInLocalMap());
         }
         else
         {
@@ -74,27 +75,52 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 bool FullSystem::trackCurrentFrame()
 {
     coarseTracker->setTrackingFrame(currentFrame);
-    SE3 rval = coarseTracker->getIncrementalTransform();
-    lastTrackedPose = lastTrackedPose * rval.inverse();
-    currentFrame->setPose(lastTrackedPose);
+    // SE3 relativePose = coarseTracker->getIncrementalTransform();
+    // lastTrackedPose = lastTrackedPose * relativePose.inverse();
+    // currentFrame->setPose(lastTrackedPose);
+    // currentFrame->relativePose = relativePose;
+    // currentFrame->referenceKF = referenceFrame;
+
+    SE3 tRes = coarseTracker->getIncrementalTransform();
+    // accumulated local transform
+    accumulateTransform = accumulateTransform * tRes.inverse();
+    currentFrame->setTrackingResult(accumulateTransform);
+    currentFrame->setReferenceKF(referenceFrame);
+
+    // Keep track of the camera in local map
+    // lastTrackedPose = lastTrackedPose * tRes.inverse();
+    // currentFrame->setPose(lastTrackedPose);
+
     return true;
 }
 
 void FullSystem::fuseCurrentFrame(const SE3 &T)
 {
+    // SE3 transformedPose = SE3();
+    // if (currentFrame->isKeyframe())
+    //     transformedPose = currentFrame->accumulatedPose;
+    // else
+    // {
+    //     auto relativePose = currentFrame->relativePose;
+    //     auto referencePose = currentFrame->referenceKF->accumulatedPose;
+    //     transformedPose = referencePose * relativePose.inverse();
+    // }
+
     auto currDepth = coarseTracker->getReferenceDepth();
-    localMapper->fuseFrame(currDepth, T);
+    localMapper->fuseFrame(currDepth, currentFrame->getPoseInLocalMap());
+    // localMapper->fuseFrame(currDepth, transformedPose);
 }
 
 void FullSystem::updateLocalMapObservation(const SE3 &T)
 {
-    localMapper->raytrace(bufferVec4wxh, T);
+    localMapper->raytrace(bufferVec4wxh, currentFrame->getPoseInLocalMap());
     coarseTracker->setReferenceInvDepth(bufferVec4wxh);
 }
 
 bool FullSystem::needNewKF()
 {
-    SE3 dt = lastReferencePose * lastTrackedPose.inverse();
+    auto dt = currentFrame->getTrackingResult();
+    // SE3 dt = referencePose * lastTrackedPose.inverse();
     Vec3d t = dt.translation();
     if (t.norm() >= 0.1)
         return true;
@@ -103,10 +129,19 @@ bool FullSystem::needNewKF()
 
 void FullSystem::createNewKF()
 {
-    lastReferencePose = lastTrackedPose;
-    // TODO: update maps in frame
-    globalMapper->addReferenceFrame(currentFrame);
-    rawKeyFramePoseHistory.push_back(lastReferencePose);
+    referenceFrame = currentFrame;
+
+    /* 
+        Flag for keyframe
+    */
+    referenceFrame->flagKeyFrame();
+    lastTrackedPose = lastTrackedPose * accumulateTransform;
+    referenceFrame->setRawKeyframePose(lastTrackedPose);
+    globalMapper->addReferenceFrame(referenceFrame);
+
+    rawKeyFramePoseHistory.push_back(lastTrackedPose);
+    accumulateTransform = SE3();
+    // lastReferencePose = lastTrackedPose;
 }
 
 void FullSystem::resetSystem()

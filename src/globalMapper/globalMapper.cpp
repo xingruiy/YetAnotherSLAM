@@ -20,10 +20,11 @@ void GlobalMapper::reset()
 
 void GlobalMapper::addFrameHistory(std::shared_ptr<Frame> frame)
 {
-    if (frame->referenceKF == NULL)
+    auto refKF = frame->getReferenceKF();
+    if (refKF == NULL)
         return;
 
-    frameHistory.push_back(std::make_pair(frame->Tr2c, frame->referenceKF));
+    frameHistory.push_back(std::make_pair(frame->getTrackingResult(), refKF));
 }
 
 void GlobalMapper::addReferenceFrame(std::shared_ptr<Frame> frame)
@@ -52,7 +53,7 @@ void GlobalMapper::marginalizeOldFrame()
         if (pt && pt->inOptimizer && pt->hostKF == kf2Del)
         {
             // printf("%lu camera and %lu pt\n", kf2Del->kfId, pt->ptId);
-            solver->removeObservation(pt->ptId, kf2Del->kfId);
+            solver->removeObservation(pt->ptId, kf2Del->getKeyframeId());
             if (pt->hostKF == kf2Del)
             {
                 solver->removeWorldPoint(pt->ptId);
@@ -133,7 +134,7 @@ std::vector<SE3> GlobalMapper::getFrameHistory() const
     {
         auto &dT = h.first;
         auto &refKF = h.second;
-        history.push_back(refKF->getPose() * dT.inverse());
+        history.push_back(refKF->getPoseInGlobalMap() * dT);
     }
 
     return history;
@@ -162,7 +163,6 @@ void GlobalMapper::optimizationLoop()
         if (frame == NULL)
             continue;
 
-        frame->flagKeyFrame();
         // std::cout << "processing: " << frame->kfId << std::endl;
 
         if (keyframeOptWin.size() >= optWinSize)
@@ -197,11 +197,11 @@ void GlobalMapper::optimizationLoop()
             if (matches.size() == 0)
                 continue;
 
-            Mat outImg;
-            Mat refImg = refKF->getImage();
-            cv::drawMatches(refImg, refKF->cvKeyPoints, image, frame->cvKeyPoints, matches, outImg);
-            cv::imshow("img", outImg);
-            cv::waitKey(1);
+            // Mat outImg;
+            // Mat refImg = refKF->getImage();
+            // cv::drawMatches(refImg, refKF->cvKeyPoints, image, frame->cvKeyPoints, matches, outImg);
+            // cv::imshow("img", outImg);
+            // cv::waitKey(1);
 
             for (auto match : matches)
             {
@@ -214,6 +214,7 @@ void GlobalMapper::optimizationLoop()
             }
         }
 
+        auto framePose = frame->getPoseInGlobalMap();
         for (int i = 0; i < numDetectedPoints; ++i)
         {
             if (matchesFound[i])
@@ -228,7 +229,7 @@ void GlobalMapper::optimizationLoop()
                 auto pt3d = std::make_shared<Point3D>();
 
                 pt3d->hostKF = frame;
-                pt3d->position = frame->getPose() * (Kinv * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z);
+                pt3d->position = framePose * (Kinv * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z);
                 pt3d->descriptor = desc;
                 frame->mapPoints[i] = pt3d;
             }
@@ -246,7 +247,7 @@ void GlobalMapper::optimizationLoop()
 
 void GlobalMapper::addToOptimizer(std::shared_ptr<Frame> kf)
 {
-    solver->addCamera(kf->kfId, kf->getPose().inverse(), kf->kfId == 0);
+    solver->addCamera(kf->getKeyframeId(), kf->getPoseInGlobalMap().inverse(), kf->getKeyframeId() == 0);
     for (int i = 0; i < kf->cvKeyPoints.size(); ++i)
     {
         auto pt = kf->mapPoints[i];
@@ -260,7 +261,7 @@ void GlobalMapper::addToOptimizer(std::shared_ptr<Frame> kf)
                 pt->inOptimizer = true;
             }
 
-            solver->addObservation(pt->ptId, kf->kfId, Vec2d(kp.pt.x, kp.pt.y));
+            solver->addObservation(pt->ptId, kf->getKeyframeId(), Vec2d(kp.pt.x, kp.pt.y));
         }
     }
 }
@@ -272,8 +273,8 @@ void GlobalMapper::windowedOptimization(const int maxIteration)
 
     {
         std::unique_lock<std::mutex> lock(localKeyFrameLock);
-        oldestKFId = keyframeOptWin.front()->kfId;
-        newestKFId = keyframeOptWin.back()->kfId;
+        oldestKFId = keyframeOptWin.front()->getKeyframeId();
+        newestKFId = keyframeOptWin.back()->getKeyframeId();
     }
 
     solver->optimize(maxIteration, oldestKFId, newestKFId);

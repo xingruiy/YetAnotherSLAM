@@ -19,6 +19,7 @@ struct BuildVertexArray
     int hashTableSize;
     int bucketSize;
     float voxelSize;
+    size_t bufferSize;
 
     __device__ __forceinline__ void select_blocks() const
     {
@@ -43,9 +44,7 @@ struct BuildVertexArray
         {
             int offset = computeOffset<1024>(val, block_count);
             if (offset != -1)
-            {
                 block_array[offset] = hashTable[x];
-            }
         }
     }
 
@@ -103,7 +102,7 @@ struct BuildVertexArray
         return true;
     }
 
-    __device__ __forceinline__ float interpolate_sdf(float &v1, float &v2) const
+    __device__ __forceinline__ float interpolateLinear(float &v1, float &v2) const
     {
         if (fabs(0 - v1) < 1e-6)
             return 0;
@@ -144,62 +143,62 @@ struct BuildVertexArray
 
         if (edgeTable[cubeIdx] & 1)
         {
-            float val = interpolate_sdf(sdf[0], sdf[1]);
+            float val = interpolateLinear(sdf[0], sdf[1]);
             verts[0] = pos + Vec3f(val, 0, 0);
         }
         if (edgeTable[cubeIdx] & 2)
         {
-            float val = interpolate_sdf(sdf[1], sdf[2]);
+            float val = interpolateLinear(sdf[1], sdf[2]);
             verts[1] = pos + Vec3f(1, val, 0);
         }
         if (edgeTable[cubeIdx] & 4)
         {
-            float val = interpolate_sdf(sdf[2], sdf[3]);
+            float val = interpolateLinear(sdf[2], sdf[3]);
             verts[2] = pos + Vec3f(1 - val, 1, 0);
         }
         if (edgeTable[cubeIdx] & 8)
         {
-            float val = interpolate_sdf(sdf[3], sdf[0]);
+            float val = interpolateLinear(sdf[3], sdf[0]);
             verts[3] = pos + Vec3f(0, 1 - val, 0);
         }
         if (edgeTable[cubeIdx] & 16)
         {
-            float val = interpolate_sdf(sdf[4], sdf[5]);
+            float val = interpolateLinear(sdf[4], sdf[5]);
             verts[4] = pos + Vec3f(val, 0, 1);
         }
         if (edgeTable[cubeIdx] & 32)
         {
-            float val = interpolate_sdf(sdf[5], sdf[6]);
+            float val = interpolateLinear(sdf[5], sdf[6]);
             verts[5] = pos + Vec3f(1, val, 1);
         }
         if (edgeTable[cubeIdx] & 64)
         {
-            float val = interpolate_sdf(sdf[6], sdf[7]);
+            float val = interpolateLinear(sdf[6], sdf[7]);
             verts[6] = pos + Vec3f(1 - val, 1, 1);
         }
         if (edgeTable[cubeIdx] & 128)
         {
-            float val = interpolate_sdf(sdf[7], sdf[4]);
+            float val = interpolateLinear(sdf[7], sdf[4]);
             verts[7] = pos + Vec3f(0, 1 - val, 1);
         }
         if (edgeTable[cubeIdx] & 256)
         {
-            float val = interpolate_sdf(sdf[0], sdf[4]);
+            float val = interpolateLinear(sdf[0], sdf[4]);
             verts[8] = pos + Vec3f(0, 0, val);
         }
         if (edgeTable[cubeIdx] & 512)
         {
-            float val = interpolate_sdf(sdf[1], sdf[5]);
+            float val = interpolateLinear(sdf[1], sdf[5]);
             verts[9] = pos + Vec3f(1, 0, val);
         }
         if (edgeTable[cubeIdx] & 1024)
         {
-            float val = interpolate_sdf(sdf[2], sdf[6]);
+            float val = interpolateLinear(sdf[2], sdf[6]);
             verts[10] = pos + Vec3f(1, 1, val);
         }
         if (edgeTable[cubeIdx] & 2048)
         {
-            float val = interpolate_sdf(sdf[3], sdf[7]);
+            float val = interpolateLinear(sdf[3], sdf[7]);
             verts[11] = pos + Vec3f(0, 1, val);
         }
 
@@ -209,7 +208,7 @@ struct BuildVertexArray
     __device__ __forceinline__ void operator()() const
     {
         int x = blockIdx.y * gridDim.x + blockIdx.x;
-        if (*triangle_count >= MAX_NUM_MESH_TRIANGLES || x >= *block_count)
+        if (*triangle_count >= bufferSize || x >= *block_count)
             return;
 
         Vec3f verts[12];
@@ -225,7 +224,7 @@ struct BuildVertexArray
             for (int i = 0; triTable[cubeIdx][i] != -1; i += 3)
             {
                 uint triangleId = atomicAdd(triangle_count, 1);
-                if (triangleId < MAX_NUM_MESH_TRIANGLES)
+                if (triangleId < bufferSize)
                 {
                     triangles[triangleId * 3] = verts[triTable[cubeIdx][i]] * voxelSize;
                     triangles[triangleId * 3 + 1] = verts[triTable[cubeIdx][i + 1]] * voxelSize;
@@ -249,31 +248,31 @@ __global__ void selectBlockKernel(BuildVertexArray bva)
 
 void create_mesh_with_normal(
     MapStruct map_struct,
-    // MapState state,
     uint &block_count,
     uint &triangle_count,
-    void *vertex_data,
-    void *vertex_normal)
+    void *vertexBuffer,
+    void *normalBuffer,
+    size_t bufferSize)
 {
     uint *cuda_block_count;
     uint *cuda_triangle_count;
-    (cudaMalloc(&cuda_block_count, sizeof(uint)));
-    (cudaMalloc(&cuda_triangle_count, sizeof(uint)));
-    (cudaMemset(cuda_block_count, 0, sizeof(uint)));
-    (cudaMemset(cuda_triangle_count, 0, sizeof(uint)));
+    cudaMalloc(&cuda_block_count, sizeof(uint));
+    cudaMalloc(&cuda_triangle_count, sizeof(uint));
+    cudaMemset(cuda_block_count, 0, sizeof(uint));
+    cudaMemset(cuda_triangle_count, 0, sizeof(uint));
 
     BuildVertexArray bva;
-    // bva.map_struct = map_struct;
     bva.block_array = map_struct.visibleTable;
     bva.block_count = cuda_block_count;
     bva.triangle_count = cuda_triangle_count;
-    bva.triangles = static_cast<Vec3f *>(vertex_data);
-    bva.surfaceNormal = static_cast<Vec3f *>(vertex_normal);
+    bva.triangles = static_cast<Vec3f *>(vertexBuffer);
+    bva.surfaceNormal = static_cast<Vec3f *>(normalBuffer);
     bva.hashTable = map_struct.hash_table_;
     bva.listBlocks = map_struct.voxels_;
     bva.hashTableSize = map_struct.hashTableSize;
     bva.bucketSize = map_struct.bucketSize;
     bva.voxelSize = map_struct.voxelSize;
+    bva.bufferSize = MAX_NUM_MESH_TRIANGLES;
 
     dim3 thread(1024);
     dim3 block = dim3(div_up(map_struct.hashTableSize, thread.x));

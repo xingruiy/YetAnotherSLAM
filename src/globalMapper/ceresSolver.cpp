@@ -1,7 +1,6 @@
 #include "globalMapper/ceresSolver.h"
 
 CeresSolver::CeresSolver(Mat33d &K)
-    : intrinsics(K), camLocalSE3(new LocalParameterizationSE3())
 {
     this->K[0] = K(0, 0);
     this->K[1] = K(1, 1);
@@ -94,6 +93,9 @@ void CeresSolver::optimize(const int maxiter, const size_t oldestKFId, const siz
     auto *se3Local = new LocalParameterizationSE3();
     for (auto kf : cameras)
     {
+        if (kf.first < oldestKFId || kf.first > newestKFId)
+            continue;
+
         problem.AddParameterBlock(kf.second.data(), SE3::num_parameters, se3Local);
 
         if (kf.first != newestKFId || kf.first == oldestKFId)
@@ -134,11 +136,17 @@ void CeresSolver::optimize(const int maxiter, const size_t oldestKFId, const siz
 
     ceres::Solver::Options options;
     ceres::Solver::Summary summary;
-    // options.eta
     options.linear_solver_type = ceres::SPARSE_SCHUR;
     // options.max_num_iterations = maxiter;
     Solve(options, &problem, &summary);
     std::cout << summary.BriefReport() << std::endl;
+}
+
+void CeresSolver::reset()
+{
+    cameras.clear();
+    mapPoints.clear();
+    observations.clear();
 }
 
 bool CeresSolver::hasCamera(const size_t camIdx)

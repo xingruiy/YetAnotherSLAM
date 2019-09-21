@@ -6,18 +6,16 @@
 class CeresSolver
 {
     double K[4];
-    Mat33d intrinsics;
     // std::shared_ptr<ceres::Problem> solver;
     std::unordered_map<size_t, Vec3d> mapPoints;
     std::unordered_map<size_t, SE3> cameras;
-    std::map<std::pair<size_t, size_t>, ceres::CostFunction *> residualBlock;
     std::unordered_map<size_t, std::unordered_map<size_t, Vec2d>> observations;
-    std::shared_ptr<LocalParameterizationSE3> camLocalSE3;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     CeresSolver(Mat33d &K);
 
+    void reset();
     bool hasCamera(const size_t camIdx);
     SE3 getCamera(const size_t camIdx);
     void optimize(const int maxiter, const size_t oldestKFId, const size_t newestKFId);

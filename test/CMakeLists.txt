@@ -4,7 +4,7 @@ add_executable(liveViewer)
 
 target_sources(liveViewer 
 PRIVATE
-    liveViewer/liveViewer.cu
+    liveViewer/liveViewer.cpp
     liveViewer/oniCamera.cpp
 )
 

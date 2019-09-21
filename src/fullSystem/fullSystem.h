@@ -30,6 +30,7 @@ class FullSystem
 
     SE3 lastTrackedPose;
     SE3 lastReferencePose;
+    SE3 accumulateTransform;
 
     GMat bufferFloatwxh;
     GMat bufferVec4wxh;

@@ -10,7 +10,7 @@ add_library(athena SHARED)
 
 target_sources(athena
 PRIVATE
-    src/utils/frame.cu
+    src/utils/frame.cpp
     src/fullSystem/fullSystem.cu
     src/mapViewer/mapViewer.cpp
     src/denseTracker/denseTracker.cu

@@ -1,7 +1,6 @@
 #include "oniCamera.h"
 #include "mapViewer/mapViewer.h"
 #include "fullSystem/fullSystem.h"
-#include "denseTracker/cudaImageProc.h"
 
 int main(int argc, char **argv)
 {

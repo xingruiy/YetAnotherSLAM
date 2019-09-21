@@ -81,7 +81,7 @@ void FeatureMatcher::matchByProjection(
     auto &mapPoints = kf->mapPoints;
     auto &keyPoints = frame->cvKeyPoints;
     auto &descriptors = frame->pointDesc;
-    auto framePoseInv = frame->getPose().inverse();
+    auto framePoseInv = frame->getPoseInGlobalMap().inverse();
 
     for (auto iter = mapPoints.begin(), iend = mapPoints.end(); iter != iend; ++iter)
     {
