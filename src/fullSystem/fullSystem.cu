@@ -9,7 +9,7 @@ FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool optimize)
     : currentState(-1)
 {
     localMapper = std::make_shared<DenseMapping>(w, h, K);
-    globalMapper = std::make_shared<GlobalMapper>(K, 7);
+    globalMapper = std::make_shared<GlobalMapper>(K, 5);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
@@ -174,6 +174,11 @@ size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
 std::vector<SE3> FullSystem::getKeyFramePoseHistory()
 {
     return globalMapper->getKeyFrameHistory();
+}
+
+std::vector<SE3> FullSystem::getFramePoseHistory()
+{
+    return globalMapper->getFrameHistory();
 }
 
 std::vector<Vec3f> FullSystem::getActiveKeyPoints()

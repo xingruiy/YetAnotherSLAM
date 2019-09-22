@@ -7,9 +7,11 @@ class Frame;
 struct Point3D
 {
     static size_t nextPtId;
-    Point3D() : ptId(nextPtId++), inOptimizer(false) {}
+    Point3D() : ptId(nextPtId++), inOptimizer(false), invalidated(false), numObservations(1) {}
     size_t ptId;
+    int numObservations;
     bool visited;
+    bool invalidated;
     bool inOptimizer;
     Vec3d position;
     Vec9f descriptor;

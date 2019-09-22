@@ -101,3 +101,30 @@ struct ReprojectionErrorFunctor
 
     double obsX, obsY;
 };
+
+struct PointToPointErrorFunctor
+{
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    PointToPointErrorFunctor(double x, double y, double z) : obsX(x), obsY(y), obsZ(z) {}
+
+    template <typename T>
+    bool operator()(const T *TData, const T *ptData, T *residual) const
+    {
+        Eigen::Map<Sophus::SE3<T> const> Twc(TData);
+        Eigen::Map<Eigen::Matrix<T, 3, 1> const> pt(ptData);
+        Eigen::Matrix<T, 3, 1> ptTransformed = Twc * pt;
+
+        residual[0] = ptTransformed(0) - T(obsX);
+        residual[1] = ptTransformed(1) - T(obsY);
+        residual[2] = ptTransformed(2) - T(obsZ);
+
+        return true;
+    }
+
+    static ceres::CostFunction *create(double x, double y, double z)
+    {
+        return new ceres::AutoDiffCostFunction<PointToPointErrorFunctor, 3, SE3::num_parameters, 3>(new PointToPointErrorFunctor(x, y, z));
+    }
+
+    double obsX, obsY, obsZ;
+};

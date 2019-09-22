@@ -28,6 +28,8 @@ class GlobalMapper
 
     std::shared_ptr<CeresSolver> solver;
 
+    bool doubleCheckPointPair(Mat image, Mat refImage, cv::KeyPoint &pt, cv::KeyPoint &refPt);
+
 public:
     GlobalMapper(Mat33d &K, int localWinSize = 5);
 

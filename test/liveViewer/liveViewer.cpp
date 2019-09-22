@@ -33,6 +33,7 @@ int main(int argc, char **argv)
 
             viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
             viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
             if (!viewer.paused())

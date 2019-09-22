@@ -19,12 +19,14 @@ FeatureMatcher::FeatureMatcher(PointType pType)
     switch (pType)
     {
     case PointType::ORB:
-        orbDetector = cv::ORB::create(1500);
+        orbDetector = cv::ORB::create(1000);
         break;
     case PointType::FAST:
-        fastDetector = cv::FastFeatureDetector::create();
+        fastDetector = cv::FastFeatureDetector::create(25);
         break;
     }
+
+    matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
 }
 
 void FeatureMatcher::detect(
@@ -54,13 +56,19 @@ EIGEN_STRONG_INLINE float computePatchScoreL2Norm(const Eigen::MatrixBase<Derive
     return (a - b).norm() / 9;
 }
 
-void FeatureMatcher::matchByProjection(
-    const std::shared_ptr<Frame> frame,
-    std::vector<bool> &matchesFound,
-    const std::shared_ptr<Frame> kf,
-    const Mat33d &K,
-    std::vector<cv::DMatch> &matches)
+void FeatureMatcher::compute(
+    Mat image,
+    std::vector<cv::KeyPoint> pt,
+    Mat &desc)
 {
+    orbDetector->compute(image, pt, desc);
+}
+
+float FeatureMatcher::computeMatchingScore(Mat desc, Mat refDesc)
+{
+    std::vector<cv::DMatch> match;
+    matcher->match(desc, refDesc, match);
+    return match[0].distance;
 }
 
 void FeatureMatcher::matchByProjection(

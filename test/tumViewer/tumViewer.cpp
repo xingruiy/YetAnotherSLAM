@@ -8,9 +8,9 @@ int main(int argc, char **argv)
     std::vector<std::string> listOfFilePath = {
         // "rgbd_dataset_freiburg1_xyz/",
         // "rgbd_dataset_freiburg1_rpy/",
-        // "rgbd_dataset_freiburg2_xyz/",
+        "rgbd_dataset_freiburg2_xyz/",
         // "rgbd_dataset_freiburg2_rpy/",
-        "rgbd_dataset_freiburg3_long_office_household/",
+        // "rgbd_dataset_freiburg3_long_office_household/",
         // "rgbd_dataset_freiburg3_structure_texture_far/",
         // "rgbd_dataset_freiburg3_structure_texture_near/",
         ""};
@@ -55,6 +55,7 @@ int main(int argc, char **argv)
 
             viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
             viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
             float *vbuffer;
@@ -64,7 +65,8 @@ int main(int argc, char **argv)
             size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
             viewer.setMeshSizeToRender(size);
             viewer.setActivePoints(fullsystem.getActiveKeyPoints());
-            viewer.setStablePoints(fullsystem.getStableKeyPoints());
+            if (i < 5)
+                viewer.setStablePoints(fullsystem.getActiveKeyPoints());
 
             if (pangolin::ShouldQuit())
                 break;
@@ -75,7 +77,7 @@ int main(int argc, char **argv)
         while (!pangolin::ShouldQuit())
             viewer.renderView();
 
-        TUMSave(baseDir + *iter, listOfTimeStamp, fullsystem.getRawFramePoseHistory());
+        TUMSave(baseDir + *iter, listOfTimeStamp, fullsystem.getFramePoseHistory());
         printf("Saved: %s...\n", iter->c_str());
     }
 }

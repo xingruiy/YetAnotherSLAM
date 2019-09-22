@@ -206,25 +206,29 @@ void MapViewer::renderView()
         glColor3f(1.f, 0.f, 0.f);
         pangolin::glDrawLineStrip(rawFrameHistory);
         glColor4f(1.f, 1.f, 1.f, 1.f);
+
+        glColor3f(0.f, 1.f, 0.f);
+        pangolin::glDrawLineStrip(frameHistory);
+        glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
     if (*displayActivePointsBox && modelView)
     {
         modelView->Activate(*mainCamera);
-        glPointSize(3.f);
+        // glPointSize(3.f);
         glColor3f(0.f, 1.f, 0.f);
         pangolin::glDrawPoints(activePoints);
-        glPointSize(1.f);
+        // glPointSize(1.f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
     if (*displayStablePointsBox && modelView)
     {
         modelView->Activate(*mainCamera);
-        glPointSize(3.f);
+        // glPointSize(3.f);
         glColor3f(1.f, 0.f, 0.f);
         pangolin::glDrawPoints(stablePoints);
-        glPointSize(1.f);
+        // glPointSize(1.f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 

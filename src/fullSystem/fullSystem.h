@@ -46,6 +46,7 @@ public:
 
     std::vector<Vec3f> getActiveKeyPoints();
     std::vector<Vec3f> getStableKeyPoints();
+    std::vector<SE3> getFramePoseHistory();
     std::vector<SE3> getKeyFramePoseHistory();
     std::vector<SE3> getRawFramePoseHistory() const;
     std::vector<SE3> getRawKeyFramePoseHistory() const;

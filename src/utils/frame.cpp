@@ -34,8 +34,8 @@ void Frame::flagKeyFrame()
 {
     keyframeFlag = true;
     kfId = nextKFId++;
-    referenceKF = NULL;
-    relativePose = SE3();
+    // referenceKF = NULL;
+    // relativePose = SE3();
 }
 
 bool Frame::isKeyframe() const
@@ -55,7 +55,7 @@ SE3 Frame::getPoseInGlobalMap() const
     else
     {
         auto referencePose = referenceKF->getPoseInGlobalMap();
-        return referencePose * relativePose.inverse();
+        return referencePose * relativePose;
     }
 }
 

@@ -31,7 +31,7 @@ void computeImageGradientCentralDiff(GMat image, GMat &gx, GMat &gy)
     dim3 block(8, 8);
     dim3 grid = getGridConfiguration2D(block, image.cols, image.rows);
     computeImageGradientCentralDiffKernel<<<grid, block>>>(image, gx, gy);
-    cudaCheckError();
+    // cudaCheckError();
 }
 
 __global__ void transformReferencePointKernel(
@@ -67,7 +67,7 @@ void transformReferencePoint(GMat depth, GMat &vmap, const Mat33d &K, const SE3 
     Vec3d t = T.matrix().topRightCorner(3, 1);
 
     transformReferencePointKernel<<<grid, block>>>(depth, vmap, RKinv.cast<float>(), t.cast<float>());
-    cudaCheckError();
+    // cudaCheckError();
 }
 
 __device__ __forceinline__ Vec4b renderPoint(
@@ -169,7 +169,7 @@ void computeNormal(const GMat vmap, GMat &nmap)
     dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
 
     computeNormalKernel<<<grid, block>>>(vmap, nmap);
-    cudaCheckError();
+    // cudaCheckError();
 }
 
 __global__ void convertDepthToInvDepthKernel(
@@ -201,7 +201,7 @@ void convertDepthToInvDepth(const GMat depth, GMat &invDepth)
     dim3 grid = getGridConfiguration2D(block, depth.cols, depth.rows);
 
     convertDepthToInvDepthKernel<<<grid, block>>>(depth, invDepth);
-    cudaCheckError();
+    // cudaCheckError();
 }
 
 __global__ void convertVMapToInvDepthKernel(
@@ -210,7 +210,7 @@ __global__ void convertVMapToInvDepthKernel(
 {
     const int x = threadIdx.x + blockDim.x * blockIdx.x;
     const int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= invDepth.cols - 1 || y >= invDepth.rows - 1)
+    if (x >= invDepth.cols || y >= invDepth.rows)
         return;
 
     const auto pt = vmap.ptr(y)[x];
@@ -218,10 +218,10 @@ __global__ void convertVMapToInvDepthKernel(
     {
         invDepth.ptr(y)[x] = 1.0 / pt(2);
     }
-    else
-    {
-        invDepth.ptr(y)[x] = 0;
-    }
+    // else
+    // {
+    //     invDepth.ptr(y)[x] = 0;
+    // }
 }
 
 void convertVMapToInvDepth(const GMat vmap, GMat &invDepth)
@@ -233,7 +233,7 @@ void convertVMapToInvDepth(const GMat vmap, GMat &invDepth)
     dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
 
     convertVMapToInvDepthKernel<<<grid, block>>>(vmap, invDepth);
-    cudaCheckError();
+    // cudaCheckError();
 }
 
 __global__ void pyrdownInvDepthKernel(
@@ -257,5 +257,5 @@ void pyrdownInvDepth(const GMat src, GMat &dst)
     dim3 grid = getGridConfiguration2D(block, src.cols, src.rows);
 
     pyrdownInvDepthKernel<<<grid, block>>>(src, dst);
-    cudaCheckError();
+    // cudaCheckError();
 }

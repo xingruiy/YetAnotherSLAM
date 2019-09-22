@@ -17,6 +17,7 @@ class FeatureMatcher
     PointType pointType;
     cv::Ptr<cv::ORB> orbDetector;
     cv::Ptr<cv::FastFeatureDetector> fastDetector;
+    cv::Ptr<cv::DescriptorMatcher> matcher;
 
     void computePatch3x3(
         Mat image,
@@ -30,6 +31,7 @@ class FeatureMatcher
 
 public:
     FeatureMatcher(PointType pType);
+
     void detect(
         Mat image, Mat depth, Mat intensity,
         std::vector<cv::KeyPoint> &keyPoints,
@@ -37,16 +39,18 @@ public:
         std::vector<float> &depthVec);
 
     void matchByProjection(
-        const std::shared_ptr<Frame> frame,
-        std::vector<bool> &matchesFound,
-        const std::shared_ptr<Frame> kf,
-        const Mat33d &K,
-        std::vector<cv::DMatch> &matches);
-
-    void matchByProjection(
         const std::shared_ptr<Frame> kf,
         const std::shared_ptr<Frame> frame,
         const Mat33d &K,
         std::vector<cv::DMatch> &matches,
         std::vector<bool> *matchesFound = NULL);
+
+    void compute(
+        Mat image,
+        std::vector<cv::KeyPoint> pt,
+        Mat &desc);
+
+    float computeMatchingScore(
+        Mat desc,
+        Mat refDesc);
 };
