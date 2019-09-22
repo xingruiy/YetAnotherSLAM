@@ -143,6 +143,94 @@ void FeatureMatcher::matchByProjection(
     }
 }
 
+void FeatureMatcher::matchByProjection2NN(
+    const std::shared_ptr<Frame> kf,
+    const std::shared_ptr<Frame> frame,
+    const Mat33d &K,
+    std::vector<cv::DMatch> &matches,
+    std::vector<bool> *matchesFound)
+{
+    matches.clear();
+    size_t numSuccessMatch = 0;
+
+    const float fx = K(0, 0);
+    const float fy = K(1, 1);
+    const float cx = K(0, 2);
+    const float cy = K(1, 2);
+
+    auto &mapPoints = kf->mapPoints;
+    auto &keyPoints = frame->cvKeyPoints;
+    auto &descriptors = frame->pointDesc;
+    auto framePoseInv = frame->getPoseInGlobalMap().inverse();
+
+    for (auto iter = mapPoints.begin(), iend = mapPoints.end(); iter != iend; ++iter)
+    {
+        const auto pt = *iter;
+        cv::DMatch m;
+        m.queryIdx = iter - mapPoints.begin();
+        if (pt && (pt->hostKF == kf))
+        {
+            Vec2d bestObs(-1, -1);
+            int bestPointIdx = -1;
+            int secondBestIdx = -1;
+            float bestPairScore = std::numeric_limits<float>::max();
+            float secondBestPairScore = std::numeric_limits<float>::max();
+
+            Vec3d ptWarped = framePoseInv * pt->position;
+            const float u = fx * ptWarped(0) / ptWarped(2) + cx;
+            const float v = fy * ptWarped(1) / ptWarped(2) + cy;
+
+            if (u > 0 && v > 0 && u < 639 && v < 479)
+            {
+                for (int i = 0; i < keyPoints.size(); ++i)
+                {
+                    if (matchesFound && (*matchesFound)[i])
+                        continue;
+
+                    const auto &x = keyPoints[i].pt.x;
+                    const auto &y = keyPoints[i].pt.y;
+                    float dist = (Vec2f(x, y) - Vec2f(u, v)).norm();
+
+                    if (dist <= MatchWindowDist)
+                    {
+                        const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
+
+                        if (score < bestPairScore)
+                        {
+                            bestPointIdx = i;
+                            bestObs = Vec2d(x, y);
+                            bestPairScore = score;
+                        }
+                        else if (score < secondBestPairScore)
+                        {
+                            secondBestIdx = i;
+                            secondBestPairScore = score;
+                        }
+                    }
+                }
+
+                if (bestPointIdx >= 0 && bestPairScore < MatchMinScore)
+                {
+                    bool chooseBest = false;
+                    if (secondBestIdx < 0)
+                        chooseBest = true;
+                    else if (bestPairScore / secondBestPairScore < 0.8)
+                        chooseBest = true;
+
+                    if (chooseBest)
+                    {
+                        m.trainIdx = bestPointIdx;
+                        matches.push_back(m);
+                        numSuccessMatch++;
+                        if (matchesFound)
+                            (*matchesFound)[bestPointIdx] = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
 void FeatureMatcher::computePatch3x3(
     Mat image,
     std::vector<cv::KeyPoint> &points,
@@ -187,6 +275,7 @@ void FeatureMatcher::extractDepth(
 
         if (x > 1 && y > 1 && x < depth.cols - 2 && y < depth.rows - 2)
         {
+            // TODO: depth interpolation seems to cause trouble, solution: edge aware interpolation?
             z = depth.ptr<float>(static_cast<int>(y + 0.5f))[static_cast<int>(x + 0.5f)];
             if (std::isfinite(z) && z > FLT_EPSILON)
                 z = z;

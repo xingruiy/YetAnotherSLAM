@@ -8,9 +8,9 @@ int main(int argc, char **argv)
     std::vector<std::string> listOfFilePath = {
         // "rgbd_dataset_freiburg1_xyz/",
         // "rgbd_dataset_freiburg1_rpy/",
-        "rgbd_dataset_freiburg2_xyz/",
+        // "rgbd_dataset_freiburg2_xyz/",
         // "rgbd_dataset_freiburg2_rpy/",
-        // "rgbd_dataset_freiburg3_long_office_household/",
+        "rgbd_dataset_freiburg3_long_office_household/",
         // "rgbd_dataset_freiburg3_structure_texture_far/",
         // "rgbd_dataset_freiburg3_structure_texture_near/",
         ""};

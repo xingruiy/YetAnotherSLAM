@@ -21,7 +21,7 @@ int main(int argc, char **argv)
         if (camera.getNextImages(depth, image))
         {
             depth.convertTo(depthFloat, CV_32FC1, depthScale);
-            depth.convertTo(depthImage, CV_8UC4);
+            // depth.convertTo(depthImage, CV_8UC4);
             viewer.setColourImage(image);
             // viewer.setDepthImage(depthImage);
 

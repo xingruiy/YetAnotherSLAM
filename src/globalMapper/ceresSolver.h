@@ -54,7 +54,7 @@ public:
     Vec3f getPtPosOptimized(const size_t ptId) const;
     SE3 getCamPoseOptimized(const size_t camId) const;
     void setCameraBlockConstant(const size_t camId);
-    void optimize(const int maxiter, const size_t oldestKFId, const size_t newestKFId);
+    void optimize(const int maxiter);
     void addCamera(const size_t camIdx, const SE3 &T, bool fixed);
     void removeCamera(const size_t camIdx);
     void addWorldPoint(const size_t ptIdx, const Vec3d &pos, bool fixed);

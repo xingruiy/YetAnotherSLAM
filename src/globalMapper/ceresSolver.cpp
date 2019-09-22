@@ -240,7 +240,7 @@ void CeresSolver::initializeParameters()
         ptBlock.second->optimizationBuffer = ptBlock.second->lastSuccessOptimized;
 }
 
-void CeresSolver::optimize(const int maxIter, const size_t oldestKFId, const size_t newestKFId)
+void CeresSolver::optimize(const int maxIter)
 {
     // solverOptions.max_num_iterations = maxIter;
 
