@@ -267,8 +267,8 @@ void create_mesh_with_normal(
     bva.triangle_count = cuda_triangle_count;
     bva.triangles = static_cast<Vec3f *>(vertexBuffer);
     bva.surfaceNormal = static_cast<Vec3f *>(normalBuffer);
-    bva.hashTable = map_struct.hash_table_;
-    bva.listBlocks = map_struct.voxels_;
+    bva.hashTable = map_struct.hashTable;
+    bva.listBlocks = map_struct.voxelBlock;
     bva.hashTableSize = map_struct.hashTableSize;
     bva.bucketSize = map_struct.bucketSize;
     bva.voxelSize = map_struct.voxelSize;

@@ -27,14 +27,14 @@ void MapStruct::reset()
 {
     dim3 block(1024);
     dim3 grid(div_up(hashTableSize, block.x));
-    resetHashKernel<<<grid, block>>>(hash_table_, hashTableSize);
+    resetHashKernel<<<grid, block>>>(hashTable, hashTableSize);
 
     grid = dim3(div_up(voxelBlockSize, block.x));
-    resetHeapKernel<<<grid, block>>>(heap_mem_, heap_mem_counter_, voxelBlockSize);
+    resetHeapKernel<<<grid, block>>>(heap, heapPtr, voxelBlockSize);
 
-    cudaMemset(excess_counter_, 0, sizeof(int));
-    cudaMemset(bucket_mutex_, 0, sizeof(int) * bucketSize);
-    cudaMemset(voxels_, 0, sizeof(Voxel) * BlockSize3 * voxelBlockSize);
+    cudaMemset(excessPtr, 0, sizeof(int));
+    cudaMemset(bucketMutex, 0, sizeof(int) * bucketSize);
+    cudaMemset(voxelBlock, 0, sizeof(Voxel) * BlockSize3 * voxelBlockSize);
 }
 
 void MapStruct::create(
@@ -44,14 +44,14 @@ void MapStruct::create(
     float voxelSize,
     float truncationDist)
 {
-    cudaMalloc((void **)&excess_counter_, sizeof(int));
-    cudaMalloc((void **)&heap_mem_counter_, sizeof(int));
+    cudaMalloc((void **)&excessPtr, sizeof(int));
+    cudaMalloc((void **)&heapPtr, sizeof(int));
     cudaMalloc((void **)&visibleBlockNum, sizeof(uint));
-    cudaMalloc((void **)&bucket_mutex_, sizeof(int) * bucketSize);
-    cudaMalloc((void **)&heap_mem_, sizeof(int) * voxelBlockSize);
-    cudaMalloc((void **)&hash_table_, sizeof(HashEntry) * hashTableSize);
+    cudaMalloc((void **)&bucketMutex, sizeof(int) * bucketSize);
+    cudaMalloc((void **)&heap, sizeof(int) * voxelBlockSize);
+    cudaMalloc((void **)&hashTable, sizeof(HashEntry) * hashTableSize);
     cudaMalloc((void **)&visibleTable, sizeof(HashEntry) * hashTableSize);
-    cudaMalloc((void **)&voxels_, sizeof(Voxel) * voxelBlockSize * BlockSize3);
+    cudaMalloc((void **)&voxelBlock, sizeof(Voxel) * voxelBlockSize * BlockSize3);
 
     this->hashTableSize = hashTableSize;
     this->bucketSize = bucketSize;
@@ -62,12 +62,12 @@ void MapStruct::create(
 
 void MapStruct::release()
 {
-    cudaFree((void *)heap_mem_);
-    cudaFree((void *)heap_mem_counter_);
-    cudaFree((void *)hash_table_);
-    cudaFree((void *)bucket_mutex_);
-    cudaFree((void *)excess_counter_);
-    cudaFree((void *)voxels_);
+    cudaFree((void *)heap);
+    cudaFree((void *)heapPtr);
+    cudaFree((void *)hashTable);
+    cudaFree((void *)bucketMutex);
+    cudaFree((void *)excessPtr);
+    cudaFree((void *)voxelBlock);
     cudaFree((void *)visibleBlockNum);
     cudaFree((void *)visibleTable);
 }

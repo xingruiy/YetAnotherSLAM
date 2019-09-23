@@ -1,7 +1,8 @@
 #include "featureMatcher.h"
 
 #define MatchWindowDist 5
-#define MatchMinScore 4
+// #define MatchMinScore 4
+#define MatchMinScore 32
 
 inline float interpolateBiLinear(Mat map, const float &x, const float &y)
 {
@@ -23,6 +24,13 @@ FeatureMatcher::FeatureMatcher(PointType pType)
         break;
     case PointType::FAST:
         fastDetector = cv::FastFeatureDetector::create(25);
+        break;
+    case BRISK:
+        briskDetector = cv::BRISK::create();
+        break;
+    case SURF:
+        surfDetector = cv::xfeatures2d::SURF::create(150);
+        briskDetector = cv::BRISK::create();
         break;
     }
 
@@ -47,6 +55,35 @@ void FeatureMatcher::detect(
     }
 
     computePatch3x3(intensity, keyPoints, patch3x3);
+    extractDepth(depth, keyPoints, depthVec);
+}
+
+void FeatureMatcher::detect(
+    Mat image, Mat depth,
+    std::vector<cv::KeyPoint> &keyPoints,
+    Mat &descriptor,
+    std::vector<float> &depthVec)
+{
+    switch (pointType)
+    {
+    case ORB:
+        orbDetector->detectAndCompute(image, Mat(), keyPoints, descriptor);
+        break;
+
+    case FAST:
+        printf("Error: not implemented at the moment...\n");
+        break;
+
+    case BRISK:
+        briskDetector->detectAndCompute(image, Mat(), keyPoints, descriptor);
+        break;
+
+    case SURF:
+        surfDetector->detect(image, keyPoints);
+        briskDetector->compute(image, keyPoints, descriptor);
+        break;
+    }
+
     extractDepth(depth, keyPoints, depthVec);
 }
 
@@ -119,7 +156,8 @@ void FeatureMatcher::matchByProjection(
 
                     if (dist <= MatchWindowDist)
                     {
-                        const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
+                        // const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
+                        const auto score = computeMatchingScore(pt->descriptor, descriptors.row(i));
 
                         if (score < bestPairScore)
                         {
@@ -193,7 +231,9 @@ void FeatureMatcher::matchByProjection2NN(
 
                     if (dist <= MatchWindowDist)
                     {
-                        const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
+                        // const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
+                        const auto score = computeMatchingScore(pt->descriptor, descriptors.row(i));
+                        // std::cout << score << std::endl;
 
                         if (score < bestPairScore)
                         {
@@ -209,12 +249,12 @@ void FeatureMatcher::matchByProjection2NN(
                     }
                 }
 
-                if (bestPointIdx >= 0 && bestPairScore < MatchMinScore)
+                if (bestPointIdx >= 0 && bestPairScore)
                 {
                     bool chooseBest = false;
                     if (secondBestIdx < 0)
                         chooseBest = true;
-                    else if (bestPairScore / secondBestPairScore < 0.8)
+                    else if (bestPairScore / secondBestPairScore < 0.6)
                         chooseBest = true;
 
                     if (chooseBest)

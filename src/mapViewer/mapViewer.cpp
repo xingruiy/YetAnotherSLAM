@@ -158,6 +158,12 @@ void MapViewer::initializeBuffers()
 
 void MapViewer::resetViewer()
 {
+    activePoints.clear();
+    stablePoints.clear();
+    rawFrameHistory.clear();
+    rawKeyFrameHistory.clear();
+    frameHistory.clear();
+    keyFrameHistory.clear();
 }
 
 void MapViewer::setColourImage(Mat image)

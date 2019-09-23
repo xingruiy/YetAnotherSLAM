@@ -65,7 +65,8 @@ void GlobalMapper::marginalizeOldFrame()
     solver->removeCamera(kf2Del->getKeyframeId());
 
     kf2Del->cvKeyPoints.clear();
-    kf2Del->pointDesc.clear();
+    // kf2Del->pointDesc.clear();
+    kf2Del->pointDesc.release();
 
     {
         std::unique_lock<std::mutex> lock(historyMutex);
@@ -188,7 +189,8 @@ void GlobalMapper::optimizationLoop()
         }
 
         std::vector<float> zVector;
-        matcher->detect(image, depth, intensity, frame->cvKeyPoints, frame->pointDesc, zVector);
+        // matcher->detect(image, depth, intensity, frame->cvKeyPoints, frame->pointDesc, zVector);
+        matcher->detect(image, depth, frame->cvKeyPoints, frame->pointDesc, zVector);
         int numDetectedPoints = frame->cvKeyPoints.size();
 
         if (numDetectedPoints == 0)
@@ -207,17 +209,19 @@ void GlobalMapper::optimizationLoop()
                 continue;
 
             std::vector<cv::DMatch> matches;
-            matcher->matchByProjection(refKF, frame, K, matches, &matchesFound);
+            // matcher->matchByProjection(refKF, frame, K, matches, &matchesFound);
+            matcher->matchByProjection2NN(refKF, frame, K, matches, &matchesFound);
+
             // matcher->matchByProjection(refKF, frame, K, matches, NULL);
 
             if (matches.size() == 0)
                 continue;
 
-            // Mat outImg;
-            // Mat refImg = refKF->getImage();
-            // cv::drawMatches(refImg, refKF->cvKeyPoints, image, frame->cvKeyPoints, matches, outImg);
-            // cv::imshow("img", outImg);
-            // cv::waitKey(1);
+            Mat outImg;
+            Mat refImg = refKF->getImage();
+            cv::drawMatches(refImg, refKF->cvKeyPoints, image, frame->cvKeyPoints, matches, outImg);
+            cv::imshow("img", outImg);
+            cv::waitKey(1);
 
             for (auto match : matches)
             {
@@ -250,10 +254,10 @@ void GlobalMapper::optimizationLoop()
                 continue;
 
             const auto &kp = frame->cvKeyPoints[i];
-            const auto &desc = frame->pointDesc[i];
+            const auto &desc = frame->pointDesc.row(i);
             const auto &z = zVector[i];
 
-            if (z > FLT_EPSILON && desc.norm() > 0)
+            if (z > FLT_EPSILON)
             {
                 auto pt3d = std::make_shared<Point3D>();
 

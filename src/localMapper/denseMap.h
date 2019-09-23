@@ -47,12 +47,12 @@ struct MapStruct
     float voxelSize;
     float truncationDist;
 
-    int *heap_mem_;
-    int *excess_counter_;
-    int *heap_mem_counter_;
-    int *bucket_mutex_;
-    Voxel *voxels_;
-    HashEntry *hash_table_;
+    int *heap;
+    int *excessPtr;
+    int *heapPtr;
+    int *bucketMutex;
+    Voxel *voxelBlock;
+    HashEntry *hashTable;
     HashEntry *visibleTable;
     uint *visibleBlockNum;
 };

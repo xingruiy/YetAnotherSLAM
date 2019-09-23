@@ -9,13 +9,16 @@ enum PointType
 {
     FAST,
     ORB,
-    HARRIS
+    BRISK,
+    SURF
 };
 
 class FeatureMatcher
 {
     PointType pointType;
     cv::Ptr<cv::ORB> orbDetector;
+    cv::Ptr<cv::BRISK> briskDetector;
+    cv::Ptr<cv::xfeatures2d::SURF> surfDetector;
     cv::Ptr<cv::FastFeatureDetector> fastDetector;
     cv::Ptr<cv::DescriptorMatcher> matcher;
 
@@ -36,6 +39,12 @@ public:
         Mat image, Mat depth, Mat intensity,
         std::vector<cv::KeyPoint> &keyPoints,
         std::vector<Vec9f> &patch3x3,
+        std::vector<float> &depthVec);
+
+    void detect(
+        Mat image, Mat depth,
+        std::vector<cv::KeyPoint> &keyPoints,
+        Mat &descriptor,
         std::vector<float> &depthVec);
 
     void matchByProjection(

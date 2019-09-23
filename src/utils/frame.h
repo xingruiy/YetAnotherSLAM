@@ -14,7 +14,8 @@ struct Point3D
     bool invalidated;
     bool inOptimizer;
     Vec3d position;
-    Vec9f descriptor;
+    // Vec9f descriptor;
+    Mat descriptor;
     std::shared_ptr<Frame> hostKF;
 };
 
@@ -58,7 +59,8 @@ public:
 
     std::shared_ptr<Frame> referenceKF;
 
-    std::vector<Vec9f> pointDesc;
+    // std::vector<Vec9f> pointDesc;
+    Mat pointDesc;
     std::vector<cv::KeyPoint> cvKeyPoints;
     std::vector<std::shared_ptr<Point3D>> mapPoints;
 };

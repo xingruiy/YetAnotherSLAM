@@ -398,8 +398,8 @@ void raycast(MapStruct map,
     delegate.cy = K(1, 2);
     delegate.pose = T.cast<float>();
     delegate.Tinv = T.inverse().cast<float>();
-    delegate.hashTable = map.hash_table_;
-    delegate.listBlock = map.voxels_;
+    delegate.hashTable = map.hashTable;
+    delegate.listBlock = map.voxelBlock;
     delegate.bucketSize = map.bucketSize;
     delegate.voxelSizeInv = 1.0 / map.voxelSize;
     delegate.raytraceStep = map.truncationDist / map.voxelSize;

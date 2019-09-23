@@ -4,6 +4,12 @@
 
 int main(int argc, char **argv)
 {
+    Mat33d K = Mat33d::Identity();
+    K(0, 0) = K(1, 1) = 525.0;
+    K(0, 2) = 319.5;
+    K(1, 2) = 239.5;
+
+    MapViewer viewer(1920, 920, 640, 480, K);
     std::string baseDir = "/home/xyang/Downloads/TUM-RGBD/";
     std::vector<std::string> listOfFilePath = {
         // "rgbd_dataset_freiburg1_xyz/",
@@ -17,15 +23,9 @@ int main(int argc, char **argv)
 
     for (auto iter = listOfFilePath.begin(); iter != listOfFilePath.end() && *iter != ""; ++iter)
     {
-
-        Mat33d K = Mat33d::Identity();
-        K(0, 0) = K(1, 1) = 525.0;
-        K(0, 2) = 319.5;
-        K(1, 2) = 239.5;
-
         Mat depth, image;
         Mat depthFloat;
-        MapViewer viewer(1920, 920, 640, 480, K);
+        viewer.resetViewer();
         FullSystem fullsystem(640, 480, K, 5, true);
 
         printf("Trying: %s...\n", iter->c_str());
