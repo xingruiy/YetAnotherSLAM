@@ -64,9 +64,9 @@ void GlobalMapper::marginalizeOldFrame()
 
     solver->removeCamera(kf2Del->getKeyframeId());
 
-    kf2Del->cvKeyPoints.clear();
+    // kf2Del->cvKeyPoints.clear();
     // kf2Del->pointDesc.clear();
-    kf2Del->pointDesc.release();
+    // kf2Del->pointDesc.release();
 
     {
         std::unique_lock<std::mutex> lock(historyMutex);
@@ -86,6 +86,7 @@ std::vector<Vec3f> GlobalMapper::getActivePoints()
 
     for (auto kf : keyframeOptWin)
     {
+        std::unique_lock<std::mutex> lock(optimizerMutex);
         if (kf == NULL)
             continue;
 
@@ -93,7 +94,7 @@ std::vector<Vec3f> GlobalMapper::getActivePoints()
             if (pt && !pt->visited && !pt->invalidated && pt->inOptimizer)
             {
                 pt->visited = true;
-                localPoints.push_back(solver->getPtPosOptimized(pt->ptId));
+                localPoints.push_back(solver->getPtPosOptimized(pt->ptId).cast<float>());
             }
     }
 
@@ -145,14 +146,13 @@ void GlobalMapper::setShouldQuit()
     shouldQuit = true;
 }
 
-bool GlobalMapper::doubleCheckPointPair(Mat image, Mat refImage, cv::KeyPoint &pt, cv::KeyPoint &refPt)
-{
-    Mat desc, refDesc;
-    matcher->compute(image, {pt}, desc);
-    matcher->compute(refImage, {refPt}, refDesc);
-    float score = matcher->computeMatchingScore(desc, refDesc);
-    // std::cout << score << std::endl;
-}
+// bool GlobalMapper::doubleCheckPointPair(Mat image, Mat refImage, cv::KeyPoint &pt, cv::KeyPoint &refPt)
+// {
+//     Mat desc, refDesc;
+//     matcher->compute(image, {pt}, desc);
+//     matcher->compute(refImage, {refPt}, refDesc);
+//     float score = matcher->computeMatchingScore(desc, refDesc);
+// }
 
 void GlobalMapper::optimizationLoop()
 {
@@ -286,11 +286,29 @@ void GlobalMapper::optimizationLoop()
 
 std::vector<std::shared_ptr<Frame>> GlobalMapper::findCloseLoopCandidate(std::shared_ptr<Frame> frame)
 {
-    auto framePose = frame->getPoseInGlobalMap();
-    auto framePosition = framePose.translation();
-    for (auto kf : keyframeHistory)
+    std::vector<std::shared_ptr<Frame>> candidates;
+    const float distTh = 1; // meters
+    auto framePosition = frame->getPoseInGlobalMap().translation();
+
+    std::vector<std::shared_ptr<Frame>> keyframeHistoryCopy;
     {
+        std::unique_lock<std::mutex> lock(historyMutex);
+        keyframeHistoryCopy = keyframeHistory;
     }
+
+    for (auto kf : keyframeHistoryCopy)
+    {
+        if (std::abs(frame->getKeyframeId() - kf->getKeyframeId()) < 50)
+            continue;
+
+        auto kfPosition = kf->getPoseInGlobalMap().translation();
+        auto dist = (kfPosition - framePosition).norm();
+
+        if (dist < distTh)
+            candidates.push_back(kf);
+    }
+
+    return candidates;
 }
 
 void GlobalMapper::globalConsistencyLoop()
@@ -298,8 +316,40 @@ void GlobalMapper::globalConsistencyLoop()
     while (!shouldQuit)
     {
         std::shared_ptr<Frame> loopKF = NULL;
+
+        {
+            std::unique_lock<std::mutex> lock(loopBufferMutex);
+            if (loopKeyFrameBuffer.size() == 0)
+                continue;
+            loopKF = loopKeyFrameBuffer.front();
+            loopKeyFrameBuffer.pop();
+        }
+
         if (loopKF == NULL)
             continue;
+
+        auto candidateClose = findCloseLoopCandidate(loopKF);
+
+        for (auto candidateKF : candidateClose)
+        {
+            std::vector<cv::DMatch> matches;
+            matcher->matchByDescriptor(candidateKF, loopKF, K, matches);
+
+            cv::Mat outImg;
+            cv::drawMatches(loopKF->getImage(),
+                            loopKF->cvKeyPoints,
+                            candidateKF->getImage(),
+                            candidateKF->cvKeyPoints,
+                            matches, outImg);
+
+            cv::imshow("img2", outImg);
+            cv::waitKey(1);
+
+            auto numSuccessMatches = matches.size();
+
+            if (numSuccessMatches < 100)
+                continue;
+        }
     }
 }
 
@@ -330,6 +380,7 @@ void GlobalMapper::windowedOptimization(const int maxIteration)
 
     {
         std::unique_lock<std::mutex> lock(optWinMutex);
+        std::unique_lock<std::mutex> lock2(optimizerMutex);
         for (auto kf : keyframeOptWin)
         {
             for (auto pt : kf->mapPoints)
@@ -337,7 +388,7 @@ void GlobalMapper::windowedOptimization(const int maxIteration)
                 if (pt && pt->inOptimizer && !pt->invalidated)
                 {
                     auto rval = solver->getPtPosOptimized(pt->ptId);
-                    if (!rval.isApprox(Vec3f()))
+                    if (!rval.isApprox(Vec3d()))
                         pt->position = rval.cast<double>();
                 }
             }
@@ -345,7 +396,16 @@ void GlobalMapper::windowedOptimization(const int maxIteration)
             auto poseOpt = solver->getCamPoseOptimized(kf->getKeyframeId()).inverse();
             kf->setOptimizationResult(poseOpt);
         }
+
+        std::unique_lock<std::mutex> lock3(loopBufferMutex);
+        loopKeyFrameBuffer.push(keyframeOptWin.back());
     }
+
+    // auto KOpt = solver->getCamParamOptimized();
+    // K = KOpt;
+    // Kinv = K.inverse();
+
+    // std::cout << K << std::endl;
 }
 
 bool GlobalMapper::hasUnfinishedWork()

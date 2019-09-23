@@ -19,12 +19,15 @@ class GlobalMapper
 
     // use lock semantics. TODO: lock-free queues?
     std::mutex optWinMutex;
+    std::mutex optimizerMutex;
     std::deque<std::shared_ptr<Frame>> keyframeOptWin;
     std::mutex historyMutex;
     std::vector<std::shared_ptr<Frame>> keyframeHistory;
     std::vector<std::pair<SE3, std::shared_ptr<Frame>>> frameHistory;
     std::mutex bufferMutex;
     std::queue<std::shared_ptr<Frame>> newKeyFrameBuffer;
+    std::mutex loopBufferMutex;
+    std::queue<std::shared_ptr<Frame>> loopKeyFrameBuffer;
 
     void addToOptimizer(std::shared_ptr<Frame> kf);
     void marginalizeOldFrame();

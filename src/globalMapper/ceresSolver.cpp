@@ -50,6 +50,16 @@ SE3 CeresSolver::getCamPoseOptimized(const size_t camId) const
     return SE3();
 }
 
+Mat33d CeresSolver::getCamParamOptimized() const
+{
+    Mat33d Kmat = Mat33d::Identity();
+    Kmat(0, 0) = K[0];
+    Kmat(1, 1) = K[1];
+    Kmat(0, 2) = K[2];
+    Kmat(1, 2) = K[3];
+    return Kmat;
+}
+
 std::shared_ptr<PointBlock> CeresSolver::getPointBlock(const size_t ptId) const
 {
     return ptBlockMap.find(ptId)->second;
@@ -249,8 +259,8 @@ void CeresSolver::optimize(const int maxIter)
     ceres::Problem problem;
     size_t smallestKFId = std::numeric_limits<size_t>::max();
 
-    if (camBlockMap.size() < 5)
-        return;
+    // if (camBlockMap.size() < 5)
+    //     return;
 
     ceres::LossFunction *robustLoss = new ceres::HuberLoss(2);
 
@@ -325,7 +335,16 @@ void CeresSolver::optimize(const int maxIter)
             camBlock.second->lastSuccessOptimized = camBlock.second->optimizationBuffer;
 
         for (auto ptBlock : ptBlockMap)
-            ptBlock.second->lastSuccessOptimized = ptBlock.second->optimizationBuffer;
+        {
+            auto &p1 = ptBlock.second->lastSuccessOptimized;
+            auto &p2 = ptBlock.second->optimizationBuffer;
+            if ((p1 - p2).norm() > 0.1f)
+            {
+                ptBlock.second->potentialOutlier = true;
+            }
+
+            p1 = p2;
+        }
     }
 
     // return;
@@ -384,20 +403,15 @@ void CeresSolver::optimize(const int maxIter)
     // std::cout << summary.BriefReport() << std::endl;
 }
 
-Vec3f CeresSolver::getPtPosOptimized(const size_t ptId) const
+Vec3d CeresSolver::getPtPosOptimized(const size_t ptId) const
 {
     auto ptBlock = ptBlockMap.find(ptId);
     if (ptBlock != ptBlockMap.end())
-        return ptBlockMap.find(ptId)->second->lastSuccessOptimized.cast<float>();
-    return Vec3f();
+        return ptBlockMap.find(ptId)->second->lastSuccessOptimized;
 }
 
 void CeresSolver::reset()
 {
-    cameras.clear();
-    mapPoints.clear();
-    observations.clear();
-
     camBlockMap.clear();
     ptBlockMap.clear();
     resBlockMap.clear();

@@ -65,8 +65,7 @@ int main(int argc, char **argv)
             size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
             viewer.setMeshSizeToRender(size);
             viewer.setActivePoints(fullsystem.getActiveKeyPoints());
-            if (i < 5)
-                viewer.setStablePoints(fullsystem.getActiveKeyPoints());
+            viewer.setStablePoints(fullsystem.getStableKeyPoints());
 
             if (pangolin::ShouldQuit())
                 break;

@@ -61,6 +61,12 @@ public:
         std::vector<cv::DMatch> &matches,
         std::vector<bool> *matchesFound = NULL);
 
+    void matchByDescriptor(
+        const std::shared_ptr<Frame> kf,
+        const std::shared_ptr<Frame> frame,
+        const Mat33d &K,
+        std::vector<cv::DMatch> &matches);
+
     void compute(
         Mat image,
         std::vector<cv::KeyPoint> pt,

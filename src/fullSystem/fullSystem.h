@@ -11,12 +11,14 @@ class FullSystem
 {
     int currentState;
     bool enableMapViewer;
+    const size_t maxNumRelocAttempt = 3;
 
     bool needNewKF();
     void createNewKF();
     bool trackCurrentFrame();
-    void fuseCurrentFrame(const SE3 &T);
-    void updateLocalMapObservation(const SE3 &T);
+    void fuseCurrentFrame();
+    void raytraceCurrentFrame();
+    bool tryRelocalizeCurrentFrame(bool updatePoints);
 
     std::shared_ptr<GlobalMapper> globalMapper;
     std::shared_ptr<DenseMapping> localMapper;
@@ -29,13 +31,13 @@ class FullSystem
     std::vector<SE3> rawKeyFramePoseHistory;
 
     SE3 lastTrackedPose;
-    SE3 lastReferencePose;
     SE3 accumulateTransform;
 
     GMat bufferFloatwxh;
     GMat bufferVec4wxh;
 
     std::thread optThread;
+    std::thread loopThread;
 
 public:
     ~FullSystem();

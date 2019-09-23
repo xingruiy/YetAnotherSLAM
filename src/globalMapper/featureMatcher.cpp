@@ -271,6 +271,22 @@ void FeatureMatcher::matchByProjection2NN(
     }
 }
 
+void FeatureMatcher::matchByDescriptor(
+    const std::shared_ptr<Frame> kf,
+    const std::shared_ptr<Frame> frame,
+    const Mat33d &K,
+    std::vector<cv::DMatch> &matches)
+{
+    std::vector<std::vector<cv::DMatch>> rawMatches;
+    matcher->knnMatch(frame->pointDesc, kf->pointDesc, rawMatches, 2);
+
+    for (auto match2NN : rawMatches)
+    {
+        if (match2NN[0].distance / match2NN[1].distance < 0.6)
+            matches.push_back(match2NN[0]);
+    }
+}
+
 void FeatureMatcher::computePatch3x3(
     Mat image,
     std::vector<cv::KeyPoint> &points,
