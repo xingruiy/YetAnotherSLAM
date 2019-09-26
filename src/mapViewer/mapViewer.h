@@ -63,6 +63,7 @@ class MapViewer
     // draw calls
     void drawLocalMap();
 
+    int systemState;
     Mat33d K, Kinv;
     int frameWidth, frameHeight;
 
@@ -88,4 +89,6 @@ public:
 
     void setMeshSizeToRender(size_t size);
     void getMeshBuffer(float *&vbuffer, float *&nbuffer, size_t &bufferSize);
+    void setCurrentState(int state);
+    void addTrackingResult(const SE3 &T);
 };

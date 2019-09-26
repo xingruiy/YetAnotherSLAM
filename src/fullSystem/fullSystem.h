@@ -6,11 +6,11 @@
 #include "localMapper/localMapper.h"
 #include "globalMapper/globalMapper.h"
 #include "denseTracker/denseTracker.h"
+#include "mapViewer/mapViewer.h"
 
 class FullSystem
 {
-    int currentState;
-    bool enableMapViewer;
+    const bool viewerEnabled;
     const size_t maxNumRelocAttempt = 3;
 
     bool needNewKF();
@@ -38,11 +38,18 @@ class FullSystem
 
     std::thread optThread;
     std::thread loopThread;
+    MapViewer *viewer;
+
+    int currentState;
 
 public:
     ~FullSystem();
     FullSystem(const char *configFile);
-    FullSystem(int w, int h, Mat33d K, int numLvl, bool view);
+    FullSystem(
+        int w, int h,
+        Mat33d K,
+        int numLvl,
+        bool enableViewer = true);
     void resetSystem();
     void processFrame(Mat rawImage, Mat rawDepth);
 
@@ -52,5 +59,6 @@ public:
     std::vector<SE3> getKeyFramePoseHistory();
     std::vector<SE3> getRawFramePoseHistory() const;
     std::vector<SE3> getRawKeyFramePoseHistory() const;
+    void setMapViewerPtr(MapViewer *viewer);
     size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 };

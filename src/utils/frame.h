@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <memory>
 #include "utils/numType.h"
 
@@ -26,15 +27,18 @@ class Frame
     Mat rawIntensity;
     bool keyframeFlag;
 
-    size_t kfId;
-    static size_t nextKFId;
-
     // Raw pose update from the tracker, this stays unchanged.
     SE3 relativePose;
     // Raw world pose used for local map registeration. Only for KFs.
     SE3 rawKeyframePose;
     // stores result from the optimizer, highly volatile
     SE3 optimizedPose;
+
+    SE3 framePose;
+    std::mutex poseMutex;
+
+    size_t kfId;
+    static size_t nextKFId;
 
 public:
     Frame();
@@ -61,6 +65,7 @@ public:
 
     // std::vector<Vec9f> pointDesc;
     Mat pointDesc;
+    std::vector<float> depthVec;
     std::vector<cv::KeyPoint> cvKeyPoints;
     std::vector<std::shared_ptr<Point3D>> mapPoints;
 };

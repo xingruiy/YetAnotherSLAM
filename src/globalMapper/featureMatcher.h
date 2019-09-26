@@ -5,9 +5,16 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/xfeatures2d.hpp>
 
-enum PointType
+enum class PointType
 {
     FAST,
+    ORB,
+    BRISK,
+    SURF
+};
+
+enum class DescType
+{
     ORB,
     BRISK,
     SURF
@@ -16,6 +23,8 @@ enum PointType
 class FeatureMatcher
 {
     PointType pointType;
+    DescType descType;
+    float minMatchingDistance;
     cv::Ptr<cv::ORB> orbDetector;
     cv::Ptr<cv::BRISK> briskDetector;
     cv::Ptr<cv::xfeatures2d::SURF> surfDetector;
@@ -33,13 +42,7 @@ class FeatureMatcher
         std::vector<float> &depthVec);
 
 public:
-    FeatureMatcher(PointType pType);
-
-    void detect(
-        Mat image, Mat depth, Mat intensity,
-        std::vector<cv::KeyPoint> &keyPoints,
-        std::vector<Vec9f> &patch3x3,
-        std::vector<float> &depthVec);
+    FeatureMatcher(PointType pType, DescType dType);
 
     void detect(
         Mat image, Mat depth,

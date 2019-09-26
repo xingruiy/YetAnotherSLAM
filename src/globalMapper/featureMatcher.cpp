@@ -14,8 +14,8 @@ inline float interpolateBiLinear(Mat map, const float &x, const float &y)
            (map.ptr<float>(v + 1)[u] * (1 - cox) + map.ptr<float>(v + 1)[u + 1] * cox) * coy;
 }
 
-FeatureMatcher::FeatureMatcher(PointType pType)
-    : pointType(pType)
+FeatureMatcher::FeatureMatcher(PointType pType, DescType dType)
+    : pointType(pType), descType(dType)
 {
     switch (pType)
     {
@@ -25,37 +25,32 @@ FeatureMatcher::FeatureMatcher(PointType pType)
     case PointType::FAST:
         fastDetector = cv::FastFeatureDetector::create(25);
         break;
-    case BRISK:
+    case PointType::BRISK:
         briskDetector = cv::BRISK::create();
         break;
-    case SURF:
+    case PointType::SURF:
         surfDetector = cv::xfeatures2d::SURF::create(150);
-        briskDetector = cv::BRISK::create();
         break;
     }
 
-    matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
-}
-
-void FeatureMatcher::detect(
-    Mat image, Mat depth, Mat intensity,
-    std::vector<cv::KeyPoint> &keyPoints,
-    std::vector<Vec9f> &patch3x3,
-    std::vector<float> &depthVec)
-{
-    switch (pointType)
+    switch (dType)
     {
-    case ORB:
-        orbDetector->detect(image, keyPoints);
+    case DescType::ORB:
+        orbDetector = cv::ORB::create(1000);
+        minMatchingDistance = 32;
+        matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
         break;
-
-    case FAST:
-        fastDetector->detect(image, keyPoints);
+    case DescType::BRISK:
+        briskDetector = cv::BRISK::create();
+        minMatchingDistance = 32;
+        matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+        break;
+    case DescType::SURF:
+        surfDetector = cv::xfeatures2d::SURF::create(150);
+        minMatchingDistance = 10;
+        matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE);
         break;
     }
-
-    computePatch3x3(intensity, keyPoints, patch3x3);
-    extractDepth(depth, keyPoints, depthVec);
 }
 
 void FeatureMatcher::detect(
@@ -66,21 +61,30 @@ void FeatureMatcher::detect(
 {
     switch (pointType)
     {
-    case ORB:
-        orbDetector->detectAndCompute(image, Mat(), keyPoints, descriptor);
+    case PointType::ORB:
+        orbDetector->detect(image, keyPoints);
         break;
-
-    case FAST:
-        printf("Error: not implemented at the moment...\n");
+    case PointType::FAST:
+        fastDetector->detect(image, keyPoints);
         break;
-
-    case BRISK:
-        briskDetector->detectAndCompute(image, Mat(), keyPoints, descriptor);
+    case PointType::BRISK:
+        briskDetector->detect(image, keyPoints);
         break;
-
-    case SURF:
+    case PointType::SURF:
         surfDetector->detect(image, keyPoints);
+        break;
+    }
+
+    switch (descType)
+    {
+    case DescType::ORB:
+        orbDetector->compute(image, keyPoints, descriptor);
+        break;
+    case DescType::BRISK:
         briskDetector->compute(image, keyPoints, descriptor);
+        break;
+    case DescType::SURF:
+        surfDetector->compute(image, keyPoints, descriptor);
         break;
     }
 
@@ -168,7 +172,7 @@ void FeatureMatcher::matchByProjection(
                     }
                 }
 
-                if (bestPointIdx >= 0 && bestPairScore < MatchMinScore)
+                if (bestPointIdx >= 0 && bestPairScore < minMatchingDistance)
                 {
                     m.trainIdx = bestPointIdx;
                     matches.push_back(m);
@@ -199,6 +203,7 @@ void FeatureMatcher::matchByProjection2NN(
     auto &mapPoints = kf->mapPoints;
     auto &keyPoints = frame->cvKeyPoints;
     auto &descriptors = frame->pointDesc;
+    auto currentDepth = frame->getDepth();
     auto framePoseInv = frame->getPoseInGlobalMap().inverse();
 
     for (auto iter = mapPoints.begin(), iend = mapPoints.end(); iter != iend; ++iter)
@@ -228,8 +233,9 @@ void FeatureMatcher::matchByProjection2NN(
                     const auto &x = keyPoints[i].pt.x;
                     const auto &y = keyPoints[i].pt.y;
                     float dist = (Vec2f(x, y) - Vec2f(u, v)).norm();
+                    auto currentZ = currentDepth.ptr<float>((int)round(y))[(int)round(x)];
 
-                    if (dist <= MatchWindowDist)
+                    if (dist <= MatchWindowDist && abs(ptWarped(2) - currentZ) < 0.05)
                     {
                         // const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
                         const auto score = computeMatchingScore(pt->descriptor, descriptors.row(i));

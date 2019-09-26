@@ -2,14 +2,20 @@
 #include "denseTracker/cudaImageProc.h"
 
 FullSystem::FullSystem(const char *configFile)
+    : viewerEnabled(false)
 {
 }
 
-FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool optimize)
-    : currentState(-1)
+FullSystem::FullSystem(
+    int w, int h,
+    Mat33d K,
+    int numLvl,
+    bool enableViewer)
+    : currentState(-1),
+      viewerEnabled(enableViewer)
 {
-    localMapper = std::make_shared<DenseMapping>(w, h, K);
     globalMapper = std::make_shared<GlobalMapper>(K, 5);
+    localMapper = std::make_shared<DenseMapping>(w, h, K);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
@@ -40,10 +46,17 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
     {
     case -1:
     {
+        if (viewerEnabled && viewer)
+            viewer->setCurrentState(-1);
+
         coarseTracker->setReferenceFrame(currentFrame);
         createNewKF();
         fuseCurrentFrame();
         currentState = 0;
+
+        if (viewerEnabled && viewer)
+            viewer->setCurrentState(0);
+
         break;
     }
     case 0:
@@ -58,22 +71,31 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
                 createNewKF();
             else
                 globalMapper->addFrameHistory(currentFrame);
-            rawFramePoseHistory.push_back(currentFrame->getPoseInLocalMap());
+
+            if (viewerEnabled && viewer)
+                viewer->addTrackingResult(currentFrame->getPoseInLocalMap());
         }
         else
         {
+            if (viewerEnabled && viewer)
+                viewer->setCurrentState(1);
+
             currentState = 1;
         }
 
         break;
     }
     case 1:
+
         size_t numAttempted = 0;
         printf("tracking loast, attempt to resuming...\n");
         while (numAttempted <= maxNumRelocAttempt)
         {
             if (tryRelocalizeCurrentFrame(numAttempted > 0))
             {
+                if (viewerEnabled && viewer)
+                    viewer->setCurrentState(0);
+
                 break;
             }
         }
@@ -186,4 +208,9 @@ std::vector<Vec3f> FullSystem::getActiveKeyPoints()
 std::vector<Vec3f> FullSystem::getStableKeyPoints()
 {
     return globalMapper->getStablePoints();
+}
+
+void FullSystem::setMapViewerPtr(MapViewer *viewer)
+{
+    this->viewer = viewer;
 }

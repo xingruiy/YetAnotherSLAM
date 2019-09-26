@@ -3,6 +3,7 @@
 #include <mutex>
 #include "utils/numType.h"
 #include "utils/frame.h"
+#include "mapViewer/mapViewer.h"
 #include "globalMapper/featureMatcher.h"
 #include "globalMapper/ceresSolver.h"
 
@@ -13,6 +14,7 @@ class GlobalMapper
     bool hasNewKF;
     bool isOptimizing;
     int optWinSize;
+    MapViewer *viewer;
 
     std::shared_ptr<FeatureMatcher> matcher;
     std::shared_ptr<CeresSolver> solver;
@@ -34,7 +36,6 @@ class GlobalMapper
     void windowedOptimization(const int maxIter);
     // TODO: double check if two pts are the same one
     std::vector<std::shared_ptr<Frame>> findCloseLoopCandidate(std::shared_ptr<Frame> frame);
-    bool doubleCheckPointPair(Mat image, Mat refImage, cv::KeyPoint &pt, cv::KeyPoint &refPt);
 
 public:
     GlobalMapper(Mat33d &K, int localWinSize = 5);
@@ -52,4 +53,5 @@ public:
     void globalConsistencyLoop();
     void setShouldQuit();
     bool hasUnfinishedWork();
+    void setMapViewer(MapViewer *viewer);
 };

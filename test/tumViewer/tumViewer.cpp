@@ -27,6 +27,7 @@ int main(int argc, char **argv)
         Mat depthFloat;
         viewer.resetViewer();
         FullSystem fullsystem(640, 480, K, 5, true);
+        fullsystem.setMapViewerPtr(&viewer);
 
         printf("Trying: %s...\n", iter->c_str());
 
@@ -53,7 +54,7 @@ int main(int argc, char **argv)
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
 
-            viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
+            // viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
             viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
             viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());

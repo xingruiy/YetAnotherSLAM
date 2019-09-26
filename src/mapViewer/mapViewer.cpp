@@ -339,3 +339,13 @@ void MapViewer::setStablePoints(const std::vector<Vec3f> &points)
 {
     stablePoints = points;
 }
+
+void MapViewer::setCurrentState(int state)
+{
+    systemState = state;
+}
+
+void MapViewer::addTrackingResult(const SE3 &T)
+{
+    rawFrameHistory.push_back(T.translation().cast<float>());
+}

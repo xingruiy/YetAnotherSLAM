@@ -259,10 +259,10 @@ void CeresSolver::optimize(const int maxIter)
     ceres::Problem problem;
     size_t smallestKFId = std::numeric_limits<size_t>::max();
 
-    // if (camBlockMap.size() < 5)
-    //     return;
+    if (camBlockMap.size() < 5)
+        return;
 
-    ceres::LossFunction *robustLoss = new ceres::HuberLoss(2);
+    ceres::LossFunction *robustLoss = new ceres::HuberLoss(100);
 
     problem.AddParameterBlock(&K[0], 4);
     problem.SetParameterBlockConstant(&K[0]);
@@ -273,9 +273,10 @@ void CeresSolver::optimize(const int maxIter)
             smallestKFId = camBlock.first;
 
         problem.AddParameterBlock(camBlock.second->optimizationBuffer.data(), SE3::num_parameters, new LocalParameterizationSE3());
+        // problem.SetParameterBlockConstant(camBlock.second->optimizationBuffer.data());
     }
 
-    // std::cout << smallestKFId << std::endl;
+    std::cout << smallestKFId << std::endl;
     problem.SetParameterBlockConstant(camBlockMap[smallestKFId]->optimizationBuffer.data());
 
     // std::cout << camBlockMap.size() << std::endl;
@@ -283,11 +284,11 @@ void CeresSolver::optimize(const int maxIter)
     for (auto ptBlock : ptBlockMap)
     {
         auto resBlock = resBlockMap.find(ptBlock.first);
+        // if (resBlock->second.size() >= 2)
         if (resBlock != resBlockMap.end() && resBlock->second.size() != 0)
         {
             problem.AddParameterBlock(ptBlock.second->optimizationBuffer.data(), 3);
-            // if (resBlock->second.size() < 2)
-            //     problem.SetParameterBlockConstant(ptBlock.second->optimizationBuffer.data());
+            problem.SetParameterBlockConstant(ptBlock.second->optimizationBuffer.data());
         }
         // problem.SetParameterBlockConstant(ptBlock.second->optimizationBuffer.data());
     }
@@ -295,7 +296,7 @@ void CeresSolver::optimize(const int maxIter)
     for (auto resBlock : resBlockMap)
     {
         auto ptIter = ptBlockMap.find(resBlock.first);
-        // if (resBlock.second.size() > 1)
+        // if (resBlock.second.size() >= 2)
         for (auto obs : resBlock.second)
         {
             auto camIter = camBlockMap.find(obs.first);
@@ -336,14 +337,15 @@ void CeresSolver::optimize(const int maxIter)
 
         for (auto ptBlock : ptBlockMap)
         {
-            auto &p1 = ptBlock.second->lastSuccessOptimized;
-            auto &p2 = ptBlock.second->optimizationBuffer;
-            if ((p1 - p2).norm() > 0.1f)
-            {
-                ptBlock.second->potentialOutlier = true;
-            }
+            // auto &p1 = ptBlock.second->lastSuccessOptimized;
+            // auto &p2 = ptBlock.second->optimizationBuffer;
+            // if ((p1 - p2).norm() > 0.1f)
+            // {
+            //     ptBlock.second->potentialOutlier = true;
+            // }
 
-            p1 = p2;
+            // p1 = p2;
+            ptBlock.second->lastSuccessOptimized = ptBlock.second->optimizationBuffer;
         }
     }
 
