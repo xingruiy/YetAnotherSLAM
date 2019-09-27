@@ -233,12 +233,16 @@ void FeatureMatcher::matchByProjection2NN(
                     const auto &x = keyPoints[i].pt.x;
                     const auto &y = keyPoints[i].pt.y;
                     float dist = (Vec2f(x, y) - Vec2f(u, v)).norm();
-                    auto currentZ = currentDepth.ptr<float>((int)round(y))[(int)round(x)];
+                    // auto currentZ = currentDepth.ptr<float>((int)round(y))[(int)round(x)];
+                    auto currentZ = frame->depthVec[i];
 
                     if (dist <= MatchWindowDist && abs(ptWarped(2) - currentZ) < 0.05)
                     {
                         // const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
                         const auto score = computeMatchingScore(pt->descriptor, descriptors.row(i));
+
+                        if (score > minMatchingDistance)
+                            continue;
                         // std::cout << score << std::endl;
 
                         if (score < bestPairScore)
@@ -255,12 +259,12 @@ void FeatureMatcher::matchByProjection2NN(
                     }
                 }
 
-                if (bestPointIdx >= 0 && bestPairScore)
+                if (bestPointIdx >= 0)
                 {
                     bool chooseBest = false;
                     if (secondBestIdx < 0)
                         chooseBest = true;
-                    else if (bestPairScore / secondBestPairScore < 0.6)
+                    else if (bestPairScore / secondBestPairScore < 0.8)
                         chooseBest = true;
 
                     if (chooseBest)

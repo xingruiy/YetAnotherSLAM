@@ -1,14 +1,13 @@
 #include "utils/frame.h"
 
 size_t Frame::nextKFId = 0;
-size_t Point3D::nextPtId = 0;
 
 Frame::Frame()
 {
 }
 
 Frame::Frame(Mat rawImage, Mat rawDepth, Mat rawIntensity)
-    : kfId(0), keyframeFlag(false)
+    : kfId(0), keyframeFlag(false), inLocalOptimizer(false)
 {
     rawImage.copyTo(this->rawImage);
     rawDepth.copyTo(this->rawDepth);
@@ -100,4 +99,38 @@ void Frame::setRawKeyframePose(const SE3 &T)
 {
     optimizedPose = T;
     rawKeyframePose = T;
+}
+
+double *Frame::getParameterBlock()
+{
+    return optimizedPose.data();
+}
+
+void Frame::updateCovisibility()
+{
+    const size_t nTh = 15;
+    covisibleKFs.clear();
+    std::map<std::shared_ptr<Frame>, size_t> neighbours;
+    for (auto pt : mapPoints)
+    {
+        if (!pt)
+            continue;
+
+        for (auto obs : pt->observations)
+        {
+            if (obs.first.get() != this)
+                neighbours[obs.first]++;
+        }
+    }
+
+    for (auto pair : neighbours)
+    {
+        if (pair.second >= nTh)
+            covisibleKFs.push_back(pair.first);
+    }
+}
+
+std::vector<std::shared_ptr<Frame>> Frame::getCovisibleKeyFrames(size_t th)
+{
+    return std::vector<std::shared_ptr<Frame>>(covisibleKFs.begin(), covisibleKFs.end());
 }

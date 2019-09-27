@@ -14,7 +14,7 @@ FullSystem::FullSystem(
     : currentState(-1),
       viewerEnabled(enableViewer)
 {
-    globalMapper = std::make_shared<GlobalMapper>(K, 5);
+    globalMapper = std::make_shared<GlobalMapper>(K, 3);
     localMapper = std::make_shared<DenseMapping>(w, h, K);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 

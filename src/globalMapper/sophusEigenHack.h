@@ -83,7 +83,7 @@ struct ReprojectionErrorFunctor
 
         Eigen::Map<Sophus::SE3<T> const> Twc(TData);
         Eigen::Map<Eigen::Matrix<T, 3, 1> const> pt(ptData);
-        Eigen::Matrix<T, 3, 1> ptWarped = Twc * pt;
+        Eigen::Matrix<T, 3, 1> ptWarped = Twc.inverse() * pt;
 
         T projX = fx * ptWarped(0) / ptWarped(2) + cx;
         T projY = fy * ptWarped(1) / ptWarped(2) + cy;
@@ -102,6 +102,41 @@ struct ReprojectionErrorFunctor
     double obsX, obsY;
 };
 
+struct ReprojectionError3DFunctor
+{
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    ReprojectionError3DFunctor(const Vec3d &obs) : obsX(obs(0)), obsY(obs(1)), obsZ(obs(2)) {}
+
+    template <typename T>
+    bool operator()(const T *K, const T *TData, const T *ptData, T *residual) const
+    {
+        const T &fx = K[0];
+        const T &fy = K[1];
+        const T &cx = K[2];
+        const T &cy = K[3];
+
+        Eigen::Map<Sophus::SE3<T> const> Twc(TData);
+        Eigen::Map<Eigen::Matrix<T, 3, 1> const> pt(ptData);
+        Eigen::Matrix<T, 3, 1> ptWarped = Twc.inverse() * pt;
+
+        T projX = fx * ptWarped(0) / ptWarped(2) + cx;
+        T projY = fy * ptWarped(1) / ptWarped(2) + cy;
+
+        residual[0] = projX - T(obsX);
+        residual[1] = projY - T(obsY);
+        residual[2] = T(1.0) * (ptWarped(2) - obsZ);
+
+        return true;
+    }
+
+    static ceres::CostFunction *create(const Vec3d &obs)
+    {
+        return new ceres::AutoDiffCostFunction<ReprojectionError3DFunctor, 3, 4, SE3::num_parameters, 3>(new ReprojectionError3DFunctor(obs));
+    }
+
+    double obsX, obsY, obsZ;
+};
+
 struct PointToPointErrorFunctor
 {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -112,7 +147,7 @@ struct PointToPointErrorFunctor
     {
         Eigen::Map<Sophus::SE3<T> const> Twc(TData);
         Eigen::Map<Eigen::Matrix<T, 3, 1> const> pt(ptData);
-        Eigen::Matrix<T, 3, 1> ptTransformed = Twc * pt;
+        Eigen::Matrix<T, 3, 1> ptTransformed = Twc.inverse() * pt;
 
         residual[0] = ptTransformed(0) - T(obsX);
         residual[1] = ptTransformed(1) - T(obsY);

@@ -1,24 +1,8 @@
 #pragma once
 #include <mutex>
 #include <memory>
+#include "utils/mapPoint.h"
 #include "utils/numType.h"
-
-class Frame;
-
-struct Point3D
-{
-    static size_t nextPtId;
-    Point3D() : ptId(nextPtId++), inOptimizer(false), invalidated(false), numObservations(1) {}
-    size_t ptId;
-    int numObservations;
-    bool visited;
-    bool invalidated;
-    bool inOptimizer;
-    Vec3d position;
-    // Vec9f descriptor;
-    Mat descriptor;
-    std::shared_ptr<Frame> hostKF;
-};
 
 class Frame
 {
@@ -63,9 +47,16 @@ public:
 
     std::shared_ptr<Frame> referenceKF;
 
+    bool inLocalOptimizer;
+    double *getParameterBlock();
+
     // std::vector<Vec9f> pointDesc;
     Mat pointDesc;
     std::vector<float> depthVec;
     std::vector<cv::KeyPoint> cvKeyPoints;
-    std::vector<std::shared_ptr<Point3D>> mapPoints;
+    std::vector<std::shared_ptr<MapPoint>> mapPoints;
+
+    void updateCovisibility();
+    std::vector<std::shared_ptr<Frame>> getCovisibleKeyFrames(size_t th);
+    std::vector<std::shared_ptr<Frame>> covisibleKFs;
 };

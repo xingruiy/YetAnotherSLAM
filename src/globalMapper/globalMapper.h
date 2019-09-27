@@ -36,6 +36,7 @@ class GlobalMapper
     void windowedOptimization(const int maxIter);
     // TODO: double check if two pts are the same one
     std::vector<std::shared_ptr<Frame>> findCloseLoopCandidate(std::shared_ptr<Frame> frame);
+    void findPointCorrespondences(std::shared_ptr<Frame> kf, std::vector<std::shared_ptr<MapPoint>> mapPoints);
 
 public:
     GlobalMapper(Mat33d &K, int localWinSize = 5);

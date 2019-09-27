@@ -1,32 +1,31 @@
 #pragma once
 #include "utils/numType.h"
-#include "utils/frame.h"
-#include <mutex>
 #include <memory>
+#include <unordered_map>
 
 class Frame;
 
 class MapPoint
 {
-    size_t id;
     static size_t nextId;
 
-    // position in global coordinate
-    Vec3d pos;
-    Vec3d normal;
-
-    Mat bestDesc;
-    bool invalidateFlag;
-    std::mutex mutexPos, mutexDesc;
-    std::shared_ptr<Frame> referenceKF;
-    std::map<std::shared_ptr<Frame>, Vec3d> observations;
-
 public:
-    MapPoint(const Vec3d &pt, std::shared_ptr<Frame> refKF);
-    void addObservation(std::shared_ptr<Frame> frame, const Vec3d &obs);
-    void removeObservation(std::shared_ptr<Frame> frame);
-    void invalidatePoint();
-    bool isValid() const;
+    MapPoint();
+    double *getParameterBlock();
     size_t getNumObservations() const;
-    std::shared_ptr<Frame> getReferenceKF() const;
+    void removeObservation(std::shared_ptr<Frame> kf);
+    void addObservation(std::shared_ptr<Frame> kf, const Vec3d &obs);
+
+    size_t id;
+    int numObservations;
+    bool visited;
+    bool invalidated;
+    bool inOptimizer;
+    Vec3d position;
+    Vec3d relativePos;
+    // Vec9f descriptor;
+    Mat descriptor;
+    bool isImmature;
+    std::shared_ptr<Frame> hostKF;
+    std::unordered_map<std::shared_ptr<Frame>, Vec3d> observations;
 };
