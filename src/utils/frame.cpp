@@ -116,7 +116,7 @@ void Frame::updateCovisibility()
         if (!pt)
             continue;
 
-        for (auto obs : pt->observations)
+        for (auto obs : pt->getObservations())
         {
             if (obs.first.get() != this)
                 neighbours[obs.first]++;

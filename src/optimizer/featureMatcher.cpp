@@ -137,13 +137,13 @@ void FeatureMatcher::matchByProjection(
         const auto pt = *iter;
         cv::DMatch m;
         m.queryIdx = iter - mapPoints.begin();
-        if (pt && (pt->hostKF == kf))
+        if (pt && (pt->getHost() == kf))
         {
             Vec2d obs(-1, -1);
             int bestPointIdx = -1;
             float bestPairScore = std::numeric_limits<float>::max();
 
-            Vec3d ptWarped = framePoseInv * pt->position;
+            Vec3d ptWarped = framePoseInv * pt->getPosWorld();
             const float u = fx * ptWarped(0) / ptWarped(2) + cx;
             const float v = fy * ptWarped(1) / ptWarped(2) + cy;
 
@@ -160,8 +160,8 @@ void FeatureMatcher::matchByProjection(
 
                     if (dist <= MatchWindowDist)
                     {
-                        // const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
-                        const auto score = computeMatchingScore(pt->descriptor, descriptors.row(i));
+                        // const auto score = computePatchScoreL2Norm(ptgetDescriptor(), descriptors[i]);
+                        const auto score = computeMatchingScore(pt->getDescriptor(), descriptors.row(i));
 
                         if (score < bestPairScore)
                         {
@@ -220,7 +220,7 @@ void FeatureMatcher::matchByProjection2NN(
         const auto pt = *iter;
         cv::DMatch m;
         m.queryIdx = iter - mapPoints.begin();
-        if (pt && (pt->hostKF == kf))
+        if (pt && (pt->getHost() == kf))
         {
             Vec2d bestObs(-1, -1);
             int bestPointIdx = -1;
@@ -228,7 +228,7 @@ void FeatureMatcher::matchByProjection2NN(
             float bestPairScore = std::numeric_limits<float>::max();
             float secondBestPairScore = std::numeric_limits<float>::max();
 
-            Vec3d ptWarped = framePoseInv * pt->position;
+            Vec3d ptWarped = framePoseInv * pt->getPosWorld();
             const float u = fx * ptWarped(0) / ptWarped(2) + cx;
             const float v = fy * ptWarped(1) / ptWarped(2) + cy;
 
@@ -247,8 +247,8 @@ void FeatureMatcher::matchByProjection2NN(
 
                     if (dist <= MatchWindowDist && abs(ptWarped(2) - currentZ) < 0.05)
                     {
-                        // const auto score = computePatchScoreL2Norm(pt->descriptor, descriptors[i]);
-                        const auto score = computeMatchingScore(pt->descriptor, descriptors.row(i));
+                        // const auto score = computePatchScoreL2Norm(ptgetDescriptor(), descriptors[i]);
+                        const auto score = computeMatchingScore(pt->getDescriptor(), descriptors.row(i));
 
                         if (score > minMatchingDistance)
                             continue;

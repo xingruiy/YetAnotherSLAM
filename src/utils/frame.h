@@ -4,6 +4,8 @@
 #include "utils/mapPoint.h"
 #include "utils/numType.h"
 
+class MapPoint;
+
 class Frame
 {
     Mat rawDepth;

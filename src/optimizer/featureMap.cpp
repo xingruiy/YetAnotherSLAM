@@ -46,14 +46,14 @@ void FeatureMap::marginalizeOldFrame()
 
     kf2Del->inLocalOptimizer = false;
 
-    for (auto pt : kf2Del->mapPoints)
-    {
-        if (pt && pt->hostKF == kf2Del)
-        {
-            if (pt->observations.size() <= 1)
-                pt->invalidated = true;
-        }
-    }
+    // for (auto pt : kf2Del->mapPoints)
+    // {
+    //     if (pt && pt->getHost() == kf2Del)
+    //     {
+    //         if (pt->observations.size() <= 1)
+    //             pt->invalidated = true;
+    //     }
+    // }
 
     {
         std::unique_lock<std::mutex> lock(historyMutex);
@@ -81,7 +81,7 @@ std::vector<Vec3f> FeatureMap::getActivePoints()
             if (pt && !pt->visited)
             {
                 pt->visited = true;
-                localPoints.push_back(pt->position.cast<float>());
+                localPoints.push_back(pt->getPosWorld().cast<float>());
             }
     }
 
@@ -107,7 +107,7 @@ std::vector<Vec3f> FeatureMap::getStablePoints()
             if (pt && !pt->visited)
             {
                 pt->visited = true;
-                stablePoints.push_back(pt->position.cast<float>());
+                stablePoints.push_back(pt->getPosWorld().cast<float>());
             }
     }
 
@@ -207,9 +207,9 @@ void FeatureMap::optimizationLoop()
 
             for (auto match : matches)
             {
-                auto pt = refKF->mapPoints[match.queryIdx];
-                auto framePt3d = frame->mapPoints[match.trainIdx];
-                auto framePt = frame->cvKeyPoints[match.trainIdx];
+                auto &pt = refKF->mapPoints[match.queryIdx];
+                auto &framePt3d = frame->mapPoints[match.trainIdx];
+                auto &framePt = frame->cvKeyPoints[match.trainIdx];
                 // auto obs = Vec2d(framePt.pt.x, framePt.pt.y);
                 auto z = zVector[match.trainIdx];
 
@@ -219,12 +219,14 @@ void FeatureMap::optimizationLoop()
                 if (!framePt3d)
                 {
                     frame->mapPoints[match.trainIdx] = pt;
-                    pt->numObservations++;
-                    pt->observations.insert(std::make_pair(frame, Vec3d(framePt.pt.x, framePt.pt.y, z)));
+                    // pt->numObservations++;
+                    // pt->observations.insert(std::make_pair(frame, ));
+                    pt->addObservation(frame, Vec3d(framePt.pt.x, framePt.pt.y, z));
                 }
                 else
                 {
-                    pt->observations.insert(framePt3d->observations.begin(), framePt3d->observations.end());
+                    // pt->observations.insert(framePt3d->observations.begin(), framePt3d->observations.end());
+                    pt->fusePoint(framePt3d);
                     frame->mapPoints[match.trainIdx] = pt;
                 }
 
@@ -261,10 +263,10 @@ void FeatureMap::optimizationLoop()
             {
                 auto pt3d = std::make_shared<MapPoint>();
 
-                pt3d->hostKF = frame;
-                pt3d->position = framePose * (Kinv * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z);
-                pt3d->descriptor = desc;
-                pt3d->observations.insert(std::make_pair(frame, Vec3d(kp.pt.x, kp.pt.y, z)));
+                pt3d->setHost(frame);
+                pt3d->setPosWorld(framePose * (Kinv * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z));
+                pt3d->setDescriptor(desc);
+                pt3d->addObservation(frame, Vec3d(kp.pt.x, kp.pt.y, z));
                 frame->mapPoints[i] = pt3d;
                 numCreatedPoints++;
             }
@@ -375,7 +377,7 @@ void FeatureMap::addToOptimizer(std::shared_ptr<Frame> kf)
 
     //         if (!pt->inOptimizer)
     //         {
-    //             solver->addWorldPoint(pt->id, pt->position, true);
+    //             solver->addWorldPoint(pt->id, ptgetPosWorld(), true);
     //             pt->inOptimizer = true;
     //         }
 
@@ -413,10 +415,10 @@ void FeatureMap::windowedOptimization(const int maxIteration)
     std::set<std::shared_ptr<Frame>> fixedKFs;
     for (auto pt : localPoints)
     {
-        if (!pt || pt->observations.size() == 0)
+        if (!pt || pt->getNumObservations() == 0)
             continue;
 
-        for (auto obs : pt->observations)
+        for (auto obs : pt->getObservations())
         {
             if (!obs.first->inLocalOptimizer)
                 fixedKFs.insert(obs.first);
@@ -446,10 +448,10 @@ void FeatureMap::windowedOptimization(const int maxIteration)
     size_t numResidualBlocks = 0;
     for (auto pt : localPoints)
     {
-        if (!pt || pt->observations.size() == 0)
+        if (!pt || pt->getNumObservations() == 0)
             continue;
 
-        for (auto obs : pt->observations)
+        for (auto obs : pt->getObservations())
         {
             // problem.AddResidualBlock(
             //     ReprojectionErrorFunctor::create(obs.second(0), obs.second(1)),
@@ -497,7 +499,7 @@ void FeatureMap::windowedOptimization(const int maxIteration)
 
     //         //         auto rval = solver->getPtPosOptimized(pt->id);
     //         //         if (!rval.isApprox(Vec3d()))
-    //         //             pt->position = rval.cast<double>();
+    //         //             ptgetPosWorld() = rval.cast<double>();
     //         //     }
     //         // }
 
