@@ -16,9 +16,8 @@ PRIVATE
     src/mapViewer/mapViewer.cpp
     src/denseTracker/denseTracker.cu
     src/denseTracker/cudaImageProc.cu
-    src/globalMapper/ceresSolver.cpp
-    src/globalMapper/globalMapper.cpp
-    src/globalMapper/featureMatcher.cpp
+    src/optimizer/featureMap.cpp
+    src/optimizer/featureMatcher.cpp
     src/localMapper/denseMap.cu
     src/localMapper/localMapper.cpp
     src/localMapper/depthFusion.cu

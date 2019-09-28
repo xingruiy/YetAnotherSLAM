@@ -4,7 +4,7 @@
 #include <iostream>
 #include "utils/numType.h"
 #include "localMapper/localMapper.h"
-#include "globalMapper/globalMapper.h"
+#include "optimizer/featureMap.h"
 #include "denseTracker/denseTracker.h"
 #include "mapViewer/mapViewer.h"
 
@@ -20,7 +20,7 @@ class FullSystem
     void raytraceCurrentFrame();
     bool tryRelocalizeCurrentFrame(bool updatePoints);
 
-    std::shared_ptr<GlobalMapper> globalMapper;
+    std::shared_ptr<FeatureMap> featureMap;
     std::shared_ptr<DenseMapping> localMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
 

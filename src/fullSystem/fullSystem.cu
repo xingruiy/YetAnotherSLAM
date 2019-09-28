@@ -14,7 +14,7 @@ FullSystem::FullSystem(
     : currentState(-1),
       viewerEnabled(enableViewer)
 {
-    globalMapper = std::make_shared<GlobalMapper>(K, 3);
+    featureMap = std::make_shared<FeatureMap>(K, 3);
     localMapper = std::make_shared<DenseMapping>(w, h, K);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
@@ -24,13 +24,13 @@ FullSystem::FullSystem(
     bufferVec4wxh.create(h, w, CV_32FC4);
     bufferFloatwxh.create(h, w, CV_32FC1);
 
-    optThread = std::thread(&GlobalMapper::optimizationLoop, globalMapper.get());
-    loopThread = std::thread(&GlobalMapper::globalConsistencyLoop, globalMapper.get());
+    optThread = std::thread(&FeatureMap::optimizationLoop, featureMap.get());
+    loopThread = std::thread(&FeatureMap::globalConsistencyLoop, featureMap.get());
 }
 
 FullSystem::~FullSystem()
 {
-    globalMapper->setShouldQuit();
+    featureMap->setShouldQuit();
     optThread.join();
     loopThread.join();
 }
@@ -70,7 +70,7 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
             if (needNewKF())
                 createNewKF();
             else
-                globalMapper->addFrameHistory(currentFrame);
+                featureMap->addFrameHistory(currentFrame);
 
             if (viewerEnabled && viewer)
                 viewer->addTrackingResult(currentFrame->getPoseInLocalMap());
@@ -157,7 +157,7 @@ void FullSystem::createNewKF()
     referenceFrame->flagKeyFrame();
     lastTrackedPose = lastTrackedPose * accumulateTransform;
     referenceFrame->setRawKeyframePose(lastTrackedPose);
-    globalMapper->addReferenceFrame(referenceFrame);
+    featureMap->addReferenceFrame(referenceFrame);
 
     rawKeyFramePoseHistory.push_back(lastTrackedPose);
     accumulateTransform = SE3();
@@ -167,7 +167,7 @@ void FullSystem::resetSystem()
 {
     currentState = -1;
     localMapper->reset();
-    globalMapper->reset();
+    featureMap->reset();
     rawFramePoseHistory.clear();
     rawKeyFramePoseHistory.clear();
 
@@ -192,22 +192,22 @@ size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
 
 std::vector<SE3> FullSystem::getKeyFramePoseHistory()
 {
-    return globalMapper->getKeyFrameHistory();
+    return featureMap->getKeyFrameHistory();
 }
 
 std::vector<SE3> FullSystem::getFramePoseHistory()
 {
-    return globalMapper->getFrameHistory();
+    return featureMap->getFrameHistory();
 }
 
 std::vector<Vec3f> FullSystem::getActiveKeyPoints()
 {
-    return globalMapper->getActivePoints();
+    return featureMap->getActivePoints();
 }
 
 std::vector<Vec3f> FullSystem::getStableKeyPoints()
 {
-    return globalMapper->getStablePoints();
+    return featureMap->getStablePoints();
 }
 
 void FullSystem::setMapViewerPtr(MapViewer *viewer)

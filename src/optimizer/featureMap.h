@@ -4,10 +4,9 @@
 #include "utils/numType.h"
 #include "utils/frame.h"
 #include "mapViewer/mapViewer.h"
-#include "globalMapper/featureMatcher.h"
-#include "globalMapper/ceresSolver.h"
+#include "optimizer/featureMatcher.h"
 
-class GlobalMapper
+class FeatureMap
 {
     Mat33d K, Kinv;
     bool shouldQuit;
@@ -17,7 +16,6 @@ class GlobalMapper
     MapViewer *viewer;
 
     std::shared_ptr<FeatureMatcher> matcher;
-    std::shared_ptr<CeresSolver> solver;
 
     // use lock semantics. TODO: lock-free queues?
     std::mutex optWinMutex;
@@ -39,7 +37,7 @@ class GlobalMapper
     void findPointCorrespondences(std::shared_ptr<Frame> kf, std::vector<std::shared_ptr<MapPoint>> mapPoints);
 
 public:
-    GlobalMapper(Mat33d &K, int localWinSize = 5);
+    FeatureMap(Mat33d &K, int localWinSize = 5);
 
     void reset();
     void addFrameHistory(std::shared_ptr<Frame> frame);
