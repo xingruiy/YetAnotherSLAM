@@ -1,22 +1,39 @@
 #include "fullSystem/fullSystem.h"
 #include "denseTracker/cudaImageProc.h"
 
-FullSystem::FullSystem(const char *configFile)
+FullSystem::FullSystem(
+    int w, int h,
+    Mat33d K,
+    int numLvl,
+    bool enableViewer)
+    : state(SystemState::NotInitialized),
+      lastState(SystemState::NotInitialized),
+      viewerEnabled(enableViewer)
 {
-}
-
-FullSystem::FullSystem(int w, int h, Mat33d K, int numLvl, bool view)
-    : currentState(-1)
-{
+    map = std::make_shared<Map>();
+    localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
     localMapper = std::make_shared<DenseMapping>(w, h, K);
-    globalMapper = std::make_shared<GlobalMapper>(K, 5);
+    loopCloser = std::make_shared<LoopCloser>(K, map);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
-    lastReferencePose = SE3(Mat44d::Identity());
+    accumulateTransform = SE3(Mat44d::Identity());
 
     bufferVec4wxh.create(h, w, CV_32FC4);
     bufferFloatwxh.create(h, w, CV_32FC1);
+
+    loopThread = std::thread(&LoopCloser::loop, loopCloser.get());
+    localOptThread = std::thread(&LocalOptimizer::loop, localOptimizer.get());
+}
+
+FullSystem::~FullSystem()
+{
+    std::cout << "wating other threads to finish..." << std::endl;
+    loopCloser->setShouldQuit();
+    localOptimizer->setShouldQuit();
+    loopThread.join();
+    localOptThread.join();
+    std::cout << "all threads finished!" << std::endl;
 }
 
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
@@ -26,37 +43,68 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
     cv::cvtColor(rawImageFloat, rawIntensity, cv::COLOR_RGB2GRAY);
     currentFrame = std::make_shared<Frame>(rawImage, rawDepth, rawIntensity);
 
-    switch (currentState)
+    switch (state)
     {
-    case -1:
+    case SystemState::NotInitialized:
     {
+        if (viewerEnabled && viewer)
+            viewer->setCurrentState(-1);
+
         coarseTracker->setReferenceFrame(currentFrame);
-        fuseCurrentFrame(lastTrackedPose);
         createNewKF();
-        currentState = 0;
+        fuseCurrentFrame();
+        state = SystemState::OK;
+
+        if (viewerEnabled && viewer)
+            viewer->setCurrentState(0);
+
         break;
     }
-    case 0:
+    case SystemState::OK:
     {
         auto rval = trackCurrentFrame();
         if (rval)
         {
-            fuseCurrentFrame(lastTrackedPose);
-            updateLocalMapObservation(lastTrackedPose);
-            rawFramePoseHistory.push_back(lastTrackedPose);
+            fuseCurrentFrame();
+            raytraceCurrentFrame();
 
             if (needNewKF())
+            {
                 createNewKF();
+            }
+            else
+            {
+                map->addFramePose(currentFrame->getTrackingResult(), currentKeyframe);
+            }
+
+            if (viewerEnabled && viewer)
+                viewer->addTrackingResult(currentFrame->getPoseInLocalMap());
         }
         else
         {
-            currentState = 1;
+            if (viewerEnabled && viewer)
+                viewer->setCurrentState(1);
+
+            state = SystemState::Lost;
         }
 
         break;
     }
-    case 1:
+    case SystemState::Lost:
+
+        size_t numAttempted = 0;
         printf("tracking loast, attempt to resuming...\n");
+        while (numAttempted <= maxNumRelocAttempt)
+        {
+            if (tryRelocalizeCurrentFrame(numAttempted > 0))
+            {
+                if (viewerEnabled && viewer)
+                    viewer->setCurrentState(0);
+
+                break;
+            }
+        }
+
         break;
     }
 }
@@ -64,74 +112,98 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 bool FullSystem::trackCurrentFrame()
 {
     coarseTracker->setTrackingFrame(currentFrame);
-    SE3 rval = coarseTracker->getIncrementalTransform();
-    lastTrackedPose = lastTrackedPose * rval.inverse();
-    currentFrame->setPose(lastTrackedPose);
+    SE3 tRes = coarseTracker->getIncrementalTransform();
+    // accumulated local transform
+    accumulateTransform = accumulateTransform * tRes.inverse();
+    currentFrame->setTrackingResult(accumulateTransform);
+    currentFrame->setReferenceKF(currentKeyframe);
+
     return true;
 }
 
-void FullSystem::fuseCurrentFrame(const SE3 &T)
+void FullSystem::fuseCurrentFrame()
 {
     auto currDepth = coarseTracker->getReferenceDepth();
-    localMapper->fuseFrame(currDepth, T);
+    localMapper->fuseFrame(currDepth, currentFrame->getPoseInLocalMap());
 }
 
-void FullSystem::updateLocalMapObservation(const SE3 &T)
+void FullSystem::raytraceCurrentFrame()
 {
-    localMapper->raytrace(bufferVec4wxh, T);
+    localMapper->raytrace(bufferVec4wxh, currentFrame->getPoseInLocalMap());
     coarseTracker->setReferenceInvDepth(bufferVec4wxh);
+}
+
+bool FullSystem::tryRelocalizeCurrentFrame(bool updatePoints)
+{
+    return true;
 }
 
 bool FullSystem::needNewKF()
 {
-    SE3 dt = lastReferencePose * lastTrackedPose.inverse();
+    auto dt = currentFrame->getTrackingResult();
     Vec3d t = dt.translation();
     if (t.norm() >= 0.1)
         return true;
+
+    Vec3d r = dt.log().tail<3>();
+    if (r.norm() >= 0.1)
+        return true;
+
     return false;
 }
 
 void FullSystem::createNewKF()
 {
-    lastReferencePose = lastTrackedPose;
-    // TODO: update maps in frame
-    globalMapper->addReferenceFrame(currentFrame);
-    rawKeyFramePoseHistory.push_back(lastReferencePose);
+    currentKeyframe = currentFrame;
+
+    currentKeyframe->flagKeyFrame();
+    lastTrackedPose = lastTrackedPose * accumulateTransform;
+    currentKeyframe->setRawKeyframePose(lastTrackedPose);
+    map->addUnprocessedKeyframe(currentKeyframe);
+    map->setCurrentKeyframe(currentKeyframe);
+    map->addKeyframePoseRaw(lastTrackedPose);
+    map->addFramePose(SE3(), currentKeyframe);
+
+    if (viewerEnabled && viewer)
+        viewer->addRawKeyFramePose(lastTrackedPose);
+
+    accumulateTransform = SE3();
 }
 
 void FullSystem::resetSystem()
 {
-    currentState = -1;
+
+    map->clear();
+    viewer->resetViewer();
     localMapper->reset();
-    globalMapper->reset();
-    rawFramePoseHistory.clear();
-    rawKeyFramePoseHistory.clear();
-
+    localOptimizer->reset();
     lastTrackedPose = SE3(Mat44d::Identity());
-    lastReferencePose = SE3(Mat44d::Identity());
-}
-
-std::vector<SE3> FullSystem::getRawFramePoseHistory() const
-{
-    return rawFramePoseHistory;
-}
-
-std::vector<SE3> FullSystem::getRawKeyFramePoseHistory() const
-{
-    return rawKeyFramePoseHistory;
+    accumulateTransform = SE3(Mat44d::Identity());
+    state = SystemState::NotInitialized;
+    lastState = SystemState::NotInitialized;
 }
 
 size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
 {
-    return localMapper->fetch_mesh_with_normal(vbuffer, nbuffer);
+    return localMapper->fetchMeshWithNormal(vbuffer, nbuffer);
 }
 
-std::vector<Vec3f> FullSystem::getActiveKeyPoints()
+std::vector<SE3> FullSystem::getKeyFramePoseHistory()
 {
-    return globalMapper->getPointHistory();
+    return map->getKeyframePoseOptimized();
 }
 
-std::vector<Vec3f> FullSystem::getStableKeyPoints()
+std::vector<SE3> FullSystem::getFramePoseHistory()
 {
-    return globalMapper->getStablePoints();
+    return map->getFramePoseOptimized();
+}
+
+std::vector<Vec3f> FullSystem::getMapPointPosAll()
+{
+    return map->getMapPointVec3All();
+}
+
+void FullSystem::setMapViewerPtr(MapViewer *viewer)
+{
+    this->viewer = viewer;
 }

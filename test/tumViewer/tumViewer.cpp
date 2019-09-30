@@ -4,6 +4,12 @@
 
 int main(int argc, char **argv)
 {
+    Mat33d K = Mat33d::Identity();
+    K(0, 0) = K(1, 1) = 525.0;
+    K(0, 2) = 319.5;
+    K(1, 2) = 239.5;
+
+    MapViewer viewer(1920, 920, 640, 480, K);
     std::string baseDir = "/home/xyang/Downloads/TUM-RGBD/";
     std::vector<std::string> listOfFilePath = {
         // "rgbd_dataset_freiburg1_xyz/",
@@ -17,16 +23,11 @@ int main(int argc, char **argv)
 
     for (auto iter = listOfFilePath.begin(); iter != listOfFilePath.end() && *iter != ""; ++iter)
     {
-        MapViewer viewer(1920, 920);
-
-        Mat33d K = Mat33d::Identity();
-        K(0, 0) = K(1, 1) = 525.0;
-        K(0, 2) = 319.5;
-        K(1, 2) = 239.5;
-
         Mat depth, image;
         Mat depthFloat;
+        viewer.resetViewer();
         FullSystem fullsystem(640, 480, K, 5, true);
+        fullsystem.setMapViewerPtr(&viewer);
 
         printf("Trying: %s...\n", iter->c_str());
 
@@ -40,7 +41,7 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < listOfTimeStamp.size(); ++i)
         {
-            printf("processing: %i / %lu \r", i, listOfTimeStamp.size());
+            // printf("processing: %i / %lu \r", i, listOfTimeStamp.size());
             depth = cv::imread(listOfDepthPath[i], cv::IMREAD_UNCHANGED);
             image = cv::imread(listOfImagePath[i], cv::IMREAD_UNCHANGED);
             depth.convertTo(depthFloat, CV_32FC1, 1 / 5000.f);
@@ -53,8 +54,8 @@ int main(int argc, char **argv)
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
 
-            viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
-            viewer.setKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
+            viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
 
             float *vbuffer;
             float *nbuffer;
@@ -62,7 +63,7 @@ int main(int argc, char **argv)
             viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
             size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
             viewer.setMeshSizeToRender(size);
-            viewer.setActivePoints(fullsystem.getActiveKeyPoints());
+            viewer.setActivePoints(fullsystem.getMapPointPosAll());
 
             if (pangolin::ShouldQuit())
                 break;
@@ -70,7 +71,25 @@ int main(int argc, char **argv)
             viewer.renderView();
         }
 
-        TUMSave(baseDir + *iter, listOfTimeStamp, fullsystem.getRawFramePoseHistory());
-        printf("Saved: %s...\n", iter->c_str());
+        while (!pangolin::ShouldQuit())
+        {
+            viewer.renderView();
+            viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
+
+            float *vbuffer;
+            float *nbuffer;
+            size_t bufferSize;
+            viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
+            size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
+            viewer.setMeshSizeToRender(size);
+            viewer.setActivePoints(fullsystem.getMapPointPosAll());
+        }
+
+        if (fullsystem.getFramePoseHistory().size() == listOfFilePath.size())
+        {
+            TUMSave(baseDir + *iter, listOfTimeStamp, fullsystem.getFramePoseHistory());
+            printf("Saved: %s...\n", iter->c_str());
+        }
     }
 }

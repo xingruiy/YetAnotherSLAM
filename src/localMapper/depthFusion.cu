@@ -262,22 +262,16 @@ struct DepthFusionFunctor
 
             auto oldSDF = unpackFloat(voxel.sdf);
             auto oldWT = voxel.wt;
-            // auto weight = 1 / dist;
 
             if (oldWT == 0)
             {
                 voxel.sdf = packFloat(sdf);
-                // voxel.wt = weight;
                 voxel.wt = 1;
                 continue;
             }
 
-            oldSDF = (oldSDF * oldWT + sdf * 1) / (oldWT + 1);
-            voxel.sdf = packFloat(oldSDF);
+            voxel.sdf = packFloat((oldSDF * oldWT + sdf * 1) / (oldWT + 1));
             voxel.wt = min(255, oldWT + 1);
-            //   oldSDF = (oldSDF * oldWT + sdf * weight) / (oldWT + weight);
-            // voxel.sdf = packFloat(oldSDF);
-            // voxel.wt = (oldWT + weight);
         }
     }
 };
@@ -303,11 +297,11 @@ void fuseDepth(
     dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
 
     CreateBlockLineTracingFunctor bfunctor;
-    bfunctor.heap = map_struct.heap_mem_;
-    bfunctor.heapPtr = map_struct.heap_mem_counter_;
-    bfunctor.hashTable = map_struct.hash_table_;
-    bfunctor.bucketMutex = map_struct.bucket_mutex_;
-    bfunctor.excessPtr = map_struct.excess_counter_;
+    bfunctor.heap = map_struct.heap;
+    bfunctor.heapPtr = map_struct.heapPtr;
+    bfunctor.hashTable = map_struct.hashTable;
+    bfunctor.bucketMutex = map_struct.bucketMutex;
+    bfunctor.excessPtr = map_struct.excessPtr;
     bfunctor.hashTableSize = map_struct.hashTableSize;
     bfunctor.bucketSize = map_struct.bucketSize;
     bfunctor.voxelSize = map_struct.voxelSize;
@@ -326,12 +320,12 @@ void fuseDepth(
     map_struct.resetVisibleBlockCount();
 
     CheckEntryVisibilityFunctor cfunctor;
-    cfunctor.hashTable = map_struct.hash_table_;
-    cfunctor.voxelBlock = map_struct.voxels_;
+    cfunctor.hashTable = map_struct.hashTable;
+    cfunctor.voxelBlock = map_struct.voxelBlock;
     cfunctor.visibleEntry = map_struct.visibleTable;
     cfunctor.visibleEntryCount = map_struct.visibleBlockNum;
-    cfunctor.heap = map_struct.heap_mem_;
-    cfunctor.heapPtr = map_struct.heap_mem_counter_;
+    cfunctor.heap = map_struct.heap;
+    cfunctor.heapPtr = map_struct.heapPtr;
     cfunctor.voxelBlockSize = map_struct.voxelBlockSize;
     cfunctor.Tinv = T.inverse().cast<float>();
     cfunctor.cols = cols;
@@ -355,7 +349,7 @@ void fuseDepth(
         return;
 
     DepthFusionFunctor functor;
-    functor.listBlock = map_struct.voxels_;
+    functor.listBlock = map_struct.voxelBlock;
     functor.visible_blocks = map_struct.visibleTable;
     functor.Tinv = T.inverse().cast<float>();
     functor.fx = fx;

@@ -1,47 +1,71 @@
 #pragma once
 #include <memory>
+#include <thread>
 #include <iostream>
+#include "utils/map.h"
 #include "utils/numType.h"
+#include "loopClosure/loopCloser.h"
 #include "localMapper/localMapper.h"
-#include "globalMapper/globalMapper.h"
+#include "optimizer/localOptimizer.h"
 #include "denseTracker/denseTracker.h"
+#include "mapViewer/mapViewer.h"
+
+enum class SystemState
+{
+    NotInitialized,
+    OK,
+    Lost
+};
 
 class FullSystem
 {
-    int currentState;
-    bool enableMapViewer;
+    const bool viewerEnabled;
+    const size_t maxNumRelocAttempt = 3;
 
     bool needNewKF();
     void createNewKF();
     bool trackCurrentFrame();
-    void fuseCurrentFrame(const SE3 &T);
-    void updateLocalMapObservation(const SE3 &T);
+    void fuseCurrentFrame();
+    void raytraceCurrentFrame();
+    bool tryRelocalizeCurrentFrame(bool updatePoints);
 
-    std::shared_ptr<GlobalMapper> globalMapper;
+    std::thread loopThread;
+    std::thread localOptThread;
+    MapViewer *viewer;
+
+    std::shared_ptr<Map> map;
+    std::shared_ptr<LoopCloser> loopCloser;
     std::shared_ptr<DenseMapping> localMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
+    std::shared_ptr<LocalOptimizer> localOptimizer;
 
     std::shared_ptr<Frame> currentFrame;
-    std::shared_ptr<Frame> referenceFrame;
-
-    std::vector<SE3> rawFramePoseHistory;
-    std::vector<SE3> rawKeyFramePoseHistory;
+    std::shared_ptr<Frame> currentKeyframe;
 
     SE3 lastTrackedPose;
-    SE3 lastReferencePose;
+    SE3 accumulateTransform;
 
     GMat bufferFloatwxh;
     GMat bufferVec4wxh;
 
+    SystemState state;
+    SystemState lastState;
+
 public:
+    ~FullSystem();
     FullSystem(const char *configFile);
-    FullSystem(int w, int h, Mat33d K, int numLvl, bool view);
+    FullSystem(
+        int w, int h,
+        Mat33d K,
+        int numLvl,
+        bool enableViewer = true);
     void resetSystem();
     void processFrame(Mat rawImage, Mat rawDepth);
 
-    std::vector<Vec3f> getActiveKeyPoints();
-    std::vector<Vec3f> getStableKeyPoints();
-    std::vector<SE3> getRawFramePoseHistory() const;
-    std::vector<SE3> getRawKeyFramePoseHistory() const;
+    std::vector<SE3> getFramePoseHistory();
+    std::vector<SE3> getKeyFramePoseHistory();
+    std::vector<Vec3f> getMapPointPosAll();
+
+    void setMapViewerPtr(MapViewer *viewer);
     size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 };

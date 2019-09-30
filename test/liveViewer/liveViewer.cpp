@@ -4,25 +4,27 @@
 
 int main(int argc, char **argv)
 {
+    Mat33d K = Mat33d::Identity();
+    K(0, 0) = K(1, 1) = 570;
+    K(0, 2) = 319.5;
+    K(1, 2) = 239.5;
     ONICamera camera(640, 480, 30);
-    MapViewer viewer(1920, 920);
-
-    Mat33d K;
-    K << 525, 0, 320,
-        0, 525, 240,
-        0, 0, 1;
+    MapViewer viewer(1920, 920, 640, 480, K);
 
     Mat depth, image;
-    Mat depthFloat, intensity, imageFloat;
+    Mat depthFloat, depthImage;
     FullSystem fullsystem(640, 480, K, 5, true);
+    fullsystem.setMapViewerPtr(&viewer);
+    float depthScale = 1.0 / 1000.0;
 
     while (true && !pangolin::ShouldQuit())
     {
         if (camera.getNextImages(depth, image))
         {
-            depth.convertTo(depthFloat, CV_32FC1, 1.0 / 1000);
+            depth.convertTo(depthFloat, CV_32FC1, depthScale);
+            // depth.convertTo(depthImage, CV_8UC4);
             viewer.setColourImage(image);
-            // viewer.setDepthImage(image);
+            // viewer.setDepthImage(depthImage);
 
             if (!viewer.paused())
                 fullsystem.processFrame(image, depthFloat);
@@ -30,8 +32,8 @@ int main(int argc, char **argv)
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
 
-            viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
-            viewer.setKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
+            viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
 
             if (!viewer.paused())
             {
@@ -41,7 +43,7 @@ int main(int argc, char **argv)
                 viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
                 size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
                 viewer.setMeshSizeToRender(size);
-                viewer.setActivePoints(fullsystem.getActiveKeyPoints());
+                viewer.setActivePoints(fullsystem.getMapPointPosAll());
             }
         }
 

@@ -19,11 +19,18 @@ void create_rendering_blocks(
     const SE3 &T,
     const Mat33d &K);
 
-void raycast(MapStruct map, GMat vmap, GMat zRangeX, GMat zRangeY, const SE3 &T, const Mat33d &K);
+void raycast(
+    MapStruct map,
+    GMat vmap,
+    GMat zRangeX,
+    GMat zRangeY,
+    const SE3 &T,
+    const Mat33d &K);
 
 void create_mesh_with_normal(
-    MapStruct map,
+    MapStruct map_struct,
     uint &block_count,
     uint &triangle_count,
-    void *vertex_data,
-    void *vertex_normal);
+    void *vertexBuffer,
+    void *normalBuffer,
+    size_t bufferSize = 0);

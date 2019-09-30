@@ -21,8 +21,8 @@ public:
   ~DenseMapping();
   DenseMapping(int w, int h, Mat33d &K);
 
+  void reset();
   void fuseFrame(GMat depth, const SE3 &T);
   void raytrace(GMat &vertex, const SE3 &T);
-  void reset();
-  size_t fetch_mesh_with_normal(void *vertex, void *normal);
+  size_t fetchMeshWithNormal(void *vertex, void *normal);
 };

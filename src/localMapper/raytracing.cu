@@ -167,7 +167,7 @@ struct FillRenderingBlockFunctor
 };
 
 void create_rendering_blocks(
-    MapStruct map_struct,
+    MapStruct map,
     uint count_visible_block,
     uint &count_rendering_block,
     GMat &zRangeX,
@@ -201,13 +201,13 @@ void create_rendering_blocks(
     delegate.fy = K(1, 1);
     delegate.cx = K(0, 2);
     delegate.cy = K(1, 2);
-    delegate.visibleEntry = map_struct.visibleTable;
+    delegate.visibleEntry = map.visibleTable;
     delegate.visible_block_count = count_visible_block;
     delegate.rendering_block_count = count_device;
     delegate.listRenderingBlock = listRenderingBlock;
     delegate.depthMax = 3.0f;
     delegate.depthMin = 0.1f;
-    delegate.voxelSize = map_struct.voxelSize;
+    delegate.voxelSize = map.voxelSize;
 
     dim3 thread = dim3(1024);
     dim3 block = dim3(div_up(count_visible_block, thread.x));
@@ -233,7 +233,7 @@ void create_rendering_blocks(
 struct MapRenderingDelegate
 {
     int width, height;
-    // MapStruct map_struct;
+    // MapStruct map;
     mutable cv::cuda::PtrStep<Vec4f> vmap;
     cv::cuda::PtrStepSz<float> zRangeX;
     cv::cuda::PtrStepSz<float> zRangeY;
@@ -375,7 +375,7 @@ struct MapRenderingDelegate
     }
 };
 
-void raycast(MapStruct map_struct,
+void raycast(MapStruct map,
              GMat vmap,
              GMat zRangeX,
              GMat zRangeY,
@@ -398,11 +398,11 @@ void raycast(MapStruct map_struct,
     delegate.cy = K(1, 2);
     delegate.pose = T.cast<float>();
     delegate.Tinv = T.inverse().cast<float>();
-    delegate.hashTable = map_struct.hash_table_;
-    delegate.listBlock = map_struct.voxels_;
-    delegate.bucketSize = map_struct.bucketSize;
-    delegate.voxelSizeInv = 1.0 / map_struct.voxelSize;
-    delegate.raytraceStep = map_struct.truncationDist / map_struct.voxelSize;
+    delegate.hashTable = map.hashTable;
+    delegate.listBlock = map.voxelBlock;
+    delegate.bucketSize = map.bucketSize;
+    delegate.voxelSizeInv = 1.0 / map.voxelSize;
+    delegate.raytraceStep = map.truncationDist / map.voxelSize;
 
     dim3 thread(4, 8);
     dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
