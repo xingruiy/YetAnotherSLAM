@@ -2,11 +2,23 @@
 #include "optimizer/costFunctors.h"
 
 FeatureMap::FeatureMap(Mat33d &K, int localWinSize)
-    : optWinSize(localWinSize), K(K),
+    : optWinSize(localWinSize), K(K), lastReferenceKF(NULL),
       isOptimizing(false), shouldQuit(false), hasNewKF(false)
 {
     Kinv = K.inverse();
     matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
+}
+
+FeatureMap::FeatureMap(
+    Mat33d &K,
+    int winSize,
+    bool updateView)
+    : localWindowSize(winSize),
+      updateMapView(updateView),
+      K(K),
+      optimizerRunning(false),
+      shouldQuit(false)
+{
 }
 
 void FeatureMap::reset()
@@ -14,15 +26,16 @@ void FeatureMap::reset()
     frameHistory.clear();
     keyframeOptWin.clear();
     keyframeHistory.clear();
+    keyframesAll.clear();
 }
 
 void FeatureMap::addFrameHistory(std::shared_ptr<Frame> frame)
 {
-    auto refKF = frame->getReferenceKF();
-    if (refKF == NULL)
-        return;
+    // auto refKF = frame->getReferenceKF();
+    // if (refKF == NULL)
+    //     return;
 
-    frameHistory.push_back(std::make_pair(frame->getTrackingResult(), refKF));
+    frameHistory.push_back(std::make_pair(frame->getTrackingResult(), lastReferenceKF));
 }
 
 void FeatureMap::addReferenceFrame(std::shared_ptr<Frame> frame)
@@ -32,6 +45,8 @@ void FeatureMap::addReferenceFrame(std::shared_ptr<Frame> frame)
 
     std::unique_lock<std::mutex> lock(bufferMutex);
     newKeyFrameBuffer.push(frame);
+    lastReferenceKF = frame;
+    std::cout << "sd" << std::endl;
 }
 
 void FeatureMap::marginalizeOldFrame()
@@ -65,13 +80,13 @@ std::vector<Vec3f> FeatureMap::getActivePoints()
 {
     std::vector<Vec3f> localPoints;
 
-    for (auto kf : keyframeOptWin)
+    for (auto kf : keyframesAll)
         if (kf)
             for (auto pt : kf->mapPoints)
                 if (pt)
                     pt->visited = false;
 
-    for (auto kf : keyframeOptWin)
+    for (auto kf : keyframesAll)
     {
         std::unique_lock<std::mutex> lock(optimizerMutex);
         if (kf == NULL)
@@ -133,7 +148,7 @@ void FeatureMap::setShouldQuit()
     shouldQuit = true;
 }
 
-void FeatureMap::optimizationLoop()
+void FeatureMap::localOptimizationLoop()
 {
     while (!shouldQuit)
     {
@@ -291,14 +306,308 @@ void FeatureMap::optimizationLoop()
     }
 }
 
-void FeatureMap::findPointCorrespondences(std::shared_ptr<Frame> kf, std::vector<std::shared_ptr<MapPoint>> mapPoints)
+void FeatureMap::localOptimizationLoop2()
 {
+    while (!shouldQuit)
+    {
+        std::shared_ptr<Frame> newKF = NULL;
+
+        {
+            std::unique_lock<std::mutex> lock(bufferMutex);
+            if (newKeyFrameBuffer.size() > 0)
+            {
+                newKF = newKeyFrameBuffer.front();
+                newKeyFrameBuffer.pop();
+            }
+        }
+
+        if (newKF == NULL)
+            continue;
+
+        Mat image = newKF->getImage();
+        Mat depth = newKF->getDepth();
+        Mat intensity = newKF->getIntensity();
+
+        // TODO: modify this;
+        auto refKF = newKF->getReferenceKF();
+        if (refKF)
+        {
+            auto dT = newKF->getTrackingResult();
+            auto refT = refKF->getPoseInGlobalMap();
+            auto T = refT * dT;
+            newKF->setOptimizationResult(T);
+        }
+
+        matcher->detect(
+            image, depth,
+            newKF->cvKeyPoints,
+            newKF->pointDesc,
+            newKF->depthVec);
+
+        int numDetectedPoints = newKF->cvKeyPoints.size();
+
+        Mat displayImage;
+        image.copyTo(displayImage);
+
+        if (numDetectedPoints == 0)
+        {
+            printf("Error: no features detected! keyframe not accepted.\n");
+            return;
+        }
+
+        newKF->mapPoints.resize(numDetectedPoints);
+        size_t numMatchedPoints = 0;
+
+        std::set<std::shared_ptr<MapPoint>> mapPointAllTemp;
+        size_t startIdx = std::min(keyframesAll.size(), (size_t)5);
+        // auto &subset = keyframesAll;
+        auto subset = std::vector<std::shared_ptr<Frame>>(keyframesAll.end() - startIdx, keyframesAll.end());
+        for (auto kf : subset)
+        {
+            for (auto pt : kf->mapPoints)
+                mapPointAllTemp.insert(pt);
+        }
+
+        auto mapPointAll = std::vector<std::shared_ptr<MapPoint>>(
+            mapPointAllTemp.begin(), mapPointAllTemp.end());
+
+        std::vector<cv::DMatch> matches;
+        matcher->matchByProjection2NN(mapPointAll, newKF, K, matches, NULL);
+
+        for (auto match : matches)
+        {
+            auto &pt = mapPointAll[match.queryIdx];
+            auto &framePt3d = newKF->mapPoints[match.trainIdx];
+            auto &framePt = newKF->cvKeyPoints[match.trainIdx];
+            auto z = newKF->depthVec[match.trainIdx];
+
+            if (!pt || pt == framePt3d)
+                continue;
+
+            if (!framePt3d)
+                pt->addObservation(newKF, Vec3d(framePt.pt.x, framePt.pt.y, z));
+            else if ((framePt3d->getPosWorld() - pt->getPosWorld()).norm() < 0.01)
+            {
+                // std::cout << (framePt3d->getPosWorld() - pt->getPosWorld()).norm() << std::endl;
+                // pt->fusePoint(framePt3d);
+            }
+
+            newKF->mapPoints[match.trainIdx] = pt;
+            numMatchedPoints++;
+        }
+
+        auto framePose = newKF->getPoseInGlobalMap();
+        size_t numCreatedPoints = 0;
+        for (int i = 0; i < numDetectedPoints; ++i)
+        {
+            if ((numMatchedPoints + numCreatedPoints) > 400)
+                break;
+
+            if (newKF->mapPoints[i] != NULL)
+            {
+                cv::drawMarker(displayImage, newKF->cvKeyPoints[i].pt, cv::Scalar(0, 0, 255), cv::MARKER_SQUARE);
+                continue;
+            }
+
+            const auto &kp = newKF->cvKeyPoints[i];
+            const auto &desc = newKF->pointDesc.row(i);
+            const auto &z = newKF->depthVec[i];
+
+            if (z > FLT_EPSILON)
+            {
+                auto pt3d = std::make_shared<MapPoint>();
+
+                pt3d->setHost(newKF);
+                pt3d->setPosWorld(framePose * (Kinv * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z));
+                pt3d->setDescriptor(desc);
+                pt3d->addObservation(newKF, Vec3d(kp.pt.x, kp.pt.y, z));
+                newKF->mapPoints[i] = pt3d;
+                numCreatedPoints++;
+            }
+        }
+
+        keyframesAll.push_back(newKF);
+        frameHistory.push_back(std::make_pair(SE3(), newKF));
+
+        cv::imshow("features", displayImage);
+        cv::waitKey(1);
+
+        // bundleAdjustmentAll(keyframesAll, mapPointAll, 50);
+        bundleAdjustmentSubset(subset, mapPointAll, 50);
+    }
 }
 
-std::vector<std::shared_ptr<Frame>> FeatureMap::findCloseLoopCandidate(std::shared_ptr<Frame> frame)
+void FeatureMap::bundleAdjustmentAll(
+    std::vector<std::shared_ptr<Frame>> kfs,
+    std::vector<std::shared_ptr<MapPoint>> pts,
+    const int maxIter)
+{
+    ceres::Problem problem;
+    for (int i = 0; i < kfs.size(); ++i)
+    {
+        problem.AddParameterBlock(
+            kfs[i]->getParameterBlock(),
+            SE3::num_parameters,
+            new LocalParameterizationSE3());
+
+        if (i == 0)
+            problem.SetParameterBlockConstant(kfs[i]->getParameterBlock());
+    }
+
+    double KBlock[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
+    ceres::LossFunction *lossFunc = new ceres::HuberLoss(10);
+
+    size_t numResidualBlocks = 0;
+    for (auto pt : pts)
+    {
+        if (!pt || pt->getNumObservations() == 0)
+            continue;
+
+        for (auto obs : pt->getObservations())
+        {
+            //     problem.AddResidualBlock(
+            //         ReprojectionErrorFunctor::create(obs.second(0), obs.second(1)),
+            //         NULL,
+            //         &KBlock[0],
+            //         obs.first->getParameterBlock(),
+            //         pt->getParameterBlock());
+
+            problem.AddResidualBlock(
+                ReprojectionError3DFunctor::create(obs.second),
+                lossFunc,
+                &KBlock[0],
+                obs.first->getParameterBlock(),
+                pt->getParameterBlock());
+
+            numResidualBlocks++;
+        }
+
+        // problem.SetParameterBlockConstant(pt->getParameterBlock());
+    }
+
+    if (numResidualBlocks == 0)
+        return;
+
+    problem.SetParameterBlockConstant(&KBlock[0]);
+
+    // K << KBlock[0], 0, KBlock[2],
+    //     0, KBlock[1], KBlock[3],
+    //     0, 0, 1;
+    // Kinv = K.inverse();
+
+    std::cout << "start bundle adjustment with keyframes: " << kfs.size() << " points : " << pts.size() << " residual blocks : " << numResidualBlocks << std::endl;
+    ceres::Solver::Options options;
+    options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+    options.preconditioner_type = ceres::SCHUR_JACOBI;
+    options.use_explicit_schur_complement = false;
+    ceres::Solver::Summary summary;
+    Solve(options, &problem, &summary);
+    std::cout << summary.BriefReport() << std::endl;
+}
+
+void FeatureMap::bundleAdjustmentSubset(
+    std::vector<std::shared_ptr<Frame>> kfs,
+    std::vector<std::shared_ptr<MapPoint>> pts,
+    const int maxIter)
+{
+    ceres::Problem problem;
+    for (int i = 0; i < kfs.size(); ++i)
+    {
+        problem.AddParameterBlock(
+            kfs[i]->getParameterBlock(),
+            SE3::num_parameters,
+            new LocalParameterizationSE3());
+
+        // if (i == 0)
+        //     problem.SetParameterBlockConstant(kfs[i]->getParameterBlock());
+
+        kfs[i]->kfIdLocalRoot = kfs[0]->getId();
+    }
+
+    std::set<std::shared_ptr<Frame>> fixedKFs;
+    for (auto pt : pts)
+    {
+        if (!pt || pt->getNumObservations() == 0)
+            continue;
+
+        for (auto obs : pt->getObservations())
+        {
+            if (obs.first->kfIdLocalRoot != kfs[0]->getId())
+                fixedKFs.insert(obs.first);
+        }
+    }
+
+    if (fixedKFs.size() == 0)
+        return;
+
+    for (auto kf : fixedKFs)
+    {
+        problem.AddParameterBlock(
+            kf->getParameterBlock(),
+            SE3::num_parameters,
+            new LocalParameterizationSE3());
+        problem.SetParameterBlockConstant(kf->getParameterBlock());
+    }
+
+    double KBlock[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
+    ceres::LossFunction *lossFunc = new ceres::HuberLoss(10);
+
+    size_t numResidualBlocks = 0;
+    for (auto pt : pts)
+    {
+        if (!pt || pt->getNumObservations() == 0)
+            continue;
+
+        for (auto obs : pt->getObservations())
+        {
+            problem.AddResidualBlock(
+                ReprojectionErrorFunctor::create(obs.second(0), obs.second(1)),
+                NULL,
+                &KBlock[0],
+                obs.first->getParameterBlock(),
+                pt->getParameterBlock());
+
+            // problem.AddResidualBlock(
+            //     ReprojectionError3DFunctor::create(obs.second),
+            //     lossFunc,
+            //     &KBlock[0],
+            //     obs.first->getParameterBlock(),
+            //     pt->getParameterBlock());
+
+            numResidualBlocks++;
+        }
+
+        // problem.SetParameterBlockConstant(pt->getParameterBlock());
+    }
+
+    if (numResidualBlocks == 0)
+        return;
+
+    problem.SetParameterBlockConstant(&KBlock[0]);
+
+    // K << KBlock[0], 0, KBlock[2],
+    //     0, KBlock[1], KBlock[3],
+    //     0, 0, 1;
+    // Kinv = K.inverse();
+
+    std::cout << "start bundleAdjustment with keyframes: " << kfs.size() << " points : " << pts.size() << " residual blocks : " << numResidualBlocks << std::endl;
+    ceres::Solver::Options options;
+    options.update_state_every_iteration = true;
+    options.linear_solver_type = ceres::DENSE_SCHUR;
+    // options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+    // options.preconditioner_type = ceres::SCHUR_JACOBI;
+    // options.use_explicit_schur_complement = false;
+    ceres::Solver::Summary summary;
+    Solve(options, &problem, &summary);
+    std::cout << summary.BriefReport() << std::endl;
+}
+
+std::vector<std::shared_ptr<Frame>> FeatureMap::findClosedCandidate(
+    std::shared_ptr<Frame> frame,
+    const float distTh,
+    const bool checkFrustumOverlapping)
 {
     std::vector<std::shared_ptr<Frame>> candidates;
-    const float distTh = 1; // meters
     auto framePosition = frame->getPoseInGlobalMap().translation();
 
     std::vector<std::shared_ptr<Frame>> keyframeHistoryCopy;
@@ -309,7 +618,7 @@ std::vector<std::shared_ptr<Frame>> FeatureMap::findCloseLoopCandidate(std::shar
 
     for (auto kf : keyframeHistoryCopy)
     {
-        // if (std::abs(frame->getKeyframeId() - kf->getKeyframeId()) < 50)
+        // if (std::abs(frame->getId() - kf->getId()) < 50)
         //     continue;
 
         auto kfPosition = kf->getPoseInGlobalMap().translation();
@@ -339,7 +648,7 @@ void FeatureMap::globalConsistencyLoop()
         if (loopKF == NULL)
             continue;
 
-        auto candidateClose = findCloseLoopCandidate(loopKF);
+        auto candidateClose = findClosedCandidate(loopKF, 1.0, false);
 
         for (auto candidateKF : candidateClose)
         {
@@ -367,7 +676,7 @@ void FeatureMap::globalConsistencyLoop()
 void FeatureMap::addToOptimizer(std::shared_ptr<Frame> kf)
 {
     kf->inLocalOptimizer = true;
-    // solver->addCamera(kf->getKeyframeId(), kf->getPoseInGlobalMap().inverse(), false);
+    // solver->addCamera(kf->getId(), kf->getPoseInGlobalMap().inverse(), false);
     // for (int i = 0; i < kf->cvKeyPoints.size(); ++i)
     // {
     //     auto pt = kf->mapPoints[i];
@@ -381,7 +690,7 @@ void FeatureMap::addToOptimizer(std::shared_ptr<Frame> kf)
     //             pt->inOptimizer = true;
     //         }
 
-    //         solver->addObservation(pt->id, kf->getKeyframeId(), Vec2d(kp.pt.x, kp.pt.y));
+    //         solver->addObservation(pt->id, kf->getId(), Vec2d(kp.pt.x, kp.pt.y));
     //     }
     // }
 }
@@ -430,12 +739,12 @@ void FeatureMap::windowedOptimization(const int maxIteration)
 
     for (auto kf : localKFs)
     {
-        // printf("local: %lu\n", kf->getKeyframeId());
+        // printf("local: %lu\n", kf->getId());
         problem.AddParameterBlock(kf->getParameterBlock(), SE3::num_parameters, new LocalParameterizationSE3());
     }
     for (auto kf : fixedKFs)
     {
-        // printf("fixed: %lu\n", kf->getKeyframeId());
+        // printf("fixed: %lu\n", kf->getId());
         problem.AddParameterBlock(kf->getParameterBlock(), SE3::num_parameters, new LocalParameterizationSE3());
         problem.SetParameterBlockConstant(kf->getParameterBlock());
     }
@@ -503,7 +812,7 @@ void FeatureMap::windowedOptimization(const int maxIteration)
     //         //     }
     //         // }
 
-    //         auto poseOpt = solver->getCamPoseOptimized(kf->getKeyframeId()).inverse();
+    //         auto poseOpt = solver->getCamPoseOptimized(kf->getId()).inverse();
     //         kf->setOptimizationResult(poseOpt);
     //     }
 
@@ -512,31 +821,25 @@ void FeatureMap::windowedOptimization(const int maxIteration)
     // }
 }
 
-bool FeatureMap::hasUnfinishedWork()
-{
-    std::unique_lock<std::mutex> lock(bufferMutex);
-    return isOptimizing && newKeyFrameBuffer.size() > 0;
-}
-
 std::vector<SE3> FeatureMap::getKeyFrameHistory()
 {
     std::vector<SE3> history;
 
     {
         std::unique_lock<std::mutex> lock(historyMutex);
-        for (auto kf : keyframeHistory)
+        for (auto kf : keyframesAll)
         {
             history.push_back(kf->getPoseInGlobalMap());
         }
     }
 
-    {
-        std::unique_lock<std::mutex> lock(optWinMutex);
-        for (auto kf : keyframeOptWin)
-        {
-            history.push_back(kf->getPoseInGlobalMap());
-        }
-    }
+    // {
+    //     std::unique_lock<std::mutex> lock(optWinMutex);
+    //     for (auto kf : keyframeOptWin)
+    //     {
+    //         history.push_back(kf->getPoseInGlobalMap());
+    //     }
+    // }
 
     return history;
 }

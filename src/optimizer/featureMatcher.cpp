@@ -186,12 +186,70 @@ void FeatureMatcher::matchByProjection(
 }
 
 void FeatureMatcher::matchByProjection2NN(
-    const std::vector<std::shared_ptr<Frame>> mapPoints,
+    const std::vector<std::shared_ptr<MapPoint>> mapPoints,
     const std::shared_ptr<Frame> frame,
     const Mat33d &K,
     std::vector<cv::DMatch> &matches,
     std::vector<bool> *matchesFound)
 {
+    matches.clear();
+    size_t numSuccessMatch = 0;
+
+    const float fx = K(0, 0);
+    const float fy = K(1, 1);
+    const float cx = K(0, 2);
+    const float cy = K(1, 2);
+
+    auto &keyPoints = frame->cvKeyPoints;
+    auto &descriptors = frame->pointDesc;
+    auto framePoseInv = frame->getPoseInGlobalMap().inverse();
+
+    for (auto iter = mapPoints.begin(), iend = mapPoints.end(); iter != iend; ++iter)
+    {
+        const auto pt = *iter;
+        cv::DMatch m;
+        m.queryIdx = iter - mapPoints.begin();
+        if (pt)
+        {
+            Vec2d obs(-1, -1);
+            int bestPointIdx = -1;
+            float bestPairScore = std::numeric_limits<float>::max();
+
+            Vec3d ptWarped = framePoseInv * pt->getPosWorld();
+            const float u = fx * ptWarped(0) / ptWarped(2) + cx;
+            const float v = fy * ptWarped(1) / ptWarped(2) + cy;
+
+            if (u > 0 && v > 0 && u < 639 && v < 479)
+            {
+                for (int i = 0; i < keyPoints.size(); ++i)
+                {
+                    const auto &x = keyPoints[i].pt.x;
+                    const auto &y = keyPoints[i].pt.y;
+                    float dist = (Vec2f(x, y) - Vec2f(u, v)).norm();
+
+                    if (dist <= MatchWindowDist)
+                    {
+                        // const auto score = computePatchScoreL2Norm(ptgetDescriptor(), descriptors[i]);
+                        const auto score = computeMatchingScore(pt->getDescriptor(), descriptors.row(i));
+
+                        if (score < bestPairScore)
+                        {
+                            bestPointIdx = i;
+                            obs = Vec2d(x, y);
+                            bestPairScore = score;
+                        }
+                    }
+                }
+
+                if (bestPointIdx >= 0 && bestPairScore < minMatchingDistance)
+                {
+                    m.trainIdx = bestPointIdx;
+                    matches.push_back(m);
+                    numSuccessMatch++;
+                }
+            }
+        }
+    }
 }
 
 void FeatureMatcher::matchByProjection2NN(
@@ -245,13 +303,12 @@ void FeatureMatcher::matchByProjection2NN(
                     // auto currentZ = currentDepth.ptr<float>((int)round(y))[(int)round(x)];
                     auto currentZ = frame->depthVec[i];
 
-                    if (dist <= MatchWindowDist && abs(ptWarped(2) - currentZ) < 0.05)
+                    if (dist <= MatchWindowDist && abs(ptWarped(2) - currentZ) < 0.1)
                     {
-                        // const auto score = computePatchScoreL2Norm(ptgetDescriptor(), descriptors[i]);
                         const auto score = computeMatchingScore(pt->getDescriptor(), descriptors.row(i));
 
-                        if (score > minMatchingDistance)
-                            continue;
+                        // if (score > minMatchingDistance)
+                        //     continue;
                         // std::cout << score << std::endl;
 
                         if (score < bestPairScore)

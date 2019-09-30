@@ -8,14 +8,39 @@
 
 class FeatureMap
 {
+    MapViewer *viewer;
+    bool optimizerRunning;
+    bool updateMapView;
+    size_t localWindowSize;
+
+    std::mutex mutexKFBuffer;
+    std::queue<std::shared_ptr<Frame>> keyframeBuffer;
+    std::vector<std::shared_ptr<Frame>> keyframesAll;
+    std::shared_ptr<Frame> lastReferenceKF;
+    // Feature Matching
+    std::shared_ptr<FeatureMatcher> matcher;
+    // Loop Closure
+    std::vector<std::shared_ptr<Frame>> findClosedCandidate(
+        std::shared_ptr<Frame> frame,
+        const float distTh,
+        const bool checkFrustumOverlapping);
+    std::vector<std::shared_ptr<Frame>> findDistantCandidate(
+        std::shared_ptr<Frame> frame);
+    // Bundle Adjustment
+    void bundleAdjustmentAll(
+        std::vector<std::shared_ptr<Frame>> kfs,
+        std::vector<std::shared_ptr<MapPoint>> pts,
+        const int maxIter);
+    void bundleAdjustmentSubset(
+        std::vector<std::shared_ptr<Frame>> kfs,
+        std::vector<std::shared_ptr<MapPoint>> pts,
+        const int maxIter);
+
     Mat33d K, Kinv;
     bool shouldQuit;
     bool hasNewKF;
     bool isOptimizing;
     int optWinSize;
-    MapViewer *viewer;
-
-    std::shared_ptr<FeatureMatcher> matcher;
 
     // use lock semantics. TODO: lock-free queues?
     std::mutex optWinMutex;
@@ -32,25 +57,22 @@ class FeatureMap
     void addToOptimizer(std::shared_ptr<Frame> kf);
     void marginalizeOldFrame();
     void windowedOptimization(const int maxIter);
-    // TODO: double check if two pts are the same one
-    std::vector<std::shared_ptr<Frame>> findCloseLoopCandidate(std::shared_ptr<Frame> frame);
-    void findPointCorrespondences(std::shared_ptr<Frame> kf, std::vector<std::shared_ptr<MapPoint>> mapPoints);
 
 public:
     FeatureMap(Mat33d &K, int localWinSize = 5);
-
+    FeatureMap(Mat33d &K, int localWinSize, bool updateView);
     void reset();
+    void setMapViewer(MapViewer *viewer);
     void addFrameHistory(std::shared_ptr<Frame> frame);
     void addReferenceFrame(std::shared_ptr<Frame> frame);
+    void localOptimizationLoop();
+    void localOptimizationLoop2();
+
+    void globalConsistencyLoop();
+    void setShouldQuit();
 
     std::vector<SE3> getFrameHistory() const;
     std::vector<SE3> getKeyFrameHistory();
     std::vector<Vec3f> getActivePoints();
     std::vector<Vec3f> getStablePoints();
-
-    void optimizationLoop();
-    void globalConsistencyLoop();
-    void setShouldQuit();
-    bool hasUnfinishedWork();
-    void setMapViewer(MapViewer *viewer);
 };

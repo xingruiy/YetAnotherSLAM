@@ -24,7 +24,7 @@ FullSystem::FullSystem(
     bufferVec4wxh.create(h, w, CV_32FC4);
     bufferFloatwxh.create(h, w, CV_32FC1);
 
-    optThread = std::thread(&FeatureMap::optimizationLoop, featureMap.get());
+    optThread = std::thread(&FeatureMap::localOptimizationLoop2, featureMap.get());
     loopThread = std::thread(&FeatureMap::globalConsistencyLoop, featureMap.get());
 }
 

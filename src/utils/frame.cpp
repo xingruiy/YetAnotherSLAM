@@ -42,7 +42,7 @@ bool Frame::isKeyframe() const
     return keyframeFlag;
 }
 
-size_t Frame::getKeyframeId() const
+size_t Frame::getId() const
 {
     return kfId;
 }

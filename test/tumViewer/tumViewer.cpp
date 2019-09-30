@@ -75,9 +75,26 @@ int main(int argc, char **argv)
         }
 
         while (!pangolin::ShouldQuit())
+        {
             viewer.renderView();
+            viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
+            viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
-        TUMSave(baseDir + *iter, listOfTimeStamp, fullsystem.getFramePoseHistory());
-        printf("Saved: %s...\n", iter->c_str());
+            float *vbuffer;
+            float *nbuffer;
+            size_t bufferSize;
+            viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
+            size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
+            viewer.setMeshSizeToRender(size);
+            viewer.setActivePoints(fullsystem.getActiveKeyPoints());
+            viewer.setStablePoints(fullsystem.getStableKeyPoints());
+        }
+
+        if (fullsystem.getFramePoseHistory().size() == listOfFilePath.size())
+        {
+            TUMSave(baseDir + *iter, listOfTimeStamp, fullsystem.getFramePoseHistory());
+            printf("Saved: %s...\n", iter->c_str());
+        }
     }
 }

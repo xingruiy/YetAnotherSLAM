@@ -36,7 +36,7 @@ public:
 
     void flagKeyFrame();
     bool isKeyframe() const;
-    size_t getKeyframeId() const;
+    size_t getId() const;
 
     SE3 getTrackingResult() const;
     SE3 getPoseInGlobalMap() const;
@@ -50,6 +50,7 @@ public:
     std::shared_ptr<Frame> referenceKF;
 
     bool inLocalOptimizer;
+    int kfIdLocalRoot;
     double *getParameterBlock();
 
     // std::vector<Vec9f> pointDesc;
