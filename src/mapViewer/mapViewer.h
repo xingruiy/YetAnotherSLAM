@@ -70,11 +70,10 @@ class MapViewer
 public:
     MapViewer(int w, int h, int fW, int fH, Mat33d &K);
     ~MapViewer();
+
     void resetViewer();
     void renderView();
 
-    void setRawFrameHistory(const std::vector<SE3> &history);
-    void setRawKeyFrameHistory(const std::vector<SE3> &history);
     void setFrameHistory(const std::vector<SE3> &history);
     void setKeyFrameHistory(const std::vector<SE3> &history);
     void setActivePoints(const std::vector<Vec3f> &points);
@@ -90,5 +89,7 @@ public:
     void setMeshSizeToRender(size_t size);
     void getMeshBuffer(float *&vbuffer, float *&nbuffer, size_t &bufferSize);
     void setCurrentState(int state);
+
     void addTrackingResult(const SE3 &T);
+    void addRawKeyFramePose(const SE3 &T);
 };

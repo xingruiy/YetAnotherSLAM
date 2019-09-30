@@ -1,17 +1,13 @@
 #include "fullSystem/fullSystem.h"
 #include "denseTracker/cudaImageProc.h"
 
-FullSystem::FullSystem(const char *configFile)
-    : viewerEnabled(false)
-{
-}
-
 FullSystem::FullSystem(
     int w, int h,
     Mat33d K,
     int numLvl,
     bool enableViewer)
-    : currentState(-1),
+    : state(SystemState::NotInitialized),
+      lastState(SystemState::NotInitialized),
       viewerEnabled(enableViewer)
 {
     map = std::make_shared<Map>();
@@ -47,9 +43,9 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
     cv::cvtColor(rawImageFloat, rawIntensity, cv::COLOR_RGB2GRAY);
     currentFrame = std::make_shared<Frame>(rawImage, rawDepth, rawIntensity);
 
-    switch (currentState)
+    switch (state)
     {
-    case -1:
+    case SystemState::NotInitialized:
     {
         if (viewerEnabled && viewer)
             viewer->setCurrentState(-1);
@@ -57,14 +53,14 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         coarseTracker->setReferenceFrame(currentFrame);
         createNewKF();
         fuseCurrentFrame();
-        currentState = 0;
+        state = SystemState::OK;
 
         if (viewerEnabled && viewer)
             viewer->setCurrentState(0);
 
         break;
     }
-    case 0:
+    case SystemState::OK:
     {
         auto rval = trackCurrentFrame();
         if (rval)
@@ -89,12 +85,12 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
             if (viewerEnabled && viewer)
                 viewer->setCurrentState(1);
 
-            currentState = 1;
+            state = SystemState::Lost;
         }
 
         break;
     }
-    case 1:
+    case SystemState::Lost:
 
         size_t numAttempted = 0;
         printf("tracking loast, attempt to resuming...\n");
@@ -167,27 +163,24 @@ void FullSystem::createNewKF()
     map->setCurrentKeyframe(currentKeyframe);
     map->addKeyframePoseRaw(lastTrackedPose);
     map->addFramePose(SE3(), currentKeyframe);
+
+    if (viewerEnabled && viewer)
+        viewer->addRawKeyFramePose(lastTrackedPose);
+
     accumulateTransform = SE3();
 }
 
 void FullSystem::resetSystem()
 {
-    currentState = -1;
+
     map->clear();
+    viewer->resetViewer();
     localMapper->reset();
     localOptimizer->reset();
     lastTrackedPose = SE3(Mat44d::Identity());
     accumulateTransform = SE3(Mat44d::Identity());
-}
-
-std::vector<SE3> FullSystem::getRawFramePoseHistory() const
-{
-    return rawFramePoseHistory;
-}
-
-std::vector<SE3> FullSystem::getRawKeyFramePoseHistory() const
-{
-    return rawKeyFramePoseHistory;
+    state = SystemState::NotInitialized;
+    lastState = SystemState::NotInitialized;
 }
 
 size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)

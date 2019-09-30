@@ -14,6 +14,7 @@ int main(int argc, char **argv)
     Mat depth, image;
     Mat depthFloat, depthImage;
     FullSystem fullsystem(640, 480, K, 5, true);
+    fullsystem.setMapViewerPtr(&viewer);
     float depthScale = 1.0 / 1000.0;
 
     while (true && !pangolin::ShouldQuit())
@@ -31,10 +32,8 @@ int main(int argc, char **argv)
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
 
-            // viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
             viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
             viewer.setFrameHistory(fullsystem.getFramePoseHistory());
-            viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
             if (!viewer.paused())
             {
@@ -44,8 +43,7 @@ int main(int argc, char **argv)
                 viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
                 size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
                 viewer.setMeshSizeToRender(size);
-                // viewer.setActivePoints(fullsystem.getActiveKeyPoints());
-                // viewer.setStablePoints(fullsystem.getStableKeyPoints());
+                viewer.setActivePoints(fullsystem.getMapPointPosAll());
             }
         }
 

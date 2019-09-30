@@ -56,7 +56,6 @@ int main(int argc, char **argv)
 
             viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
             viewer.setFrameHistory(fullsystem.getFramePoseHistory());
-            viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
             float *vbuffer;
             float *nbuffer;
@@ -77,7 +76,6 @@ int main(int argc, char **argv)
             viewer.renderView();
             viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
             viewer.setFrameHistory(fullsystem.getFramePoseHistory());
-            viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
 
             float *vbuffer;
             float *nbuffer;

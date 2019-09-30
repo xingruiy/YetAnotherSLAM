@@ -289,20 +289,6 @@ void MapViewer::drawLocalMap()
     phongProgram.Unbind();
 }
 
-void MapViewer::setRawFrameHistory(const std::vector<SE3> &history)
-{
-    rawFrameHistory.clear();
-    for (auto T : history)
-        rawFrameHistory.push_back(T.translation().cast<float>());
-}
-
-void MapViewer::setRawKeyFrameHistory(const std::vector<SE3> &history)
-{
-    rawKeyFrameHistory.clear();
-    for (auto T : history)
-        rawKeyFrameHistory.push_back(T.matrix().cast<float>());
-}
-
 void MapViewer::setFrameHistory(const std::vector<SE3> &history)
 {
     frameHistory.clear();
@@ -312,7 +298,6 @@ void MapViewer::setFrameHistory(const std::vector<SE3> &history)
 
 void MapViewer::setKeyFrameHistory(const std::vector<SE3> &history)
 {
-    // std::cout << history.size() << std::endl;
     keyFrameHistory.clear();
     for (auto T : history)
         keyFrameHistory.push_back(T.matrix().cast<float>());
@@ -348,4 +333,9 @@ void MapViewer::setCurrentState(int state)
 void MapViewer::addTrackingResult(const SE3 &T)
 {
     rawFrameHistory.push_back(T.translation().cast<float>());
+}
+
+void MapViewer::addRawKeyFramePose(const SE3 &T)
+{
+    rawKeyFrameHistory.push_back(T.matrix().cast<float>());
 }

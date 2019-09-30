@@ -19,8 +19,6 @@ void Map::clear()
     framePoseRawAll.clear();
     unprocessedKeyframeQueue = std::queue<std::shared_ptr<Frame>>();
     loopClosingKeyframeQueue = std::queue<std::shared_ptr<Frame>>();
-    // std::queue<std::shared_ptr<Frame>>().swap(unprocessedKeyframeQueue);
-    // std::queue<std::shared_ptr<Frame>>().swap(loopClosingKeyframeQueue);
 }
 
 void Map::addKeyFrame(std::shared_ptr<Frame> kf)

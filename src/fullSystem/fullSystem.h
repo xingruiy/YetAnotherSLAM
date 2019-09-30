@@ -10,6 +10,13 @@
 #include "denseTracker/denseTracker.h"
 #include "mapViewer/mapViewer.h"
 
+enum class SystemState
+{
+    NotInitialized,
+    OK,
+    Lost
+};
+
 class FullSystem
 {
     const bool viewerEnabled;
@@ -22,6 +29,10 @@ class FullSystem
     void raytraceCurrentFrame();
     bool tryRelocalizeCurrentFrame(bool updatePoints);
 
+    std::thread loopThread;
+    std::thread localOptThread;
+    MapViewer *viewer;
+
     std::shared_ptr<Map> map;
     std::shared_ptr<LoopCloser> loopCloser;
     std::shared_ptr<DenseMapping> localMapper;
@@ -31,20 +42,14 @@ class FullSystem
     std::shared_ptr<Frame> currentFrame;
     std::shared_ptr<Frame> currentKeyframe;
 
-    std::vector<SE3> rawFramePoseHistory;
-    std::vector<SE3> rawKeyFramePoseHistory;
-
     SE3 lastTrackedPose;
     SE3 accumulateTransform;
 
     GMat bufferFloatwxh;
     GMat bufferVec4wxh;
 
-    std::thread loopThread;
-    std::thread localOptThread;
-    MapViewer *viewer;
-
-    int currentState;
+    SystemState state;
+    SystemState lastState;
 
 public:
     ~FullSystem();
@@ -59,8 +64,6 @@ public:
 
     std::vector<SE3> getFramePoseHistory();
     std::vector<SE3> getKeyFramePoseHistory();
-    std::vector<SE3> getRawFramePoseHistory() const;
-    std::vector<SE3> getRawKeyFramePoseHistory() const;
     std::vector<Vec3f> getMapPointPosAll();
 
     void setMapViewerPtr(MapViewer *viewer);
