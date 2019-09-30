@@ -10,19 +10,21 @@ add_library(athena SHARED)
 
 target_sources(athena
 PRIVATE
+    src/utils/map.cpp
     src/utils/frame.cpp
     src/utils/mapPoint.cpp
     src/fullSystem/fullSystem.cu
     src/mapViewer/mapViewer.cpp
     src/denseTracker/denseTracker.cu
     src/denseTracker/cudaImageProc.cu
-    src/optimizer/featureMap.cpp
+    src/optimizer/localOptimizer.cpp
     src/optimizer/featureMatcher.cpp
     src/localMapper/denseMap.cu
     src/localMapper/localMapper.cpp
     src/localMapper/depthFusion.cu
     src/localMapper/meshScene.cu
     src/localMapper/raytracing.cu
+    src/loopClosure/loopCloser.cpp
 )
 
 target_compile_features(athena

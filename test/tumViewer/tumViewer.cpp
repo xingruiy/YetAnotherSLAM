@@ -54,7 +54,6 @@ int main(int argc, char **argv)
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
 
-            // viewer.setRawFrameHistory(fullsystem.getRawFramePoseHistory());
             viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
             viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             viewer.setRawKeyFrameHistory(fullsystem.getRawKeyFramePoseHistory());
@@ -65,8 +64,7 @@ int main(int argc, char **argv)
             viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
             size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
             viewer.setMeshSizeToRender(size);
-            viewer.setActivePoints(fullsystem.getActiveKeyPoints());
-            viewer.setStablePoints(fullsystem.getStableKeyPoints());
+            viewer.setActivePoints(fullsystem.getMapPointPosAll());
 
             if (pangolin::ShouldQuit())
                 break;
@@ -87,8 +85,7 @@ int main(int argc, char **argv)
             viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
             size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
             viewer.setMeshSizeToRender(size);
-            viewer.setActivePoints(fullsystem.getActiveKeyPoints());
-            viewer.setStablePoints(fullsystem.getStableKeyPoints());
+            viewer.setActivePoints(fullsystem.getMapPointPosAll());
         }
 
         if (fullsystem.getFramePoseHistory().size() == listOfFilePath.size())

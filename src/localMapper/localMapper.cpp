@@ -63,7 +63,7 @@ void DenseMapping::reset()
   deviceMap.reset();
 }
 
-size_t DenseMapping::fetch_mesh_with_normal(void *vertex, void *normal)
+size_t DenseMapping::fetchMeshWithNormal(void *vertex, void *normal)
 {
   uint count_triangle = 0;
 

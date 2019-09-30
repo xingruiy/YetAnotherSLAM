@@ -14,8 +14,10 @@ FullSystem::FullSystem(
     : currentState(-1),
       viewerEnabled(enableViewer)
 {
-    featureMap = std::make_shared<FeatureMap>(K, 3);
+    map = std::make_shared<Map>();
+    localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
     localMapper = std::make_shared<DenseMapping>(w, h, K);
+    loopCloser = std::make_shared<LoopCloser>(K, map);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
@@ -24,15 +26,18 @@ FullSystem::FullSystem(
     bufferVec4wxh.create(h, w, CV_32FC4);
     bufferFloatwxh.create(h, w, CV_32FC1);
 
-    optThread = std::thread(&FeatureMap::localOptimizationLoop2, featureMap.get());
-    loopThread = std::thread(&FeatureMap::globalConsistencyLoop, featureMap.get());
+    loopThread = std::thread(&LoopCloser::loop, loopCloser.get());
+    localOptThread = std::thread(&LocalOptimizer::loop, localOptimizer.get());
 }
 
 FullSystem::~FullSystem()
 {
-    featureMap->setShouldQuit();
-    optThread.join();
+    std::cout << "wating other threads to finish..." << std::endl;
+    loopCloser->setShouldQuit();
+    localOptimizer->setShouldQuit();
     loopThread.join();
+    localOptThread.join();
+    std::cout << "all threads finished!" << std::endl;
 }
 
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
@@ -68,9 +73,13 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
             raytraceCurrentFrame();
 
             if (needNewKF())
+            {
                 createNewKF();
+            }
             else
-                featureMap->addFrameHistory(currentFrame);
+            {
+                map->addFramePose(currentFrame->getTrackingResult(), currentKeyframe);
+            }
 
             if (viewerEnabled && viewer)
                 viewer->addTrackingResult(currentFrame->getPoseInLocalMap());
@@ -111,7 +120,7 @@ bool FullSystem::trackCurrentFrame()
     // accumulated local transform
     accumulateTransform = accumulateTransform * tRes.inverse();
     currentFrame->setTrackingResult(accumulateTransform);
-    currentFrame->setReferenceKF(referenceFrame);
+    currentFrame->setReferenceKF(currentKeyframe);
 
     return true;
 }
@@ -149,28 +158,24 @@ bool FullSystem::needNewKF()
 
 void FullSystem::createNewKF()
 {
-    referenceFrame = currentFrame;
+    currentKeyframe = currentFrame;
 
-    /* 
-        Flag for keyframe
-    */
-    referenceFrame->flagKeyFrame();
+    currentKeyframe->flagKeyFrame();
     lastTrackedPose = lastTrackedPose * accumulateTransform;
-    referenceFrame->setRawKeyframePose(lastTrackedPose);
-    featureMap->addReferenceFrame(referenceFrame);
-
-    rawKeyFramePoseHistory.push_back(lastTrackedPose);
+    currentKeyframe->setRawKeyframePose(lastTrackedPose);
+    map->addUnprocessedKeyframe(currentKeyframe);
+    map->setCurrentKeyframe(currentKeyframe);
+    map->addKeyframePoseRaw(lastTrackedPose);
+    map->addFramePose(SE3(), currentKeyframe);
     accumulateTransform = SE3();
 }
 
 void FullSystem::resetSystem()
 {
     currentState = -1;
+    map->clear();
     localMapper->reset();
-    featureMap->reset();
-    rawFramePoseHistory.clear();
-    rawKeyFramePoseHistory.clear();
-
+    localOptimizer->reset();
     lastTrackedPose = SE3(Mat44d::Identity());
     accumulateTransform = SE3(Mat44d::Identity());
 }
@@ -187,27 +192,22 @@ std::vector<SE3> FullSystem::getRawKeyFramePoseHistory() const
 
 size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
 {
-    return localMapper->fetch_mesh_with_normal(vbuffer, nbuffer);
+    return localMapper->fetchMeshWithNormal(vbuffer, nbuffer);
 }
 
 std::vector<SE3> FullSystem::getKeyFramePoseHistory()
 {
-    return featureMap->getKeyFrameHistory();
+    return map->getKeyframePoseOptimized();
 }
 
 std::vector<SE3> FullSystem::getFramePoseHistory()
 {
-    return featureMap->getFrameHistory();
+    return map->getFramePoseOptimized();
 }
 
-std::vector<Vec3f> FullSystem::getActiveKeyPoints()
+std::vector<Vec3f> FullSystem::getMapPointPosAll()
 {
-    return featureMap->getActivePoints();
-}
-
-std::vector<Vec3f> FullSystem::getStableKeyPoints()
-{
-    return featureMap->getStablePoints();
+    return map->getMapPointVec3All();
 }
 
 void FullSystem::setMapViewerPtr(MapViewer *viewer)

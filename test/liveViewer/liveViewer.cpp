@@ -44,8 +44,8 @@ int main(int argc, char **argv)
                 viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
                 size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
                 viewer.setMeshSizeToRender(size);
-                viewer.setActivePoints(fullsystem.getActiveKeyPoints());
-                viewer.setStablePoints(fullsystem.getStableKeyPoints());
+                // viewer.setActivePoints(fullsystem.getActiveKeyPoints());
+                // viewer.setStablePoints(fullsystem.getStableKeyPoints());
             }
         }
 
