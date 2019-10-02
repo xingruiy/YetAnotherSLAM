@@ -8,7 +8,9 @@ FullSystem::FullSystem(
     bool enableViewer)
     : state(SystemState::NotInitialized),
       lastState(SystemState::NotInitialized),
-      viewerEnabled(enableViewer)
+      viewerEnabled(enableViewer),
+      mappingEnabled(true),
+      numProcessedFrames(0)
 {
     map = std::make_shared<Map>();
     localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
@@ -107,6 +109,10 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 
         break;
     }
+
+    lastState = state;
+    if (state == SystemState::OK)
+        numProcessedFrames += 1;
 }
 
 bool FullSystem::trackCurrentFrame()
@@ -123,6 +129,7 @@ bool FullSystem::trackCurrentFrame()
 
 void FullSystem::fuseCurrentFrame()
 {
+
     auto currDepth = coarseTracker->getReferenceDepth();
     localMapper->fuseFrame(currDepth, currentFrame->getPoseInLocalMap());
 }
@@ -159,10 +166,14 @@ void FullSystem::createNewKF()
     currentKeyframe->flagKeyFrame();
     lastTrackedPose = lastTrackedPose * accumulateTransform;
     currentKeyframe->setRawKeyframePose(lastTrackedPose);
-    map->addUnprocessedKeyframe(currentKeyframe);
-    map->setCurrentKeyframe(currentKeyframe);
-    map->addKeyframePoseRaw(lastTrackedPose);
-    map->addFramePose(SE3(), currentKeyframe);
+
+    if (mappingEnabled)
+    {
+        map->addUnprocessedKeyframe(currentKeyframe);
+        map->setCurrentKeyframe(currentKeyframe);
+        map->addKeyframePoseRaw(lastTrackedPose);
+        map->addFramePose(SE3(), currentKeyframe);
+    }
 
     if (viewerEnabled && viewer)
         viewer->addRawKeyFramePose(lastTrackedPose);
@@ -206,4 +217,9 @@ std::vector<Vec3f> FullSystem::getMapPointPosAll()
 void FullSystem::setMapViewerPtr(MapViewer *viewer)
 {
     this->viewer = viewer;
+}
+
+void FullSystem::setMappingEnable(const bool enable)
+{
+    mappingEnabled = enable;
 }

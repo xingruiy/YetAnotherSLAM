@@ -28,6 +28,6 @@ public:
     void loop();
     void reset();
     void setShouldQuit();
-
+    bool pauseMapping;
     void setMap(std::shared_ptr<Map> map);
 };

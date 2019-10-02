@@ -3,7 +3,7 @@
 size_t MapPoint::nextId = 0;
 
 MapPoint::MapPoint()
-    : id(nextId++)
+    : id(nextId++), bad(false)
 {
 }
 
@@ -43,6 +43,8 @@ void MapPoint::fusePoint(std::shared_ptr<MapPoint> &other)
 {
   auto obs = other->getObservations();
   observations.insert(obs.begin(), obs.end());
+  position = (position + other->position) / 2.0;
+  other->flagBad();
   other = NULL;
 }
 
@@ -79,4 +81,14 @@ void MapPoint::setDescriptor(const Mat &desc)
 Mat MapPoint::getDescriptor() const
 {
   return descriptor;
+}
+
+bool MapPoint::isBad() const
+{
+  return bad;
+}
+
+void MapPoint::flagBad()
+{
+  bad = true;
 }

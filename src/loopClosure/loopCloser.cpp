@@ -13,7 +13,9 @@ void LoopCloser::loop()
         auto frame = map->getLoopClosingKeyframe();
         if (frame == NULL)
             continue;
-    }
+
+        auto kpAll = map->getMapPointsAll();
+        }
 }
 
 void LoopCloser::setShouldQuit()

@@ -25,6 +25,7 @@ int main(int argc, char **argv)
             // depth.convertTo(depthImage, CV_8UC4);
             viewer.setColourImage(image);
             // viewer.setDepthImage(depthImage);
+            fullsystem.setMappingEnable(viewer.mappingEnabled());
 
             if (!viewer.paused())
                 fullsystem.processFrame(image, depthFloat);
@@ -32,10 +33,7 @@ int main(int argc, char **argv)
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
 
-            viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
-            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
-
-            if (!viewer.paused())
+            if (!viewer.paused() && viewer.mappingEnabled())
             {
                 float *vbuffer;
                 float *nbuffer;
@@ -44,6 +42,8 @@ int main(int argc, char **argv)
                 size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
                 viewer.setMeshSizeToRender(size);
                 viewer.setActivePoints(fullsystem.getMapPointPosAll());
+                viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+                viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             }
         }
 

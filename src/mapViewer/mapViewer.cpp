@@ -56,11 +56,10 @@ void MapViewer::setupDisplay()
     displayColourBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Image", true, true);
     displayDepthBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Depth", true, true);
     displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.View Model", true, true);
-    enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Current Camera", false, true);
+    enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Enable Mapping", true, true);
     displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Trajectory", true, true);
-    displayActivePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Active Points", true, true);
-    displayStablePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Stable Points", true, true);
-    displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Key Frame Frustum", true, true);
+    displayPointBox = std::make_shared<pangolin::Var<bool>>("Menu.Diplay Points", true, true);
+    displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Keyframes", true, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -218,7 +217,7 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
-    if (*displayActivePointsBox && modelView)
+    if (*displayPointBox && modelView)
     {
         modelView->Activate(*mainCamera);
         // glPointSize(3.f);
@@ -228,15 +227,15 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
-    if (*displayStablePointsBox && modelView)
-    {
-        modelView->Activate(*mainCamera);
-        // glPointSize(3.f);
-        glColor3f(1.f, 0.f, 0.f);
-        pangolin::glDrawPoints(stablePoints);
-        // glPointSize(1.f);
-        glColor4f(1.f, 1.f, 1.f, 1.f);
-    }
+    // if (*displayStablePointsBox && modelView)
+    // {
+    //     modelView->Activate(*mainCamera);
+    //     // glPointSize(3.f);
+    //     glColor3f(1.f, 0.f, 0.f);
+    //     pangolin::glDrawPoints(stablePoints);
+    //     // glPointSize(1.f);
+    //     glColor4f(1.f, 1.f, 1.f, 1.f);
+    // }
 
     if (*displayKFHistoryBox && modelView)
     {
@@ -274,6 +273,11 @@ bool MapViewer::isResetRequested()
 bool MapViewer::paused() const
 {
     return *pauseSystemBox;
+}
+
+bool MapViewer::mappingEnabled() const
+{
+    return *enableMappingBox;
 }
 
 void MapViewer::drawLocalMap()

@@ -51,9 +51,11 @@ class FullSystem
     SystemState state;
     SystemState lastState;
 
+    bool mappingEnabled;
+    size_t numProcessedFrames;
+
 public:
     ~FullSystem();
-    FullSystem(const char *configFile);
     FullSystem(
         int w, int h,
         Mat33d K,
@@ -67,5 +69,6 @@ public:
     std::vector<Vec3f> getMapPointPosAll();
 
     void setMapViewerPtr(MapViewer *viewer);
+    void setMappingEnable(const bool enable);
     size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 };

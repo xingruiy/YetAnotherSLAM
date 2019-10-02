@@ -9,6 +9,7 @@ class Frame;
 class MapPoint
 {
     size_t id;
+    bool bad;
     Vec3d position;
     Mat descriptor;
     std::shared_ptr<Frame> hostKF;
@@ -35,5 +36,6 @@ public:
     void addObservation(std::shared_ptr<Frame> kf, const Vec3d &obs);
     std::unordered_map<std::shared_ptr<Frame>, Vec3d> getObservations() const;
 
-    bool visited;
+    bool isBad() const;
+    void flagBad();
 };

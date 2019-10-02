@@ -28,8 +28,7 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> enableMappingBox;
     std::shared_ptr<pangolin::Var<bool>> displayKFHistoryBox;
     std::shared_ptr<pangolin::Var<bool>> displayFrameHistoryBox;
-    std::shared_ptr<pangolin::Var<bool>> displayActivePointsBox;
-    std::shared_ptr<pangolin::Var<bool>> displayStablePointsBox;
+    std::shared_ptr<pangolin::Var<bool>> displayPointBox;
 
     GLuint vaoPhong;
     GLuint vaoColour;
@@ -81,6 +80,7 @@ public:
 
     bool isResetRequested();
     bool paused() const;
+    bool mappingEnabled() const;
 
     void setColourImage(Mat image);
     void setDepthImage(Mat image);
