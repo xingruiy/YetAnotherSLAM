@@ -26,7 +26,10 @@ class Map
 
 public:
     Map();
+
     void clear();
+    void writeToDisk(const char *fileName);
+    void readFromDisk(const char *fileName);
     void addKeyFrame(std::shared_ptr<Frame> kf);
     Mat getPointDescriptorsAll() const;
     std::shared_ptr<Frame> getCurrentKeyframe() const;

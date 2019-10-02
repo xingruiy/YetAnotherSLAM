@@ -27,7 +27,7 @@ class FullSystem
     bool trackCurrentFrame();
     void fuseCurrentFrame();
     void raytraceCurrentFrame();
-    bool tryRelocalizeCurrentFrame(bool updatePoints);
+    bool tryRelocalizeCurrentFrame();
 
     std::thread loopThread;
     std::thread localOptThread;
@@ -66,15 +66,25 @@ public:
         Mat33d K,
         int numLvl,
         bool enableViewer = true);
+
+    // allow viewing the map
+    void setMapViewerPtr(MapViewer *viewer);
+
+    // toggle mapping
+    void setMappingEnable(const bool enable);
+
+    // trigger relocalization
+    // TODO: this is currently in infinite mode
+    void setSystemStateToLost();
+
+    // reset the system to its initial state
     void resetSystem();
+
+    // main process function
     void processFrame(Mat rawImage, Mat rawDepth);
 
     std::vector<SE3> getFramePoseHistory();
     std::vector<SE3> getKeyFramePoseHistory();
     std::vector<Vec3f> getMapPointPosAll();
-
-    void setMapViewerPtr(MapViewer *viewer);
-    void setMappingEnable(const bool enable);
-    void setSystemStateToLost();
     size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 };

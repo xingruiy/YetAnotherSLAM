@@ -238,16 +238,6 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
-    // if (*displayStablePointsBox && modelView)
-    // {
-    //     modelView->Activate(*mainCamera);
-    //     // glPointSize(3.f);
-    //     glColor3f(1.f, 0.f, 0.f);
-    //     pangolin::glDrawPoints(stablePoints);
-    //     // glPointSize(1.f);
-    //     glColor4f(1.f, 1.f, 1.f, 1.f);
-    // }
-
     if (*displayKFHistoryBox && modelView)
     {
         modelView->Activate(*mainCamera);

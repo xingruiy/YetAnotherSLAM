@@ -107,7 +107,7 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         printf("tracking loast, attempt to resuming...\n");
         while (numAttempted <= maxNumRelocAttempt)
         {
-            if (tryRelocalizeCurrentFrame(numAttempted > 0))
+            if (tryRelocalizeCurrentFrame())
             {
                 if (viewerEnabled && viewer)
                     viewer->setCurrentState(0);
@@ -149,7 +149,7 @@ void FullSystem::raytraceCurrentFrame()
     coarseTracker->setReferenceInvDepth(bufferVec4wxh);
 }
 
-bool FullSystem::tryRelocalizeCurrentFrame(bool updatePoints)
+bool FullSystem::tryRelocalizeCurrentFrame()
 {
     auto matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
     currentFrame->detectKeyPoints(matcher);

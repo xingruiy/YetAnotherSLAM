@@ -1,4 +1,5 @@
 #include "utils/map.h"
+#include <fstream>
 
 Map::Map()
 {
@@ -150,9 +151,7 @@ std::vector<Vec3f> Map::getMapPointVec3All()
     std::unique_lock<std::mutex> lock(mapMutex);
 
     for (auto pt : mapPointsAll)
-    {
         pts.push_back(pt->getPosWorld().cast<float>());
-    }
 
     return pts;
 }
@@ -173,4 +172,24 @@ void Map::addFramePose(const SE3 &T, std::shared_ptr<Frame> kf)
 {
     std::unique_lock<std::mutex> lock(histMutex);
     framePoseOptimized.push_back(std::make_pair(T, kf));
+}
+
+void Map::writeToDisk(const char *fileName)
+{
+    std::ofstream file(fileName);
+    if (file.is_open())
+    {
+    }
+
+    file.close();
+}
+
+void Map::readFromDisk(const char *fileName)
+{
+    std::ifstream file(fileName);
+    if (file.is_open())
+    {
+    }
+
+    file.close();
 }

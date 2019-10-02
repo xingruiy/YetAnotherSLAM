@@ -25,6 +25,7 @@ PRIVATE
     src/localMapper/meshScene.cu
     src/localMapper/raytracing.cu
     src/loopClosure/loopCloser.cpp
+    src/localizer/localizer.cpp
 )
 
 target_compile_features(athena
