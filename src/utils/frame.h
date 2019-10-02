@@ -3,8 +3,10 @@
 #include <memory>
 #include "utils/mapPoint.h"
 #include "utils/numType.h"
+#include "optimizer/featureMatcher.h"
 
 class MapPoint;
+class FeatureMatcher;
 
 class Frame
 {
@@ -26,13 +28,29 @@ class Frame
     size_t kfId;
     static size_t nextKFId;
 
+    int imgWidth;
+    int imgHeight;
+    Mat33d camIntrinsics;
+    size_t numPointsCreated;
+    size_t numPointsDetectd;
+    std::shared_ptr<Frame> referenceKF;
+
 public:
     Frame();
-    Frame(Mat rawImage, Mat rawDepth, Mat rawIntensity);
+    Frame(int w,
+          int h,
+          Mat33d &K,
+          Mat colourImage,
+          Mat depthImage,
+          Mat intensityImage);
 
-    Mat getDepth();
-    Mat getImage();
-    Mat getIntensity();
+    int getImageWidth() const;
+    int getImageHeight() const;
+    Mat33d getIntrinsics() const;
+
+    Mat getDepth() const;
+    Mat getImage() const;
+    Mat getIntensity() const;
 
     void flagKeyFrame();
     bool isKeyframe() const;
@@ -41,25 +59,26 @@ public:
     SE3 getTrackingResult() const;
     SE3 getPoseInGlobalMap() const;
     SE3 getPoseInLocalMap() const;
-    void setTrackingResult(const SE3 &T);
-    void setRawKeyframePose(const SE3 &T);
-    void setOptimizationResult(const SE3 &T);
+
     void setReferenceKF(std::shared_ptr<Frame> kf);
     std::shared_ptr<Frame> getReferenceKF() const;
 
-    std::shared_ptr<Frame> referenceKF;
+    bool hasMapPoint() const;
+    std::shared_ptr<MapPoint> createMapPoint(size_t idx);
+    void setMapPoint(std::shared_ptr<MapPoint> pt, size_t idx);
+    void eraseMapPoint(size_t idx);
+    void detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher);
+    const std::vector<std::shared_ptr<MapPoint>> &getMapPoints() const;
 
-    bool inLocalOptimizer;
-    int kfIdLocalRoot;
     double *getParameterBlock();
+    void setTrackingResult(const SE3 &T);
+    void setRawKeyframePose(const SE3 &T);
+    void setOptimizationResult(const SE3 &T);
 
-    // std::vector<Vec9f> pointDesc;
+    // TODO : refactory this
     Mat pointDesc;
+    int kfIdLocalRoot;
     std::vector<float> depthVec;
     std::vector<cv::KeyPoint> cvKeyPoints;
     std::vector<std::shared_ptr<MapPoint>> mapPoints;
-
-    void updateCovisibility();
-    std::vector<std::shared_ptr<Frame>> getCovisibleKeyFrames(size_t th);
-    std::vector<std::shared_ptr<Frame>> covisibleKFs;
 };

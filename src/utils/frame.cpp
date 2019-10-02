@@ -6,25 +6,51 @@ Frame::Frame()
 {
 }
 
-Frame::Frame(Mat rawImage, Mat rawDepth, Mat rawIntensity)
-    : kfId(0), keyframeFlag(false), inLocalOptimizer(false)
+Frame::Frame(int w,
+             int h,
+             Mat33d &K,
+             Mat colourImage,
+             Mat depthImage,
+             Mat intensityImage)
+    : kfId(0),
+      numPointsDetectd(0),
+      numPointsCreated(0),
+      imgWidth(w),
+      imgHeight(h),
+      keyframeFlag(false),
+      camIntrinsics(K)
 {
-    rawImage.copyTo(this->rawImage);
-    rawDepth.copyTo(this->rawDepth);
-    rawIntensity.copyTo(this->rawIntensity);
+    colourImage.copyTo(rawImage);
+    depthImage.copyTo(rawDepth);
+    intensityImage.copyTo(rawIntensity);
 }
 
-Mat Frame::getDepth()
+int Frame::getImageWidth() const
+{
+    return imgWidth;
+}
+
+int Frame::getImageHeight() const
+{
+    return imgHeight;
+}
+
+Mat33d Frame::getIntrinsics() const
+{
+    return camIntrinsics;
+}
+
+Mat Frame::getDepth() const
 {
     return rawDepth;
 }
 
-Mat Frame::getImage()
+Mat Frame::getImage() const
 {
     return rawImage;
 }
 
-Mat Frame::getIntensity()
+Mat Frame::getIntensity() const
 {
     return rawIntensity;
 }
@@ -33,8 +59,6 @@ void Frame::flagKeyFrame()
 {
     keyframeFlag = true;
     kfId = nextKFId++;
-    // referenceKF = NULL;
-    // relativePose = SE3();
 }
 
 bool Frame::isKeyframe() const
@@ -74,16 +98,6 @@ SE3 Frame::getPoseInLocalMap() const
     }
 }
 
-void Frame::setReferenceKF(std::shared_ptr<Frame> kf)
-{
-    referenceKF = kf;
-}
-
-std::shared_ptr<Frame> Frame::getReferenceKF() const
-{
-    return referenceKF;
-}
-
 void Frame::setTrackingResult(const SE3 &T)
 {
     relativePose = T;
@@ -101,36 +115,64 @@ void Frame::setRawKeyframePose(const SE3 &T)
     rawKeyframePose = T;
 }
 
+void Frame::setReferenceKF(std::shared_ptr<Frame> kf)
+{
+    referenceKF = kf;
+}
+
+std::shared_ptr<Frame> Frame::getReferenceKF() const
+{
+    return referenceKF;
+}
+
 double *Frame::getParameterBlock()
 {
     return optimizedPose.data();
 }
 
-void Frame::updateCovisibility()
+bool Frame::hasMapPoint() const
 {
-    const size_t nTh = 15;
-    covisibleKFs.clear();
-    std::map<std::shared_ptr<Frame>, size_t> neighbours;
-    for (auto pt : mapPoints)
-    {
-        if (!pt)
-            continue;
+    numPointsCreated != 0;
+}
 
-        for (auto obs : pt->getObservations())
-        {
-            if (obs.first.get() != this)
-                neighbours[obs.first]++;
-        }
-    }
+void Frame::setMapPoint(std::shared_ptr<MapPoint> pt, size_t idx)
+{
+    mapPoints[idx] = pt;
+    numPointsCreated++;
+}
 
-    for (auto pair : neighbours)
+void Frame::eraseMapPoint(size_t idx)
+{
+    mapPoints[idx] = NULL;
+}
+
+const std::vector<std::shared_ptr<MapPoint>> &Frame::getMapPoints() const
+{
+    return mapPoints;
+}
+
+void Frame::detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher)
+{
+    if (numPointsDetectd == 0)
     {
-        if (pair.second >= nTh)
-            covisibleKFs.push_back(pair.first);
+        matcher->detect(rawImage, rawDepth, cvKeyPoints, pointDesc, depthVec);
+        numPointsDetectd = cvKeyPoints.size();
+        mapPoints.resize(numPointsDetectd);
     }
 }
 
-std::vector<std::shared_ptr<Frame>> Frame::getCovisibleKeyFrames(size_t th)
+std::shared_ptr<MapPoint> Frame::createMapPoint(size_t idx)
 {
-    return std::vector<std::shared_ptr<Frame>>(covisibleKFs.begin(), covisibleKFs.end());
+    const auto z = depthVec[idx];
+    if (z > FLT_EPSILON)
+    {
+        auto pt = std::make_shared<MapPoint>();
+        const auto &kp = cvKeyPoints[idx].pt;
+        const auto &desc = pointDesc.row(idx);
+        pt->setDescriptor(desc);
+        pt->setPosWorld(optimizedPose * (camIntrinsics.inverse() * Vec3d(kp.x, kp.y, 1.0) * z));
+        return pt;
+    }
+
+    return NULL;
 }

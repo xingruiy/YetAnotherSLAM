@@ -4,6 +4,7 @@
 LoopCloser::LoopCloser(const Mat33d &K, std::shared_ptr<Map> map)
     : shouldQuit(false), map(map), K(K)
 {
+    matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
 }
 
 void LoopCloser::loop()
@@ -15,7 +16,7 @@ void LoopCloser::loop()
             continue;
 
         auto kpAll = map->getMapPointsAll();
-        }
+    }
 }
 
 void LoopCloser::setShouldQuit()
@@ -41,7 +42,7 @@ void LoopCloser::optimize(
             SE3::num_parameters,
             new LocalParameterizationSE3());
 
-        if (i == 0)
+        if (kfs[i]->getId())
             problem.SetParameterBlockConstant(kfs[i]->getParameterBlock());
     }
 

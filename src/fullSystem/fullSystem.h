@@ -47,10 +47,15 @@ class FullSystem
 
     GMat bufferFloatwxh;
     GMat bufferVec4wxh;
+    Mat cbufferFloatwxh;
+    Mat cbufferFloatVec3wxh;
 
     SystemState state;
     SystemState lastState;
 
+    int imageWidth;
+    int imageHeight;
+    Mat33d camIntrinsics;
     bool mappingEnabled;
     size_t numProcessedFrames;
 
@@ -70,5 +75,6 @@ public:
 
     void setMapViewerPtr(MapViewer *viewer);
     void setMappingEnable(const bool enable);
+    void setSystemStateToLost();
     size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 };

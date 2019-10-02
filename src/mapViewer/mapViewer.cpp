@@ -60,6 +60,7 @@ void MapViewer::setupDisplay()
     displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Trajectory", true, true);
     displayPointBox = std::make_shared<pangolin::Var<bool>>("Menu.Diplay Points", true, true);
     displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Keyframes", true, true);
+    localizationMode = std::make_shared<pangolin::Var<bool>>("Menu.Localization Mode", false, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -227,6 +228,16 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
+    if (*localizationMode && modelView)
+    {
+        modelView->Activate(*mainCamera);
+        glColor3f(1.f, 0.f, 0.f);
+        glPointSize(3.f);
+        pangolin::glDrawPoints(matchedPoints);
+        glPointSize(1.f);
+        glColor4f(1.f, 1.f, 1.f, 1.f);
+    }
+
     // if (*displayStablePointsBox && modelView)
     // {
     //     modelView->Activate(*mainCamera);
@@ -257,6 +268,11 @@ void MapViewer::checkButtonsAndBoxes()
 {
     if (pangolin::Pushed(*resetBtn))
         requestSystemReset = true;
+
+    if (*localizationMode)
+    {
+        *enableMappingBox = false;
+    }
 }
 
 bool MapViewer::isResetRequested()
@@ -273,6 +289,11 @@ bool MapViewer::isResetRequested()
 bool MapViewer::paused() const
 {
     return *pauseSystemBox;
+}
+
+bool MapViewer::isLocalizationMode() const
+{
+    return *localizationMode;
 }
 
 bool MapViewer::mappingEnabled() const
@@ -327,6 +348,11 @@ void MapViewer::setActivePoints(const std::vector<Vec3f> &points)
 void MapViewer::setStablePoints(const std::vector<Vec3f> &points)
 {
     stablePoints = points;
+}
+
+void MapViewer::setMatchedPoints(const std::vector<Vec3f> &points)
+{
+    matchedPoints = points;
 }
 
 void MapViewer::setCurrentState(int state)

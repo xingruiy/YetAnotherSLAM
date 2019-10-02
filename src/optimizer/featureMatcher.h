@@ -5,6 +5,9 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/xfeatures2d.hpp>
 
+class Frame;
+class MapPoint;
+
 enum class PointType
 {
     FAST,

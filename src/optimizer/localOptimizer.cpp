@@ -49,12 +49,7 @@ void LocalOptimizer::loop()
             frame->setOptimizationResult(T);
         }
 
-        matcher->detect(
-            image, depth,
-            frame->cvKeyPoints,
-            frame->pointDesc,
-            frame->depthVec);
-
+        frame->detectKeyPoints(matcher);
         int numDetectedPoints = frame->cvKeyPoints.size();
 
         Mat displayImage;
@@ -69,88 +64,75 @@ void LocalOptimizer::loop()
         frame->mapPoints.resize(numDetectedPoints);
         size_t numMatchedPoints = 0;
 
-        if (!pauseMapping)
+        std::set<std::shared_ptr<MapPoint>> mapPointTemp;
+        auto localKFs = map->getLastNKeyframes(5);
+        for (auto kf : localKFs)
         {
-
-            std::set<std::shared_ptr<MapPoint>> mapPointTemp;
-            auto localKFs = map->getLastNKeyframes(5);
-            for (auto kf : localKFs)
-            {
-                for (auto pt : kf->mapPoints)
-                    if (pt && !pt->isBad())
-                        mapPointTemp.insert(pt);
-            }
-
-            auto mapPointAll = std::vector<std::shared_ptr<MapPoint>>(
-                mapPointTemp.begin(), mapPointTemp.end());
-
-            std::vector<cv::DMatch> matches;
-            matcher->matchByProjection2NN(mapPointAll, frame, K, matches, NULL);
-
-            for (auto match : matches)
-            {
-                auto &pt = mapPointAll[match.queryIdx];
-                auto &framePt3d = frame->mapPoints[match.trainIdx];
-                auto &framePt = frame->cvKeyPoints[match.trainIdx];
-                auto z = frame->depthVec[match.trainIdx];
-
-                if (!pt || pt == framePt3d)
-                    continue;
-
-                if (!framePt3d)
-                {
-                    pt->addObservation(frame, Vec3d(framePt.pt.x, framePt.pt.y, z));
-                }
-                else if ((framePt3d->getPosWorld() - pt->getPosWorld()).norm() < 0.05)
-                {
-                    pt->fusePoint(framePt3d);
-                }
-
-                frame->mapPoints[match.trainIdx] = pt;
-                numMatchedPoints++;
-            }
-
-            auto framePose = frame->getPoseInGlobalMap();
-            size_t numCreatedPoints = 0;
-            for (int i = 0; i < numDetectedPoints; ++i)
-            {
-                if ((numMatchedPoints + numCreatedPoints) > 400)
-                    break;
-
-                if (frame->mapPoints[i] != NULL)
-                {
-                    cv::drawMarker(displayImage, frame->cvKeyPoints[i].pt, cv::Scalar(0, 0, 255), cv::MARKER_SQUARE);
-                    continue;
-                }
-                else
-                    cv::drawMarker(displayImage, frame->cvKeyPoints[i].pt, cv::Scalar(0, 255, 0), cv::MARKER_CROSS);
-
-                const auto &kp = frame->cvKeyPoints[i];
-                const auto &desc = frame->pointDesc.row(i);
-                const auto &z = frame->depthVec[i];
-
-                if (z > FLT_EPSILON)
-                {
-                    auto pt3d = std::make_shared<MapPoint>();
-
-                    pt3d->setHost(frame);
-                    pt3d->setPosWorld(framePose * (K.inverse() * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z));
-                    pt3d->setDescriptor(desc);
-                    pt3d->addObservation(frame, Vec3d(kp.pt.x, kp.pt.y, z));
-                    frame->mapPoints[i] = pt3d;
-                    if (!pauseMapping)
-                        map->addMapPoint(pt3d);
-                    numCreatedPoints++;
-                }
-            }
-
-            cv::imshow("features", displayImage);
-            cv::waitKey(1);
-
-            map->addKeyFrame(frame);
-            optimize(localKFs, mapPointAll, 50);
+            for (auto pt : kf->mapPoints)
+                if (pt && !pt->isBad())
+                    mapPointTemp.insert(pt);
         }
 
+        auto mapPointAll = std::vector<std::shared_ptr<MapPoint>>(
+            mapPointTemp.begin(), mapPointTemp.end());
+
+        std::vector<cv::DMatch> matches;
+        matcher->matchByProjection2NN(mapPointAll, frame, K, matches, NULL);
+
+        for (auto match : matches)
+        {
+            auto &pt = mapPointAll[match.queryIdx];
+            auto &framePt3d = frame->mapPoints[match.trainIdx];
+            auto &framePt = frame->cvKeyPoints[match.trainIdx];
+            auto z = frame->depthVec[match.trainIdx];
+
+            if (!pt || pt == framePt3d)
+                continue;
+
+            if (!framePt3d)
+            {
+                pt->addObservation(frame, Vec3d(framePt.pt.x, framePt.pt.y, z));
+            }
+            else if ((framePt3d->getPosWorld() - pt->getPosWorld()).norm() < 0.05)
+            {
+                pt->fusePoint(framePt3d);
+            }
+
+            // frame->mapPoints[match.trainIdx] = pt;
+            frame->setMapPoint(pt, match.trainIdx);
+            numMatchedPoints++;
+        }
+
+        auto framePose = frame->getPoseInGlobalMap();
+        size_t numCreatedPoints = 0;
+        for (int i = 0; i < numDetectedPoints; ++i)
+        {
+            if ((numMatchedPoints + numCreatedPoints) > 400)
+                break;
+
+            // if (frame->mapPoints[i] != NULL)
+            // {
+            //     cv::drawMarker(displayImage, frame->cvKeyPoints[i].pt, cv::Scalar(0, 0, 255), cv::MARKER_SQUARE);
+            //     continue;
+            // }
+            // else
+            //     cv::drawMarker(displayImage, frame->cvKeyPoints[i].pt, cv::Scalar(0, 255, 0), cv::MARKER_CROSS);
+
+            auto pt = frame->createMapPoint(i);
+            if (pt)
+            {
+                pt->setHost(frame);
+                frame->setMapPoint(pt, i);
+                map->addMapPoint(pt);
+                numCreatedPoints++;
+            }
+        }
+
+        // cv::imshow("features", displayImage);
+        // cv::waitKey(1);
+
+        map->addKeyFrame(frame);
+        // optimize(localKFs, mapPointAll, 50);
         map->addLoopClosingKeyframe(frame);
     }
 }

@@ -10,6 +10,9 @@ FullSystem::FullSystem(
       lastState(SystemState::NotInitialized),
       viewerEnabled(enableViewer),
       mappingEnabled(true),
+      imageWidth(w),
+      imageHeight(h),
+      camIntrinsics(K),
       numProcessedFrames(0)
 {
     map = std::make_shared<Map>();
@@ -40,10 +43,16 @@ FullSystem::~FullSystem()
 
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 {
-    Mat rawImageFloat, rawIntensity;
-    rawImage.convertTo(rawImageFloat, CV_32FC3);
-    cv::cvtColor(rawImageFloat, rawIntensity, cv::COLOR_RGB2GRAY);
-    currentFrame = std::make_shared<Frame>(rawImage, rawDepth, rawIntensity);
+    rawImage.convertTo(cbufferFloatVec3wxh, CV_32FC3);
+    cv::cvtColor(cbufferFloatVec3wxh, cbufferFloatwxh, cv::COLOR_RGB2GRAY);
+
+    currentFrame = std::make_shared<Frame>(
+        imageWidth,
+        imageHeight,
+        camIntrinsics,
+        rawImage,
+        rawDepth,
+        cbufferFloatwxh);
 
     switch (state)
     {
@@ -112,7 +121,7 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 
     lastState = state;
     if (state == SystemState::OK)
-        numProcessedFrames += 1;
+        numProcessedFrames++;
 }
 
 bool FullSystem::trackCurrentFrame()
@@ -142,6 +151,35 @@ void FullSystem::raytraceCurrentFrame()
 
 bool FullSystem::tryRelocalizeCurrentFrame(bool updatePoints)
 {
+    auto matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
+    currentFrame->detectKeyPoints(matcher);
+    Mat descAll;
+    const auto desc = map->getPointDescriptorsAll();
+    std::vector<std::vector<cv::DMatch>> rawMatches;
+    std::vector<cv::DMatch> matches;
+    cv::Ptr<cv::DescriptorMatcher> matcher2 = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+    matcher2->knnMatch(currentFrame->pointDesc, desc, rawMatches, 2);
+
+    for (auto knn : rawMatches)
+    {
+        if (knn[0].distance / knn[1].distance < 0.8)
+            matches.push_back(knn[0]);
+    }
+
+    const auto &pts = map->getMapPointsAll();
+
+    std::vector<Vec3f> matchedPoints;
+    for (auto m : matches)
+    {
+        if (pts[m.trainIdx] && !pts[m.trainIdx]->isBad())
+            matchedPoints.push_back(pts[m.trainIdx]->getPosWorld().cast<float>());
+    }
+
+    if (viewerEnabled && viewer)
+        viewer->setMatchedPoints(matchedPoints);
+
+    std::cout << matchedPoints.size() << std::endl;
+
     return true;
 }
 
@@ -222,4 +260,9 @@ void FullSystem::setMapViewerPtr(MapViewer *viewer)
 void FullSystem::setMappingEnable(const bool enable)
 {
     mappingEnabled = enable;
+}
+
+void FullSystem::setSystemStateToLost()
+{
+    state = SystemState::Lost;
 }

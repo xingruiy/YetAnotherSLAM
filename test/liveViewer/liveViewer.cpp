@@ -27,6 +27,9 @@ int main(int argc, char **argv)
             // viewer.setDepthImage(depthImage);
             fullsystem.setMappingEnable(viewer.mappingEnabled());
 
+            if (viewer.isLocalizationMode())
+                fullsystem.setSystemStateToLost();
+
             if (!viewer.paused())
                 fullsystem.processFrame(image, depthFloat);
 
