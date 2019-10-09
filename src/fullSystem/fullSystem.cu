@@ -187,11 +187,11 @@ bool FullSystem::needNewKF()
 {
     auto dt = currentFrame->getTrackingResult();
     Vec3d t = dt.translation();
-    if (t.norm() >= 0.1)
+    if (t.norm() >= 0.3)
         return true;
 
     Vec3d r = dt.log().tail<3>();
-    if (r.norm() >= 0.1)
+    if (r.norm() >= 0.3)
         return true;
 
     return false;
@@ -208,7 +208,7 @@ void FullSystem::createNewKF()
     if (mappingEnabled)
     {
         map->addUnprocessedKeyframe(currentKeyframe);
-        map->setCurrentKeyframe(currentKeyframe);
+        // map->setCurrentKeyframe(currentKeyframe);
         map->addKeyframePoseRaw(lastTrackedPose);
         map->addFramePose(SE3(), currentKeyframe);
     }

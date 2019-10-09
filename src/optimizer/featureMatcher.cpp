@@ -1,6 +1,6 @@
 #include "featureMatcher.h"
 
-#define MatchWindowDist 5
+#define MatchWindowDist 3
 // #define MatchMinScore 4
 #define MatchMinScore 32
 
@@ -162,6 +162,9 @@ void FeatureMatcher::matchByProjection(
                     {
                         // const auto score = computePatchScoreL2Norm(ptgetDescriptor(), descriptors[i]);
                         const auto score = computeMatchingScore(pt->getDescriptor(), descriptors.row(i));
+
+                        if (score > 32)
+                            continue;
 
                         if (score < bestPairScore)
                         {
@@ -405,10 +408,10 @@ void FeatureMatcher::extractDepth(
         const float &y = kp.pt.y;
         float z = 0.f;
 
-        if (x > 1 && y > 1 && x < depth.cols - 2 && y < depth.rows - 2)
+        if (x > 0 && y > 0 && x < depth.cols && y < depth.rows)
         {
             // TODO: depth interpolation seems to cause trouble, solution: edge aware interpolation?
-            z = depth.ptr<float>(static_cast<int>(y + 0.5f))[static_cast<int>(x + 0.5f)];
+            z = depth.ptr<float>(static_cast<int>(round(y)))[static_cast<int>(round(x))];
             if (std::isfinite(z) && z > FLT_EPSILON)
                 z = z;
             else

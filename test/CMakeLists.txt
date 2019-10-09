@@ -32,3 +32,31 @@ target_link_libraries(tumViewer
 PRIVATE
     athena
 )
+
+# unit test
+
+add_executable(unitTest)
+
+target_sources(unitTest 
+PRIVATE
+    unitTest/testSophusCeresInteraction.cpp
+)
+
+target_link_libraries(unitTest
+PRIVATE
+    athena
+)
+
+# draw cam
+
+add_executable(drawCam)
+
+target_sources(drawCam 
+PRIVATE
+    unitTest/simpleDrawingPangolin.cpp
+)
+
+target_link_libraries(drawCam
+PRIVATE
+    athena
+)

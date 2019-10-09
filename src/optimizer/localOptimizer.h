@@ -16,6 +16,9 @@ class LocalOptimizer
         std::vector<std::shared_ptr<MapPoint>> pts,
         const int maxIter);
 
+    void optimize(std::shared_ptr<Frame> kf);
+    void optimizePoints(std::shared_ptr<Frame> kf);
+
     Mat33d K;
     bool shouldQuit;
 
