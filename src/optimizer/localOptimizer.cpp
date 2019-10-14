@@ -49,8 +49,9 @@ void LocalOptimizer::optimize(std::shared_ptr<Frame> kf)
     std::set<std::shared_ptr<Frame>> fixedKFs;
     for (auto pt : kf->mapPoints)
     {
-        if (pt && pt->getNumObservations() > 1)
+        if (pt && !pt->isBad() && pt->isMature())
         {
+            std::unique_lock<std::mutex> lock(pt->lock);
             for (auto obs : pt->getObservations())
             {
                 if (obs.first != kf && fixedKFs.find(obs.first) == fixedKFs.end())
@@ -70,8 +71,9 @@ void LocalOptimizer::optimize(std::shared_ptr<Frame> kf)
     size_t numResidualBlocks = 0;
     for (auto pt : kf->mapPoints)
     {
-        if (pt && pt->getNumObservations() > 1)
+        if (pt && !pt->isBad() && pt->isMature())
         {
+            std::unique_lock<std::mutex> lock(pt->lock);
             for (auto obs : pt->getObservations())
             {
                 problem.AddResidualBlock(
@@ -87,8 +89,8 @@ void LocalOptimizer::optimize(std::shared_ptr<Frame> kf)
             problem.SetParameterBlockConstant(pt->getParameterBlock());
         }
     }
-    // std::cout << numResidualBlocks << std::endl;
 
+    std::cout << numResidualBlocks << std::endl;
     ceres::Solver::Options options;
     ceres::Solver::Summary summary;
     options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -157,6 +159,7 @@ void LocalOptimizer::optimizePoints(std::shared_ptr<Frame> kf)
     {
         if (pt && pt->getNumObservations() > 1)
         {
+            std::unique_lock<std::mutex> lock(pt->lock);
             for (auto obs : pt->getObservations())
             {
                 if (obs.first != kf && fixedKFs.find(obs.first) == fixedKFs.end())
@@ -178,6 +181,7 @@ void LocalOptimizer::optimizePoints(std::shared_ptr<Frame> kf)
     {
         if (pt && pt->getNumObservations() > 1)
         {
+            std::unique_lock<std::mutex> lock(pt->lock);
             for (auto obs : pt->getObservations())
             {
                 problem.AddResidualBlock(
@@ -270,16 +274,23 @@ void LocalOptimizer::loop()
             std::vector<bool> matchesFound(numDetectedPoints);
             std::fill(matchesFound.begin(), matchesFound.end(), false);
             matcher->matchByProjection2NN(kf, frame, K, matches, NULL);
-            Mat outImg;
-            cv::drawMatches(kf->getImage(), kf->cvKeyPoints, frame->getImage(), frame->cvKeyPoints, matches, outImg);
-            cv::imshow("img", outImg);
-            cv::waitKey(1);
+            // Mat outImg;
+            // cv::drawMatches(kf->getImage(), kf->cvKeyPoints, frame->getImage(), frame->cvKeyPoints, matches, outImg);
+            // cv::imshow("img", outImg);
+            // cv::waitKey(1);
         }
 
         for (auto match : matches)
         {
-            frame->mapPoints[match.trainIdx] = kf->mapPoints[match.queryIdx];
-            frame->mapPoints[match.trainIdx]->addObservation(frame, Vec3d(frame->cvKeyPoints[match.trainIdx].pt.x, frame->cvKeyPoints[match.trainIdx].pt.y, frame->depthVec[match.trainIdx]));
+            auto &pt = frame->mapPoints[match.trainIdx];
+            pt = kf->mapPoints[match.queryIdx];
+            pt->addObservation(
+                frame,
+                Vec3d(frame->cvKeyPoints[match.trainIdx].pt.x,
+                      frame->cvKeyPoints[match.trainIdx].pt.y,
+                      frame->depthVec[match.trainIdx]));
+            if (pt->checkParallaxAngle())
+                pt->setMature();
         }
 
         optimize(frame);
@@ -287,8 +298,8 @@ void LocalOptimizer::loop()
 
         for (int i = 0; i < numDetectedPoints; ++i)
         {
-            // if (frame->mapPoints[i] != NULL)
-            //     continue;
+            if (frame->mapPoints[i] != NULL)
+                continue;
 
             const auto &z = frame->depthVec[i];
             if (z > FLT_EPSILON)
@@ -310,6 +321,8 @@ void LocalOptimizer::loop()
         map->setCurrentKeyframe(frame);
         map->addLoopClosingKeyframe(frame);
     }
+
+    std::cout << "local optimizer finished." << std::endl;
 }
 
 // void LocalOptimizer::loop()
@@ -451,7 +464,7 @@ void LocalOptimizer::optimize(
     std::set<std::shared_ptr<Frame>> fixedKFs;
     for (auto pt : pts)
     {
-        if (!pt || pt->isBad() || pt->getNumObservations() < 2)
+        if (!pt || pt->isBad() || !pt->isMature())
             continue;
 
         for (auto obs : pt->getObservations())
@@ -480,7 +493,7 @@ void LocalOptimizer::optimize(
     size_t numResidualBlocks = 0;
     for (auto pt : pts)
     {
-        if (!pt || pt->isBad() || pt->getNumObservations() < 2)
+        if (!pt || pt->isBad() || !pt->isMature())
             continue;
 
         for (auto obs : pt->getObservations())

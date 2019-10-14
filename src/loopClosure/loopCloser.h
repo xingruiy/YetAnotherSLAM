@@ -3,6 +3,7 @@
 #include <memory>
 #include <ceres/ceres.h>
 #include "utils/map.h"
+#include "localizer/localizer.h"
 #include "optimizer/featureMatcher.h"
 
 class LoopCloser

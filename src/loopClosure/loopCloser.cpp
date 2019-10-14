@@ -1,3 +1,4 @@
+#include <mutex>
 #include "loopCloser.h"
 #include "optimizer/costFunctors.h"
 
@@ -15,8 +16,39 @@ void LoopCloser::loop()
         if (frame == NULL)
             continue;
 
-        auto kpAll = map->getMapPointsAll();
+        std::cout << "working on frame : " << frame->getId() << std::endl;
+
+        frame->detectKeyPoints(matcher);
+        const auto &desc = map->getPointDescriptorsAll();
+        std::vector<std::vector<cv::DMatch>> rawMatches;
+        std::vector<cv::DMatch> matches;
+        cv::Ptr<cv::DescriptorMatcher> matcher2 = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+        matcher2->knnMatch(frame->pointDesc, desc, rawMatches, 2);
+
+        for (auto knn : rawMatches)
+        {
+            if (knn[0].distance / knn[1].distance < 0.8)
+                matches.push_back(knn[0]);
+        }
+
+        const auto &pts = map->getMapPointsAll();
+
+        std::vector<std::shared_ptr<MapPoint>> matchedPoints;
+        for (auto m : matches)
+        {
+            auto &pt = pts[m.trainIdx];
+            if (pt && !pt->isBad() && pt->isMature())
+            {
+                std::unique_lock<std::mutex> lock(pt->lock);
+                auto &framePt = frame->mapPoints[m.queryIdx];
+
+                pt->fusePoint(framePt);
+                framePt = pt;
+            }
+        }
     }
+
+    std::cout << "loop closer finished." << std::endl;
 }
 
 void LoopCloser::setShouldQuit()

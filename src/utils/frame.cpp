@@ -98,6 +98,12 @@ SE3 Frame::getPoseInLocalMap() const
     }
 }
 
+Vec3d Frame::getPositionWorld() const
+{
+    SE3 T = getPoseInGlobalMap();
+    return T.translation();
+}
+
 void Frame::setTrackingResult(const SE3 &T)
 {
     relativePose = T;

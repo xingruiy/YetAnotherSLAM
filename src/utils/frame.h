@@ -59,6 +59,7 @@ public:
     SE3 getTrackingResult() const;
     SE3 getPoseInGlobalMap() const;
     SE3 getPoseInLocalMap() const;
+    Vec3d getPositionWorld() const;
 
     void setReferenceKF(std::shared_ptr<Frame> kf);
     std::shared_ptr<Frame> getReferenceKF() const;
@@ -78,6 +79,7 @@ public:
     // TODO : refactory this
     Mat pointDesc;
     int kfIdLocalRoot;
+    std::mutex keyframeLock;
     std::vector<float> depthVec;
     std::vector<cv::KeyPoint> cvKeyPoints;
     std::vector<std::shared_ptr<MapPoint>> mapPoints;

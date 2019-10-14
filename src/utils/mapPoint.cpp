@@ -1,14 +1,23 @@
 #include "mapPoint.h"
+#include <cmath>
 
 size_t MapPoint::nextId = 0;
 
 MapPoint::MapPoint()
-    : id(nextId++), bad(false)
+    : id(nextId++), bad(false), mature(false)
 {
 }
 
-MapPoint::MapPoint(std::shared_ptr<Frame> hostKF, const Vec3d &posWorld, Mat desc)
-    : id(nextId++), hostKF(hostKF), position(posWorld), descriptor(desc)
+MapPoint::MapPoint(
+    std::shared_ptr<Frame> hostKF,
+    const Vec3d &posWorld,
+    Mat desc)
+    : id(nextId++),
+      hostKF(hostKF),
+      position(posWorld),
+      descriptor(desc),
+      bad(false),
+      mature(false)
 {
 }
 
@@ -41,6 +50,8 @@ std::unordered_map<std::shared_ptr<Frame>, Vec3d> MapPoint::getObservations() co
 
 void MapPoint::fusePoint(std::shared_ptr<MapPoint> &other)
 {
+  if (other)
+    std::unique_lock<std::mutex> lock(other->lock);
   auto obs = other->getObservations();
   observations.insert(obs.begin(), obs.end());
   position = (position + other->position) / 2.0;
@@ -91,4 +102,36 @@ bool MapPoint::isBad() const
 void MapPoint::flagBad()
 {
   bad = true;
+}
+
+bool MapPoint::isMature() const
+{
+  return mature && observations.size() > 1;
+}
+
+void MapPoint::setMature()
+{
+  mature = true;
+}
+
+bool MapPoint::checkParallaxAngle() const
+{
+  if (isMature())
+    return false;
+
+  auto hostPos = hostKF->getPositionWorld();
+  Vec3d hostDir = hostPos - getPosWorld();
+  for (auto obs : observations)
+  {
+    auto &kf = obs.first;
+    if (kf == hostKF)
+      continue;
+
+    auto pos = kf->getPositionWorld();
+    Vec3d dir = pos - getPosWorld();
+    double cosa = hostDir.dot(dir) / (hostDir.norm() * dir.norm());
+    double angle = std::acos(cosa);
+    if (angle > 0.2)
+      return true;
+  }
 }

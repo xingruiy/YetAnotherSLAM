@@ -33,12 +33,13 @@ FullSystem::FullSystem(
 
 FullSystem::~FullSystem()
 {
-    std::cout << "wating other threads to finish..." << std::endl;
     loopCloser->setShouldQuit();
     localOptimizer->setShouldQuit();
+    printf("wating other threads to finish...\n");
+
     loopThread.join();
     localOptThread.join();
-    std::cout << "all threads finished!" << std::endl;
+    printf("all threads finished!\n");
 }
 
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
@@ -221,7 +222,6 @@ void FullSystem::createNewKF()
 
 void FullSystem::resetSystem()
 {
-
     map->clear();
     viewer->resetViewer();
     localMapper->reset();
