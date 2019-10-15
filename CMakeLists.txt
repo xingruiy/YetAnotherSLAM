@@ -24,7 +24,6 @@ PRIVATE
     src/localMapper/depthFusion.cu
     src/localMapper/meshScene.cu
     src/localMapper/raytracing.cu
-    src/loopClosure/loopCloser.cpp
     src/localizer/localizer.cpp
 )
 

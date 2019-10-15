@@ -4,7 +4,6 @@
 #include <iostream>
 #include "utils/map.h"
 #include "utils/numType.h"
-#include "loopClosure/loopCloser.h"
 #include "localMapper/localMapper.h"
 #include "optimizer/localOptimizer.h"
 #include "denseTracker/denseTracker.h"
@@ -34,7 +33,6 @@ class FullSystem
     MapViewer *viewer;
 
     std::shared_ptr<Map> map;
-    std::shared_ptr<LoopCloser> loopCloser;
     std::shared_ptr<DenseMapping> localMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
     std::shared_ptr<LocalOptimizer> localOptimizer;

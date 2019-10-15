@@ -68,7 +68,7 @@ public:
         std::vector<bool> *matchesFound = NULL);
 
     void matchByProjection2NN(
-        const std::vector<std::shared_ptr<MapPoint>> mapPoints,
+        const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
         const std::shared_ptr<Frame> frame,
         const Mat33d &K,
         std::vector<cv::DMatch> &matches,

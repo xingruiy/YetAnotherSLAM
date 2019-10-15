@@ -66,7 +66,10 @@ size_t MapPoint::getNumObservations() const
 
 Vec3d MapPoint::getPosWorld() const
 {
-  return position;
+  if (isMature())
+    return position;
+  else
+    return hostKF->getPoseInGlobalMap() * position;
 }
 
 std::shared_ptr<Frame> MapPoint::getHost() const
@@ -112,6 +115,7 @@ bool MapPoint::isMature() const
 void MapPoint::setMature()
 {
   mature = true;
+  position = hostKF->getPoseInGlobalMap() * position;
 }
 
 bool MapPoint::checkParallaxAngle() const
@@ -131,7 +135,7 @@ bool MapPoint::checkParallaxAngle() const
     Vec3d dir = pos - getPosWorld();
     double cosa = hostDir.dot(dir) / (hostDir.norm() * dir.norm());
     double angle = std::acos(cosa);
-    if (angle > 0.2)
+    if (angle > 0.3)
       return true;
   }
 }

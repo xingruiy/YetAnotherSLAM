@@ -189,7 +189,7 @@ void FeatureMatcher::matchByProjection(
 }
 
 void FeatureMatcher::matchByProjection2NN(
-    const std::vector<std::shared_ptr<MapPoint>> mapPoints,
+    const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
     const std::shared_ptr<Frame> frame,
     const Mat33d &K,
     std::vector<cv::DMatch> &matches,
@@ -283,7 +283,6 @@ void FeatureMatcher::matchByProjection2NN(
         m.queryIdx = iter - mapPoints.begin();
         if (pt && (pt->getHost() == kf))
         {
-            Vec2d bestObs(-1, -1);
             int bestPointIdx = -1;
             int secondBestIdx = -1;
             float bestPairScore = std::numeric_limits<float>::max();
@@ -317,7 +316,6 @@ void FeatureMatcher::matchByProjection2NN(
                         if (score < bestPairScore)
                         {
                             bestPointIdx = i;
-                            bestObs = Vec2d(x, y);
                             bestPairScore = score;
                         }
                         else if (score < secondBestPairScore)

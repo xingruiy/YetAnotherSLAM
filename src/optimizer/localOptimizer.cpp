@@ -1,5 +1,18 @@
 #include "optimizer/localOptimizer.h"
 #include "optimizer/costFunctors.h"
+#include <numeric>
+#include <iostream>
+#include <algorithm>
+
+template <class T>
+std::vector<size_t> sortIndex(const std::vector<T> &v)
+{
+    std::vector<size_t> idx(v.size());
+    std::iota(idx.begin(), idx.end(), 0);
+    std::sort(idx.begin(), idx.end(), [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
+
+    return idx;
+}
 
 LocalOptimizer::LocalOptimizer(
     Mat33d &K,
@@ -60,7 +73,10 @@ void LocalOptimizer::optimize(std::shared_ptr<Frame> kf)
         }
     }
 
-    std::cout << fixedKFs.size() << std::endl;
+    if (fixedKFs.size() == 0)
+        return;
+
+    // std::cout << fixedKFs.size() << std::endl;
 
     for (auto frame : fixedKFs)
     {
@@ -90,7 +106,7 @@ void LocalOptimizer::optimize(std::shared_ptr<Frame> kf)
         }
     }
 
-    std::cout << numResidualBlocks << std::endl;
+    // std::cout << numResidualBlocks << std::endl;
     ceres::Solver::Options options;
     ceres::Solver::Summary summary;
     options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -145,14 +161,14 @@ void LocalOptimizer::optimizePoints(std::shared_ptr<Frame> kf)
     problem.AddParameterBlock(&KBlock[0], 4);
     problem.SetParameterBlockConstant(&KBlock[0]);
 
-    std::vector<Vec3d> before;
-    for (auto pt : kf->mapPoints)
-    {
-        if (pt)
-            before.push_back(pt->getPosWorld());
-        else
-            before.push_back(Vec3d());
-    }
+    // std::vector<Vec3d> before;
+    // for (auto pt : kf->mapPoints)
+    // {
+    //     if (pt)
+    //         before.push_back(pt->getPosWorld());
+    //     else
+    //         before.push_back(Vec3d());
+    // }
 
     std::set<std::shared_ptr<Frame>> fixedKFs;
     for (auto pt : kf->mapPoints)
@@ -167,8 +183,6 @@ void LocalOptimizer::optimizePoints(std::shared_ptr<Frame> kf)
             }
         }
     }
-
-    std::cout << fixedKFs.size() << std::endl;
 
     for (auto frame : fixedKFs)
     {
@@ -201,43 +215,6 @@ void LocalOptimizer::optimizePoints(std::shared_ptr<Frame> kf)
     options.linear_solver_type = ceres::DENSE_SCHUR;
     Solve(options, &problem, &summary);
     std::cout << summary.BriefReport() << std::endl;
-
-    // for (int i = 0; i < kf->mapPoints.size(); ++i)
-    // {
-    //     auto pt = kf->mapPoints[i];
-    //     if (!pt)
-    //         continue;
-    //     auto b = before[i];
-    //     auto c = pt->getPosWorld();
-    //     auto diff = (b - c).norm();
-    //     if (diff > 0.4)
-    //     {
-    //         std::cout << "pt before : " << b << std::endl;
-    //         std::cout << "pt after : " << c << std::endl;
-
-    //         auto obs = pt->getObservations();
-    //         std::cout << "Num obs: " << obs.size() << std::endl;
-    //         for (auto ob : obs)
-    //         {
-    //             auto &kf = ob.first;
-    //             auto &d = ob.second;
-    //             std::cout << kf->getPoseInGlobalMap().matrix3x4() << std::endl;
-    //             std::cout << d << std::endl;
-    //             Vec2d val = d.head<2>();
-
-    //             auto e = kf->getPoseInGlobalMap().inverse() * b;
-    //             Vec2d proj = {KBlock[0] * e(0) / e(2) + KBlock[2], KBlock[1] * e(1) / e(2) + KBlock[3]};
-
-    //             std::cout << "before : " << (proj - val).norm() << std::endl;
-    //             std::cout << proj << std::endl;
-
-    //             e = kf->getPoseInGlobalMap().inverse() * pt->getPosWorld();
-    //             proj = {KBlock[0] * e(0) / e(2) + KBlock[2], KBlock[1] * e(1) / e(2) + KBlock[3]};
-    //             std::cout << "after: " << (proj - val).norm() << std::endl;
-    //             std::cout << proj << std::endl;
-    //         }
-    //     }
-    // }
 }
 
 void LocalOptimizer::loop()
@@ -266,46 +243,62 @@ void LocalOptimizer::loop()
             return;
         }
 
-        std::vector<cv::DMatch> matches;
-
-        auto kf = map->getCurrentKeyframe();
-        if (kf != NULL)
+        size_t activePoints = 0;
+        auto lastKF = map->getCurrentKeyframe();
+        if (lastKF != NULL)
         {
-            std::vector<bool> matchesFound(numDetectedPoints);
-            std::fill(matchesFound.begin(), matchesFound.end(), false);
-            matcher->matchByProjection2NN(kf, frame, K, matches, NULL);
+            std::vector<cv::DMatch> matches;
+            matcher->matchByProjection2NN(lastKF, frame, K, matches, NULL);
+
+            for (auto m : matches)
+            {
+                auto &pt = lastKF->mapPoints[m.queryIdx];
+                auto &framePt = frame->mapPoints[m.trainIdx];
+                auto &kp = frame->cvKeyPoints[m.trainIdx];
+                auto &z = frame->depthVec[m.trainIdx];
+
+                if (!framePt)
+                {
+                    framePt = pt;
+                    pt->addObservation(frame, Vec3d(kp.pt.x, kp.pt.y, z));
+                    if (pt->checkParallaxAngle())
+                        pt->setMature();
+
+                    activePoints++;
+                }
+            }
+
             // Mat outImg;
-            // cv::drawMatches(kf->getImage(), kf->cvKeyPoints, frame->getImage(), frame->cvKeyPoints, matches, outImg);
+            // cv::drawMatches(
+            //     lastKF->getImage(),
+            //     lastKF->cvKeyPoints,
+            //     frame->getImage(),
+            //     frame->cvKeyPoints,
+            //     matches,
+            //     outImg);
             // cv::imshow("img", outImg);
             // cv::waitKey(1);
+
+            // std::cout << "num of successful matches: " << activePoints << std::endl;
+
+            optimize(frame);
+            optimizePoints(frame);
         }
+        // optimizePoints(frame);
 
-        for (auto match : matches)
+        auto index = sortIndex(frame->depthVec);
+        for (int k = 0; k < numDetectedPoints; k += 1)
         {
-            auto &pt = frame->mapPoints[match.trainIdx];
-            pt = kf->mapPoints[match.queryIdx];
-            pt->addObservation(
-                frame,
-                Vec3d(frame->cvKeyPoints[match.trainIdx].pt.x,
-                      frame->cvKeyPoints[match.trainIdx].pt.y,
-                      frame->depthVec[match.trainIdx]));
-            if (pt->checkParallaxAngle())
-                pt->setMature();
-        }
-
-        optimize(frame);
-        optimizePoints(frame);
-
-        for (int i = 0; i < numDetectedPoints; ++i)
-        {
-            if (frame->mapPoints[i] != NULL)
+            auto i = index[k];
+            auto &framePt = frame->mapPoints[i];
+            if (framePt)
                 continue;
 
             const auto &z = frame->depthVec[i];
             if (z > FLT_EPSILON)
             {
                 const auto &kp = frame->cvKeyPoints[i];
-                Vec3d pos = frame->getPoseInGlobalMap() * (K.inverse() * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z);
+                Vec3d pos = K.inverse() * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z;
 
                 auto pt = std::make_shared<MapPoint>();
                 pt->setHost(frame);
@@ -315,14 +308,16 @@ void LocalOptimizer::loop()
                 frame->mapPoints[i] = pt;
                 map->addMapPoint(pt);
             }
+
+            activePoints++;
+
+            // if (activePoints >= 400)
+            //     break;
         }
 
         map->addKeyFrame(frame);
         map->setCurrentKeyframe(frame);
-        map->addLoopClosingKeyframe(frame);
     }
-
-    std::cout << "local optimizer finished." << std::endl;
 }
 
 // void LocalOptimizer::loop()
@@ -330,12 +325,9 @@ void LocalOptimizer::loop()
 //     while (!shouldQuit)
 //     {
 //         auto frame = map->getUnprocessedKeyframe();
+
 //         if (frame == NULL)
 //             continue;
-
-//         Mat image = frame->getImage();
-//         Mat depth = frame->getDepth();
-//         Mat intensity = frame->getIntensity();
 
 //         auto refKF = frame->getReferenceKF();
 //         if (refKF)
@@ -348,97 +340,75 @@ void LocalOptimizer::loop()
 
 //         frame->detectKeyPoints(matcher);
 //         int numDetectedPoints = frame->cvKeyPoints.size();
-
-//         Mat displayImage;
-//         image.copyTo(displayImage);
-
 //         if (numDetectedPoints == 0)
 //         {
 //             printf("Error: no features detected! keyframe not accepted.\n");
 //             return;
 //         }
 
-//         frame->mapPoints.resize(numDetectedPoints);
-//         size_t numMatchedPoints = 0;
-
-//         std::set<std::shared_ptr<MapPoint>> mapPointTemp;
-//         auto localKFs = map->getLastNKeyframes(1);
-//         for (auto kf : localKFs)
+//         std::vector<cv::DMatch> matches;
+//         auto kf = map->getCurrentKeyframe();
+//         if (kf != NULL)
 //         {
-//             for (auto pt : kf->mapPoints)
-//                 if (pt && !pt->isBad())
-//                     mapPointTemp.insert(pt);
+//             std::vector<bool> matchesFound(numDetectedPoints);
+//             std::fill(matchesFound.begin(), matchesFound.end(), false);
+//             matcher->matchByProjection2NN(kf, frame, K, matches, NULL);
+//             // Mat outImg;
+//             // cv::drawMatches(kf->getImage(), kf->cvKeyPoints, frame->getImage(), frame->cvKeyPoints, matches, outImg);
+//             // cv::imshow("img", outImg);
+//             // cv::waitKey(1);
 //         }
 
-//         auto mapPointAll = std::vector<std::shared_ptr<MapPoint>>(
-//             mapPointTemp.begin(), mapPointTemp.end());
-
-//         std::vector<cv::DMatch> matches;
-//         matcher->matchByProjection2NN(mapPointAll, frame, K, matches, NULL);
-
+//         size_t activePoints = 0;
 //         for (auto match : matches)
 //         {
-//             auto &pt = mapPointAll[match.queryIdx];
-//             auto &framePt3d = frame->mapPoints[match.trainIdx];
-//             auto &framePt = frame->cvKeyPoints[match.trainIdx];
-//             auto z = frame->depthVec[match.trainIdx];
+//             auto &pt = frame->mapPoints[match.trainIdx];
+//             pt = kf->mapPoints[match.queryIdx];
+//             activePoints++;
 
-//             if (!pt || pt == framePt3d)
-//                 continue;
-
-//             if (!framePt3d)
-//             {
-//                 pt->addObservation(frame, Vec3d(framePt.pt.x, framePt.pt.y, z));
-//             }
-//             // else if ((framePt3d->getPosWorld() - pt->getPosWorld()).norm() < 0.05)
-//             // {
-//             // pt->fusePoint(framePt3d);
-//             // }
-//             else
-//             {
-//                 continue;
-//             }
-
-//             // frame->mapPoints[match.trainIdx] = pt;
-//             frame->setMapPoint(pt, match.trainIdx);
-//             numMatchedPoints++;
+//             pt->addObservation(
+//                 frame,
+//                 Vec3d(frame->cvKeyPoints[match.trainIdx].pt.x,
+//                       frame->cvKeyPoints[match.trainIdx].pt.y,
+//                       frame->depthVec[match.trainIdx]));
+//             if (pt->checkParallaxAngle())
+//                 pt->setMature();
 //         }
 
-//         // cv::imshow("features", displayImage);
-//         // cv::waitKey(1);
+//         optimize(frame);
+//         optimizePoints(frame);
 
-//         localKFs.push_back(frame);
-//         optimize(localKFs, mapPointAll, 50);
-
-//         auto framePose = frame->getPoseInGlobalMap();
-//         size_t numCreatedPoints = 0;
-//         for (int i = 0; i < numDetectedPoints; ++i)
+//         auto index = sortIndex(frame->depthVec);
+//         for (int k = 0; k < numDetectedPoints; ++k)
 //         {
-//             // if ((numMatchedPoints + numCreatedPoints) > 400)
-//             //     break;
-
+//             auto i = index[k];
 //             if (frame->mapPoints[i] != NULL)
 //                 continue;
-//             // {
-//             //     cv::drawMarker(displayImage, frame->cvKeyPoints[i].pt, cv::Scalar(0, 0, 255), cv::MARKER_SQUARE);
-//             //     continue;
-//             // }
-//             // else
-//             //     cv::drawMarker(displayImage, frame->cvKeyPoints[i].pt, cv::Scalar(0, 255, 0), cv::MARKER_CROSS);
 
-//             auto pt = frame->createMapPoint(i);
-//             if (pt)
+//             const auto &z = frame->depthVec[i];
+//             if (z > FLT_EPSILON)
 //             {
+//                 const auto &kp = frame->cvKeyPoints[i];
+//                 Vec3d pos = frame->getPoseInGlobalMap() * (K.inverse() * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z);
+
+//                 auto pt = std::make_shared<MapPoint>();
 //                 pt->setHost(frame);
-//                 frame->setMapPoint(pt, i);
-//                 pt->addObservation(frame, Vec3d(frame->cvKeyPoints[i].pt.x, frame->cvKeyPoints[i].pt.y, frame->depthVec[i]));
+//                 pt->setPosWorld(pos);
+//                 pt->setDescriptor(frame->pointDesc.row(i));
+//                 pt->addObservation(frame, Vec3d(kp.pt.x, kp.pt.y, z));
+//                 frame->mapPoints[i] = pt;
 //                 map->addMapPoint(pt);
-//                 numCreatedPoints++;
 //             }
+
+//             activePoints++;
+
+//             if (activePoints >= 400)
+//                 break;
 //         }
 
+//         std::cout << "active pts: " << activePoints << std::endl;
 //         map->addKeyFrame(frame);
-//         map->addLoopClosingKeyframe(frame);
+//         map->setCurrentKeyframe(frame);
 //     }
 // }
 

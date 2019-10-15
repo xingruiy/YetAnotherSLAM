@@ -243,11 +243,11 @@ void MapViewer::renderView()
         modelView->Activate(*mainCamera);
         glColor3f(1.f, 0.f, 0.f);
         for (auto T : rawKeyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.01f);
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
         glColor3f(0.f, 1.f, 0.f);
         for (auto T : keyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.01f);
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 

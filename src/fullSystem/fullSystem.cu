@@ -18,7 +18,6 @@ FullSystem::FullSystem(
     map = std::make_shared<Map>();
     localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
     localMapper = std::make_shared<DenseMapping>(w, h, K);
-    loopCloser = std::make_shared<LoopCloser>(K, map);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
@@ -27,17 +26,13 @@ FullSystem::FullSystem(
     bufferVec4wxh.create(h, w, CV_32FC4);
     bufferFloatwxh.create(h, w, CV_32FC1);
 
-    loopThread = std::thread(&LoopCloser::loop, loopCloser.get());
     localOptThread = std::thread(&LocalOptimizer::loop, localOptimizer.get());
 }
 
 FullSystem::~FullSystem()
 {
-    loopCloser->setShouldQuit();
     localOptimizer->setShouldQuit();
     printf("wating other threads to finish...\n");
-
-    loopThread.join();
     localOptThread.join();
     printf("all threads finished!\n");
 }
