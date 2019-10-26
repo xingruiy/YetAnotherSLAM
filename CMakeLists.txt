@@ -13,6 +13,7 @@ PRIVATE
     src/utils/map.cpp
     src/utils/frame.cpp
     src/utils/mapPoint.cpp
+    src/utils/mapCUDA.cu
     src/fullSystem/fullSystem.cu
     src/mapViewer/mapViewer.cpp
     src/denseTracker/denseTracker.cu

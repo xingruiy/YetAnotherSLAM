@@ -255,6 +255,14 @@ void FeatureMatcher::matchByProjection2NN(
     }
 }
 
+void FeatureMatcher::matchByProjectionEpipolar(
+    const std::shared_ptr<Frame> kf,
+    const std::shared_ptr<Frame> frame,
+    const Mat33d &K,
+    std::vector<cv::DMatch> &matches)
+{
+}
+
 void FeatureMatcher::matchByProjection2NN(
     const std::shared_ptr<Frame> kf,
     const std::shared_ptr<Frame> frame,

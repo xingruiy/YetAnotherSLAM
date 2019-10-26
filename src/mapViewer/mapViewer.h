@@ -58,6 +58,7 @@ class MapViewer
     std::vector<Mat44f> rawKeyFrameHistory;
     std::vector<Vec3f> frameHistory;
     std::vector<Mat44f> keyFrameHistory;
+    std::vector<Mat44f> relocHypotheses;
 
     bool requestSystemReset;
 
@@ -81,6 +82,7 @@ public:
     void setActivePoints(const std::vector<Vec3f> &points);
     void setStablePoints(const std::vector<Vec3f> &points);
     void setMatchedPoints(const std::vector<Vec3f> &points);
+    void setRelocalizationHypotheses(std::vector<SE3> &H);
 
     bool isResetRequested();
     bool paused() const;

@@ -4,7 +4,7 @@
 size_t MapPoint::nextId = 0;
 
 MapPoint::MapPoint()
-    : id(nextId++), bad(false), mature(false)
+    : id(nextId++), bad(false)
 {
 }
 
@@ -16,8 +16,7 @@ MapPoint::MapPoint(
       hostKF(hostKF),
       position(posWorld),
       descriptor(desc),
-      bad(false),
-      mature(false)
+      bad(false)
 {
 }
 
@@ -66,10 +65,7 @@ size_t MapPoint::getNumObservations() const
 
 Vec3d MapPoint::getPosWorld() const
 {
-  if (isMature())
-    return position;
-  else
-    return hostKF->getPoseInGlobalMap() * position;
+  return position;
 }
 
 std::shared_ptr<Frame> MapPoint::getHost() const
@@ -105,37 +101,4 @@ bool MapPoint::isBad() const
 void MapPoint::flagBad()
 {
   bad = true;
-}
-
-bool MapPoint::isMature() const
-{
-  return mature && observations.size() > 1;
-}
-
-void MapPoint::setMature()
-{
-  mature = true;
-  position = hostKF->getPoseInGlobalMap() * position;
-}
-
-bool MapPoint::checkParallaxAngle() const
-{
-  if (isMature())
-    return false;
-
-  auto hostPos = hostKF->getPositionWorld();
-  Vec3d hostDir = hostPos - getPosWorld();
-  for (auto obs : observations)
-  {
-    auto &kf = obs.first;
-    if (kf == hostKF)
-      continue;
-
-    auto pos = kf->getPositionWorld();
-    Vec3d dir = pos - getPosWorld();
-    double cosa = hostDir.dot(dir) / (hostDir.norm() * dir.norm());
-    double angle = std::acos(cosa);
-    if (angle > 0.3)
-      return true;
-  }
 }

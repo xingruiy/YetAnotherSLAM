@@ -228,7 +228,7 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
-    if (*localizationMode && modelView)
+    if (matchedPoints.size() > 0 && modelView)
     {
         modelView->Activate(*mainCamera);
         glColor3f(1.f, 0.f, 0.f);
@@ -241,13 +241,17 @@ void MapViewer::renderView()
     if (*displayKFHistoryBox && modelView)
     {
         modelView->Activate(*mainCamera);
-        glColor3f(1.f, 0.f, 0.f);
-        for (auto T : rawKeyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+        // glColor3f(1.f, 0.f, 0.f);
+        // for (auto T : rawKeyFrameHistory)
+        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
-        glColor3f(0.f, 1.f, 0.f);
-        for (auto T : keyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+        // glColor3f(0.f, 1.f, 0.f);
+        // for (auto T : keyFrameHistory)
+        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+
+        glColor3f(1.f, 0.f, 0.f);
+        for (auto T : relocHypotheses)
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.1f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
@@ -348,6 +352,15 @@ void MapViewer::setMatchedPoints(const std::vector<Vec3f> &points)
 void MapViewer::setCurrentState(int state)
 {
     systemState = state;
+}
+
+void MapViewer::setRelocalizationHypotheses(std::vector<SE3> &H)
+{
+    relocHypotheses.clear();
+    for (auto h : H)
+    {
+        relocHypotheses.push_back(h.matrix().cast<float>());
+    }
 }
 
 void MapViewer::addTrackingResult(const SE3 &T)

@@ -98,6 +98,11 @@ SE3 Frame::getPoseInLocalMap() const
     }
 }
 
+size_t Frame::getNumPointsDetected() const
+{
+    return numPointsDetectd;
+}
+
 Vec3d Frame::getPositionWorld() const
 {
     SE3 T = getPoseInGlobalMap();

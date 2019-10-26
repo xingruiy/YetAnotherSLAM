@@ -1,4 +1,5 @@
 #include "fullSystem/fullSystem.h"
+#include "localizer/localizer.h"
 #include "denseTracker/cudaImageProc.h"
 
 FullSystem::FullSystem(
@@ -98,21 +99,15 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         break;
     }
     case SystemState::Lost:
-
-        size_t numAttempted = 0;
+    {
         printf("tracking loast, attempt to resuming...\n");
-        while (numAttempted <= maxNumRelocAttempt)
+        if (tryRelocalizeCurrentFrame())
         {
-            if (tryRelocalizeCurrentFrame())
-            {
-                if (viewerEnabled && viewer)
-                    viewer->setCurrentState(0);
-
-                break;
-            }
+            if (viewerEnabled && viewer)
+                viewer->setCurrentState(0);
         }
-
         break;
+    }
     }
 
     lastState = state;
@@ -147,34 +142,62 @@ void FullSystem::raytraceCurrentFrame()
 
 bool FullSystem::tryRelocalizeCurrentFrame()
 {
+    Mat descriptor;
+    std::vector<bool> valid;
+    std::vector<float> keyPointDepth;
+    std::vector<cv::KeyPoint> cvKeyPoint;
     auto matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
-    currentFrame->detectKeyPoints(matcher);
-    Mat descAll;
-    const auto desc = map->getPointDescriptorsAll();
-    std::vector<std::vector<cv::DMatch>> rawMatches;
-    std::vector<cv::DMatch> matches;
-    cv::Ptr<cv::DescriptorMatcher> matcher2 = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
-    matcher2->knnMatch(currentFrame->pointDesc, desc, rawMatches, 2);
+    matcher->detect(
+        currentFrame->getImage(),
+        currentFrame->getDepth(),
+        cvKeyPoint,
+        descriptor,
+        keyPointDepth);
 
-    for (auto knn : rawMatches)
+    auto numFeatures = keyPointDepth.size();
+    std::vector<Vec3d> keyPoint(numFeatures);
+
+    if (numFeatures < 10)
     {
-        if (knn[0].distance / knn[1].distance < 0.8)
-            matches.push_back(knn[0]);
+        printf("too few points detected(%lu), relocalization failed...\n", numFeatures);
+        return false;
     }
 
-    const auto &pts = map->getMapPointsAll();
-
-    std::vector<Vec3f> matchedPoints;
-    for (auto m : matches)
+    valid.resize(numFeatures);
+    std::fill(valid.begin(), valid.end(), true);
+    for (int n = 0; n < numFeatures; ++n)
     {
-        if (pts[m.trainIdx] && !pts[m.trainIdx]->isBad())
-            matchedPoints.push_back(pts[m.trainIdx]->getPosWorld().cast<float>());
+        auto &z = keyPointDepth[n];
+        if (z > FLT_EPSILON)
+        {
+            auto &kp = cvKeyPoint[n].pt;
+            keyPoint[n] = camIntrinsics.inverse() * Vec3d(kp.x, kp.y, 1.0) * z;
+        }
+        else
+        {
+            valid[n] = false;
+        }
+    }
+
+    Localizer relocalizer;
+    std::vector<SE3> hypothesesList;
+    if (!relocalizer.getRelocHypotheses(
+            map,
+            keyPoint,
+            descriptor,
+            valid,
+            hypothesesList,
+            false))
+        return false;
+
+    if (hypothesesList.size() == 0)
+    {
+        printf("too few hypotheses(%lu), relocalization failed...\n", hypothesesList.size());
+        return false;
     }
 
     if (viewerEnabled && viewer)
-        viewer->setMatchedPoints(matchedPoints);
-
-    std::cout << matchedPoints.size() << std::endl;
+        viewer->setRelocalizationHypotheses(hypothesesList);
 
     return true;
 }
@@ -204,7 +227,6 @@ void FullSystem::createNewKF()
     if (mappingEnabled)
     {
         map->addUnprocessedKeyframe(currentKeyframe);
-        // map->setCurrentKeyframe(currentKeyframe);
         map->addKeyframePoseRaw(lastTrackedPose);
         map->addFramePose(SE3(), currentKeyframe);
     }
@@ -220,11 +242,9 @@ void FullSystem::resetSystem()
     map->clear();
     viewer->resetViewer();
     localMapper->reset();
-    localOptimizer->reset();
     lastTrackedPose = SE3(Mat44d::Identity());
     accumulateTransform = SE3(Mat44d::Identity());
     state = SystemState::NotInitialized;
-    lastState = SystemState::NotInitialized;
 }
 
 size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
@@ -250,6 +270,7 @@ std::vector<Vec3f> FullSystem::getMapPointPosAll()
 void FullSystem::setMapViewerPtr(MapViewer *viewer)
 {
     this->viewer = viewer;
+    this->localOptimizer->setViewer(viewer);
 }
 
 void FullSystem::setMappingEnable(const bool enable)

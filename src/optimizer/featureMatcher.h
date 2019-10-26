@@ -74,6 +74,12 @@ public:
         std::vector<cv::DMatch> &matches,
         std::vector<bool> *matchesFound = NULL);
 
+    void matchByProjectionEpipolar(
+        const std::shared_ptr<Frame> kf,
+        const std::shared_ptr<Frame> frame,
+        const Mat33d &K,
+        std::vector<cv::DMatch> &matches);
+
     void matchByDescriptor(
         const std::shared_ptr<Frame> kf,
         const std::shared_ptr<Frame> frame,

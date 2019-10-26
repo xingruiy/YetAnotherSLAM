@@ -60,6 +60,7 @@ public:
     SE3 getPoseInGlobalMap() const;
     SE3 getPoseInLocalMap() const;
     Vec3d getPositionWorld() const;
+    size_t getNumPointsDetected() const;
 
     void setReferenceKF(std::shared_ptr<Frame> kf);
     std::shared_ptr<Frame> getReferenceKF() const;

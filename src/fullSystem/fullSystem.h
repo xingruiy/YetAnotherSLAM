@@ -80,9 +80,9 @@ public:
 
     // main process function
     void processFrame(Mat rawImage, Mat rawDepth);
+    size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 
     std::vector<SE3> getFramePoseHistory();
     std::vector<SE3> getKeyFramePoseHistory();
     std::vector<Vec3f> getMapPointPosAll();
-    size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 };

@@ -11,7 +11,6 @@ class MapPoint
 {
     size_t id;
     bool bad;
-    bool mature;
     Vec3d position;
     Mat descriptor;
     std::shared_ptr<Frame> hostKF;
@@ -40,9 +39,6 @@ public:
 
     bool isBad() const;
     void flagBad();
-    bool isMature() const;
-    void setMature();
-    bool checkParallaxAngle() const;
 
     std::mutex lock;
 };

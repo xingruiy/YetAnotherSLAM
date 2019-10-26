@@ -1,134 +1,176 @@
+#include "utils/mapCUDA.h"
 #include "localizer/localizer.h"
+#include "optimizer/featureMatcher.h"
 
-void Localizer::AbsoluteOrientation(
-    std::vector<Vec3d> &ref,
-    std::vector<Vec3d> &src,
-    SE3 &finalEstimate,
+#define MinimumNumMatches 3
+
+void Localizer::absoluteOrientation(
+    const std::vector<Vec3d> &srcPts,
+    const std::vector<Vec3d> &dstPts,
+    SE3 &estimate)
+{
+    Vec3d srcMean = (srcPts[0] + srcPts[1] + srcPts[2]) / 3.0;
+    Vec3d dstMean = (dstPts[0] + dstPts[1] + dstPts[2]) / 3.0;
+    Mat33d SVDMat = Mat33d::Zero();
+    SVDMat += (srcPts[0] - srcMean) * (dstPts[0] - dstMean).transpose();
+    SVDMat += (srcPts[1] - srcMean) * (dstPts[1] - dstMean).transpose();
+    SVDMat += (srcPts[2] - srcMean) * (dstPts[2] - dstMean).transpose();
+    auto UVMat = SVDMat.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Mat33d MatV = UVMat.matrixV();
+    Mat33d MatU = UVMat.matrixU();
+    Mat33d Rot = Mat33d::Identity();
+    if (MatU.determinant() * MatV.determinant() < 0)
+    {
+        Mat33d I = Mat33d::Identity();
+        I(2, 2) = -1;
+        Rot = MatU * I * MatV.transpose();
+    }
+    else
+        Rot = MatU * MatV.transpose();
+    Vec3d t = dstMean - Rot * srcMean;
+    Mat44d Transform = Mat44d::Identity();
+    Transform.topLeftCorner(3, 3) = Rot;
+    Transform.topRightCorner(3, 1) = t;
+    estimate = SE3(Transform);
+}
+
+void Localizer::absoluteOrientation(
+    const std::vector<Vec3d> &srcPts,
+    const std::vector<Vec3d> &dstPts,
+    const std::vector<bool> &outliers,
+    SE3 &estimate)
+{
+    auto numInliers = 0;
+    Vec3d srcMean = Vec3d::Zero();
+    Vec3d dstMean = Vec3d::Zero();
+    for (int n = 0; n < outliers.size(); ++n)
+    {
+        if (outliers[n])
+            continue;
+
+        numInliers++;
+        srcMean += srcPts[n];
+        dstMean += dstPts[n];
+    }
+
+    srcMean /= numInliers;
+    dstMean /= numInliers;
+
+    Mat33d SVDMat = Mat33d::Zero();
+
+    for (int n = 0; n < outliers.size(); ++n)
+    {
+        if (outliers[n])
+            continue;
+
+        SVDMat += (srcPts[n] - srcMean) * (dstPts[n] - dstMean).transpose();
+    }
+
+    auto UVMat = SVDMat.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Mat33d MatV = UVMat.matrixV();
+    Mat33d MatU = UVMat.matrixU();
+    Mat33d Rot = Mat33d::Identity();
+    if (MatU.determinant() * MatV.determinant() < 0)
+    {
+        Mat33d I = Mat33d::Identity();
+        I(2, 2) = -1;
+        Rot = MatU * I * MatV.transpose();
+    }
+    else
+        Rot = MatU * MatV.transpose();
+    Vec3d t = dstMean - Rot * srcMean;
+    Mat44d Transform = Mat44d::Identity();
+    Transform.topLeftCorner(3, 3) = Rot;
+    Transform.topRightCorner(3, 1) = t;
+    estimate = SE3(Transform);
+}
+
+int Localizer::evaluateOutlier(
+    const std::vector<Vec3d> &srcPts,
+    const std::vector<Vec3d> &dstPts,
+    SE3 &estimate,
+    std::vector<bool> &outliers)
+{
+    Mat33d R = estimate.rotationMatrix();
+    Vec3d t = estimate.translation();
+
+    int nInliers = 0;
+    std::fill(outliers.begin(), outliers.end(), true);
+    const double inlierDistTh = 0.05;
+
+    for (int i = 0; i < srcPts.size(); ++i)
+    {
+        double dist = (dstPts[i] - (R * srcPts[i] + t)).norm();
+        if (dist <= inlierDistTh)
+        {
+            nInliers++;
+            outliers[i] = false;
+        }
+    }
+
+    return nInliers;
+}
+
+void Localizer::runRansacAO(
+    const std::vector<Vec3d> &src,
+    const std::vector<Vec3d> &dst,
+    SE3 &bestEsimate,
     size_t &numInliers,
     const int maxIterations)
 {
-    using std::chrono::duration_cast;
-    using std::chrono::microseconds;
-    using std::chrono::system_clock;
-
-    size_t nPointPairs = ref.size();
+    size_t nPointPairs = src.size();
     if (nPointPairs < 3)
         return;
 
     std::vector<bool> outliers(nPointPairs);
-
-    Mat33d bestRot = Mat33d::Identity();
-    Vec3d bestTrans = Vec3d::Zero();
     size_t bestNumInliers = 0;
+    size_t numIter = 0;
 
-    auto now = system_clock::now();
-    int seed = duration_cast<microseconds>(now.time_since_epoch()).count();
-    srand(seed);
-
-    size_t iter = 0;
-    const float inlierTh = 0.05;
-    size_t nBadSamples = 0;
-    const size_t ransacMaxIterations = 100;
-
-    while (iter < ransacMaxIterations)
+    while (numIter < maxIterations)
     {
-        iter++;
+        numIter++;
 
-        bool badSample = false;
         int samples[3] = {0, 0, 0};
         for (int i = 0; i < 3; ++i)
+        {
             samples[i] = rand() % nPointPairs;
+        }
 
         if (samples[0] == samples[1] ||
             samples[1] == samples[2] ||
             samples[2] == samples[0])
-            badSample = true;
+            continue;
 
         Vec3d srcA(src[samples[0]]);
         Vec3d srcB(src[samples[1]]);
         Vec3d srcC(src[samples[2]]);
 
-        Vec3d refA(ref[samples[0]]);
-        Vec3d refB(ref[samples[1]]);
-        Vec3d refC(ref[samples[2]]);
+        Vec3d refA(dst[samples[0]]);
+        Vec3d refB(dst[samples[1]]);
+        Vec3d refC(dst[samples[2]]);
 
-        float srcD = (srcB - srcA).cross(srcA - srcC).norm();
-        float refD = (refB - refA).cross(refA - refC).norm();
+        float srcD = (srcB - srcA).cross(srcC - srcA).norm();
+        float refD = (refB - refA).cross(refC - refA).norm();
 
-        if (badSample || srcD < FLT_EPSILON || refD < FLT_EPSILON)
-        {
-            nBadSamples++;
-            continue;
-        }
-
-        Vec3d srcMean = (srcA + srcB + srcC) / 3;
-        Vec3d refMean = (refA + refB + refC) / 3;
-
-        srcA -= srcMean;
-        srcB -= srcMean;
-        srcC -= srcMean;
-
-        refA -= refMean;
-        refB -= refMean;
-        refC -= refMean;
-
-        Mat33d Ab = Mat33d::Zero();
-        Ab += srcA * refA.transpose();
-        Ab += srcB * refB.transpose();
-        Ab += srcC * refC.transpose();
-
-        Eigen::JacobiSVD<Mat33d> svd;
-        svd.compute(Ab, Eigen::ComputeFullU | Eigen::ComputeFullV);
-        Mat33d V = svd.matrixV();
-        Mat33d U = svd.matrixU();
-        Mat33d R = (V * U.transpose()).transpose();
-        if (R.determinant() < 0)
+        if (srcD < FLT_EPSILON || refD < FLT_EPSILON)
             continue;
 
-        Vec3d t = srcMean - R * refMean;
+        std::vector<Vec3d> srcPts = {src[samples[0]],
+                                     src[samples[1]],
+                                     src[samples[2]]};
 
-        int nInliers = 0;
-        std::fill(outliers.begin(), outliers.end(), true);
-        for (int i = 0; i < src.size(); ++i)
-        {
-            double dist = (src[i] - (R * ref[i] + t)).norm();
-            if (dist <= inlierTh)
-            {
-                nInliers++;
-                outliers[i] = false;
-            }
-        }
+        std::vector<Vec3d> dstPts = {dst[samples[0]],
+                                     dst[samples[1]],
+                                     dst[samples[2]]};
+
+        SE3 estimate;
+        absoluteOrientation(srcPts, dstPts, estimate);
+        int nInliers = evaluateOutlier(src, dst, estimate, outliers);
 
         if (nInliers > bestNumInliers)
         {
-
-            Ab = Mat33d::Zero();
-            srcMean = Vec3d::Zero();
-            refMean = Vec3d::Zero();
-            for (int i = 0; i < outliers.size(); ++i)
-            {
-                if (!outliers[i])
-                {
-                    srcMean += src[i];
-                    refMean += ref[i];
-                }
-            }
-
-            srcMean /= nInliers;
-            refMean /= nInliers;
-
-            for (int i = 0; i < outliers.size(); ++i)
-                if (!outliers[i])
-                    Ab += src[i] * ref[i].transpose();
-
-            Ab -= nInliers * srcMean * refMean.transpose();
-
-            svd.compute(Ab, Eigen::ComputeFullU | Eigen::ComputeFullV);
-            V = svd.matrixV();
-            U = svd.matrixU();
-            bestRot = (V * U.transpose()).transpose();
-            bestTrans = srcMean - bestRot * refMean;
-            bestNumInliers = nInliers;
+            absoluteOrientation(src, dst, outliers, bestEsimate);
+            bestNumInliers = evaluateOutlier(src, dst, estimate, outliers);
         }
     }
 
@@ -152,4 +194,135 @@ SE3 Localizer::getWorldTransform(
             currentPts.push_back(currPt->getPosWorld());
         }
     }
+}
+
+template <class Derived>
+cv::Vec3f eigenVecToCV(const Eigen::MatrixBase<Derived> &in)
+{
+    cv::Vec3f out;
+    out(0) = in(0);
+    out(1) = in(1);
+    out(2) = in(2);
+    return out;
+}
+
+std::vector<cv::DMatch> Localizer::getMatches2NN(Mat src, Mat dst, bool allowAmbiguity)
+{
+    std::vector<std::vector<cv::DMatch>> rawMatches;
+    std::vector<cv::DMatch> matches;
+
+    auto matcher2 = cv::BFMatcher(cv::NORM_HAMMING);
+    matcher2.knnMatch(src, dst, rawMatches, 2);
+
+    for (auto knn : rawMatches)
+        if (knn[0].distance / knn[1].distance < 0.8)
+            matches.push_back(knn[0]);
+        else if (allowAmbiguity)
+        {
+            matches.push_back(knn[0]);
+            matches.push_back(knn[1]);
+        }
+
+    return matches;
+}
+
+std::vector<SE3> Localizer::getWorldTransform(
+    const std::vector<std::vector<Vec3d>> &src,
+    const std::vector<std::vector<Vec3d>> &dst)
+{
+    std::vector<SE3> result;
+    const auto &numLists = src.size();
+    printf("total of %lu hypotheses need to be computed...\n", numLists);
+
+    for (auto i = 0; i < numLists; ++i)
+    {
+        SE3 estimate;
+        size_t numInliers;
+
+        runRansacAO(
+            src[i],
+            dst[i],
+            estimate,
+            numInliers,
+            200);
+
+        printf("hypothesis %i has an inlier ratio of %lu / %lu...\n", i, numInliers, src[i].size());
+        result.push_back(estimate);
+    }
+
+    return result;
+}
+
+bool Localizer::getRelocHypotheses(
+    const std::shared_ptr<Map> map,
+    const std::vector<Vec3d> &framePts,
+    const Mat framePtDesc,
+    const std::vector<bool> &framePtValid,
+    std::vector<SE3> &estimateList,
+    const bool &useGraphMatching)
+{
+    estimateList.clear();
+    auto &mapPts = map->getMapPointsAll();
+    auto mapPtDesc = map->getPointDescriptorsAll();
+
+    // get a rough match of the map points and frame points
+    auto matches = getMatches2NN(framePtDesc, mapPtDesc, useGraphMatching);
+    auto numPointPairs = matches.size();
+
+    if (numPointPairs < MinimumNumMatches)
+    {
+        printf("Too few points matched(%lu)! abort...\n", numPointPairs);
+        return false;
+    }
+
+    std::vector<std::vector<Vec3d>> src;
+    std::vector<std::vector<Vec3d>> dst;
+
+    if (useGraphMatching)
+    {
+        // refine the match result
+        // Mat srcPointPos(1, numPointPairs, CV_32FC3);
+        // Mat dstPointPos(1, numPointPairs, CV_32FC3);
+        // Mat descriptorDist(1, numPointPairs, CV_32FC3);
+
+        // for (auto i = 0; i < numPointPairs; ++i)
+        // {
+        //     const auto &match = matches[i];
+        //     auto &mapPt = mapPts[match.trainIdx];
+        //     auto &framePt = framePts[match.queryIdx];
+
+        //     descriptorDist.ptr<float>(0)[i] = match.distance;
+        //     srcPointPos.ptr<Vec3f>(0)[i] = mapPt->getPosWorld().cast<float>();
+        //     dstPointPos.ptr<Vec3f>(0)[i] = framePt->getPosWorld().cast<float>();
+        // }
+
+        // auto adjacencyMat = createAdjacencyMat(
+        //     numPointPairs,
+        //     descriptorDist,
+        //     srcPointPos,
+        //     dstPointPos);
+    }
+    else
+    {
+        std::vector<Vec3d> srcTemp, dstTemp;
+        for (const auto &match : matches)
+        {
+            auto &mapPt = mapPts[match.trainIdx];
+            auto &framePt = framePts[match.queryIdx];
+
+            if (!mapPt ||
+                (mapPt && mapPt->isBad()) ||
+                !framePtValid[match.queryIdx])
+                continue;
+
+            srcTemp.push_back(framePt);
+            dstTemp.push_back(mapPt->getPosWorld());
+        }
+
+        src.push_back(srcTemp);
+        dst.push_back(dstTemp);
+    }
+
+    estimateList = getWorldTransform(src, dst);
+    return true;
 }

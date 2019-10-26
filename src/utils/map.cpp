@@ -151,7 +151,7 @@ std::vector<Vec3f> Map::getMapPointVec3All()
     std::unique_lock<std::mutex> lock(mapMutex);
 
     for (auto pt : mapPointsAll)
-        if (pt && !pt->isBad() && pt->isMature())
+        if (pt && !pt->isBad())
             pts.push_back(pt->getPosWorld().cast<float>());
 
     return pts;
