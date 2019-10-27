@@ -187,7 +187,7 @@ bool FullSystem::tryRelocalizeCurrentFrame()
             descriptor,
             valid,
             hypothesesList,
-            false))
+            true))
         return false;
 
     if (hypothesesList.size() == 0)

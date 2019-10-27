@@ -23,10 +23,10 @@ void Localizer::absoluteOrientation(
     {
         Mat33d I = Mat33d::Identity();
         I(2, 2) = -1;
-        Rot = MatU * I * MatV.transpose();
+        Rot = MatV * I * MatU.transpose();
     }
     else
-        Rot = MatU * MatV.transpose();
+        Rot = MatV * MatU.transpose();
     Vec3d t = dstMean - Rot * srcMean;
     Mat44d Transform = Mat44d::Identity();
     Transform.topLeftCorner(3, 3) = Rot;
@@ -74,10 +74,10 @@ void Localizer::absoluteOrientation(
     {
         Mat33d I = Mat33d::Identity();
         I(2, 2) = -1;
-        Rot = MatU * I * MatV.transpose();
+        Rot = MatV * I * MatU.transpose();
     }
     else
-        Rot = MatU * MatV.transpose();
+        Rot = MatV * MatU.transpose();
     Vec3d t = dstMean - Rot * srcMean;
     Mat44d Transform = Mat44d::Identity();
     Transform.topLeftCorner(3, 3) = Rot;
@@ -226,11 +226,12 @@ std::vector<cv::DMatch> Localizer::getMatches2NN(Mat src, Mat dst, bool allowAmb
     return matches;
 }
 
-std::vector<SE3> Localizer::getWorldTransform(
+void Localizer::getWorldTransform(
     const std::vector<std::vector<Vec3d>> &src,
-    const std::vector<std::vector<Vec3d>> &dst)
+    const std::vector<std::vector<Vec3d>> &dst,
+    std::vector<SE3> &result)
 {
-    std::vector<SE3> result;
+    result.clear();
     const auto &numLists = src.size();
     printf("total of %lu hypotheses need to be computed...\n", numLists);
 
@@ -249,8 +250,152 @@ std::vector<SE3> Localizer::getWorldTransform(
         printf("hypothesis %i has an inlier ratio of %lu / %lu...\n", i, numInliers, src[i].size());
         result.push_back(estimate);
     }
+}
 
-    return result;
+Mat Localizer::createAdjacencyMat(
+    const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
+    const std::vector<Vec3d> &framePoints,
+    const std::vector<bool> &framePtValid,
+    const std::vector<cv::DMatch> &matches)
+{
+    auto numPointPairs = matches.size();
+    Mat srcPointPos(1, numPointPairs, CV_32FC3);
+    Mat dstPointPos(1, numPointPairs, CV_32FC3);
+    Mat descriptorDist(1, numPointPairs, CV_32FC3);
+    Mat validPairPt(1, numPointPairs, CV_8UC1);
+
+    for (auto i = 0; i < numPointPairs; ++i)
+    {
+        const auto &match = matches[i];
+        auto &mapPt = mapPoints[match.trainIdx];
+        auto &framePt = framePoints[match.queryIdx];
+
+        if (!mapPt ||
+            mapPt->isBad() ||
+            !framePtValid[match.queryIdx])
+            validPairPt.ptr<uchar>(0)[i] = 0;
+        else
+            validPairPt.ptr<uchar>(0)[i] = 1;
+
+        descriptorDist.ptr<float>(0)[i] = match.distance;
+        srcPointPos.ptr<Vec3f>(0)[i] = mapPt->getPosWorld().cast<float>();
+        dstPointPos.ptr<Vec3f>(0)[i] = framePt.cast<float>();
+    }
+
+    auto adjacencyMat = ::createAdjacencyMat(
+        numPointPairs,
+        descriptorDist,
+        srcPointPos,
+        dstPointPos,
+        validPairPt);
+
+    return adjacencyMat;
+}
+
+void Localizer::selectMatches(
+    const Mat &adjacencyMat,
+    const std::vector<cv::DMatch> &matches,
+    std::vector<std::vector<cv::DMatch>> &subMatches)
+{
+    // filtered out useful key points
+    Mat rank;
+    cv::reduce(adjacencyMat, rank, 0, CV_REDUCE_SUM);
+    Mat rankIndex;
+
+    if (rank.cols == 0)
+    {
+        printf("empty adjacency matrix! abort...\n");
+        return;
+    }
+
+    cv::sortIdx(rank, rankIndex, CV_SORT_DESCENDING);
+    std::vector<std::vector<int>> selectedGraph;
+
+    // selecting multiple hypotheses
+    for (int i = 0; i < 10; ++i)
+    {
+        std::vector<int> mSelectedIdx;
+        int headIdx = 0;
+        int nSelected = 0;
+
+        // for every sub-graph, select as many key pairs as we can
+        // the selection process starts at the ith element
+        for (int j = i; j < rankIndex.cols; ++j)
+        {
+
+            int idx = rankIndex.at<int>(j);
+            // always keep the first pair
+            if (nSelected == 0)
+            {
+                mSelectedIdx.push_back(idx);
+                headIdx = idx;
+                nSelected++;
+                continue;
+            }
+
+            // check confidence score associated with the first pair in the sub-graph
+            // this is essentially the consistency check to make sure every pair in
+            // the graph is consistent with each other;
+            float score = adjacencyMat.at<float>(headIdx, idx);
+            if (score > 0.1)
+            {
+                mSelectedIdx.push_back(idx);
+                nSelected++;
+            }
+
+            if (nSelected >= 200)
+                break;
+        }
+
+        // ao* needs at least 3 points to run
+        // although it should be noticed that
+        // more points generally means better.
+        size_t nRefindMatches = 1;
+        if (nSelected >= 3)
+        {
+            std::vector<int> refined;
+            refined.push_back(mSelectedIdx[0]);
+            for (int k = 1; k < nSelected; ++k)
+            {
+                int a = mSelectedIdx[k];
+                int l = k + 1;
+                for (; l < nSelected; ++l)
+                {
+                    int b = mSelectedIdx[l];
+                    // check if the score is close to 0
+                    // essentially it means multiple points has been matched to the same one
+                    // or vice versa
+                    if (adjacencyMat.at<float>(a, b) < FLT_EPSILON ||
+                        adjacencyMat.at<float>(b, a) < FLT_EPSILON)
+                        if (adjacencyMat.at<float>(headIdx, b) > adjacencyMat.at<float>(headIdx, a))
+                            break;
+                }
+                if (l >= nSelected)
+                {
+                    refined.push_back(a);
+                    nRefindMatches++;
+                }
+            }
+
+            selectedGraph.push_back(refined);
+        }
+    }
+
+    Mat tmp;
+    if (selectedGraph.size() == 0)
+    {
+        printf("not enough graphs found(%lu), abort...\n", selectedGraph.size());
+        return;
+    }
+
+    subMatches.clear();
+    for (auto &graph : selectedGraph)
+    {
+        std::vector<cv::DMatch> temp;
+        for (auto &m : graph)
+            temp.push_back(matches[m]);
+        subMatches.push_back(temp);
+    }
 }
 
 bool Localizer::getRelocHypotheses(
@@ -275,37 +420,27 @@ bool Localizer::getRelocHypotheses(
         return false;
     }
 
-    std::vector<std::vector<Vec3d>> src;
-    std::vector<std::vector<Vec3d>> dst;
+    std::vector<std::vector<cv::DMatch>> subMatches;
 
     if (useGraphMatching)
     {
-        // refine the match result
-        // Mat srcPointPos(1, numPointPairs, CV_32FC3);
-        // Mat dstPointPos(1, numPointPairs, CV_32FC3);
-        // Mat descriptorDist(1, numPointPairs, CV_32FC3);
-
-        // for (auto i = 0; i < numPointPairs; ++i)
-        // {
-        //     const auto &match = matches[i];
-        //     auto &mapPt = mapPts[match.trainIdx];
-        //     auto &framePt = framePts[match.queryIdx];
-
-        //     descriptorDist.ptr<float>(0)[i] = match.distance;
-        //     srcPointPos.ptr<Vec3f>(0)[i] = mapPt->getPosWorld().cast<float>();
-        //     dstPointPos.ptr<Vec3f>(0)[i] = framePt->getPosWorld().cast<float>();
-        // }
-
-        // auto adjacencyMat = createAdjacencyMat(
-        //     numPointPairs,
-        //     descriptorDist,
-        //     srcPointPos,
-        //     dstPointPos);
+        auto adjacentMat = createAdjacencyMat(
+            mapPts,
+            framePts,
+            framePtValid,
+            matches);
+        selectMatches(adjacentMat, matches, subMatches);
     }
     else
+        subMatches.push_back(matches);
+
+    std::vector<std::vector<Vec3d>> src;
+    std::vector<std::vector<Vec3d>> dst;
+
+    for (auto &graph : subMatches)
     {
         std::vector<Vec3d> srcTemp, dstTemp;
-        for (const auto &match : matches)
+        for (const auto &match : graph)
         {
             auto &mapPt = mapPts[match.trainIdx];
             auto &framePt = framePts[match.queryIdx];
@@ -323,6 +458,6 @@ bool Localizer::getRelocHypotheses(
         dst.push_back(dstTemp);
     }
 
-    estimateList = getWorldTransform(src, dst);
+    getWorldTransform(src, dst, estimateList);
     return true;
 }

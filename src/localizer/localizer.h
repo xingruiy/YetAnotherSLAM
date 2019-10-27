@@ -9,9 +9,10 @@ class Localizer
         Mat src, Mat dst,
         bool allowAmbiguity);
 
-    std::vector<SE3> getWorldTransform(
+    void getWorldTransform(
         const std::vector<std::vector<Vec3d>> &src,
-        const std::vector<std::vector<Vec3d>> &dst);
+        const std::vector<std::vector<Vec3d>> &dst,
+        std::vector<SE3> &result);
 
     void runRansacAO(
         const std::vector<Vec3d> &ref,
@@ -36,6 +37,17 @@ class Localizer
         const std::vector<Vec3d> &dstPts,
         SE3 &estimate,
         std::vector<bool> &outliers);
+
+    Mat createAdjacencyMat(
+        const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
+        const std::vector<Vec3d> &framePoints,
+        const std::vector<bool> &framePtValid,
+        const std::vector<cv::DMatch> &matches);
+
+    void selectMatches(
+        const Mat &adjacencyMat,
+        const std::vector<cv::DMatch> &matches,
+        std::vector<std::vector<cv::DMatch>> &subMatches);
 
 public:
     SE3 getRelativeTransform(

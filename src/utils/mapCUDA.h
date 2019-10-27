@@ -7,4 +7,5 @@ Mat createAdjacencyMat(
     size_t numPairs,
     Mat descriptorDist,
     Mat srcPointPos,
-    Mat dstPointPos);
+    Mat dstPointPos,
+    Mat validPairPt);
