@@ -14,7 +14,8 @@ FullSystem::FullSystem(
       imageWidth(w),
       imageHeight(h),
       camIntrinsics(K),
-      numProcessedFrames(0)
+      numProcessedFrames(0),
+      useGraphMatching(false)
 {
     map = std::make_shared<Map>();
     localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
@@ -187,7 +188,7 @@ bool FullSystem::tryRelocalizeCurrentFrame()
             descriptor,
             valid,
             hypothesesList,
-            true))
+            useGraphMatching))
         return false;
 
     if (hypothesesList.size() == 0)
@@ -281,4 +282,9 @@ void FullSystem::setMappingEnable(const bool enable)
 void FullSystem::setSystemStateToLost()
 {
     state = SystemState::Lost;
+}
+
+void FullSystem::setGraphMatching(const bool &flag)
+{
+    useGraphMatching = flag;
 }

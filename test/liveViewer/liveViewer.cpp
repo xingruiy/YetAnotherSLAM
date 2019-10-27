@@ -28,7 +28,10 @@ int main(int argc, char **argv)
             fullsystem.setMappingEnable(viewer.mappingEnabled());
 
             if (viewer.isLocalizationMode())
+            {
                 fullsystem.setSystemStateToLost();
+                fullsystem.setGraphMatching(viewer.isGraphMatchingMode());
+            }
 
             if (!viewer.paused())
                 fullsystem.processFrame(image, depthFloat);

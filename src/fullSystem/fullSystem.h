@@ -55,6 +55,7 @@ class FullSystem
     int imageHeight;
     Mat33d camIntrinsics;
     bool mappingEnabled;
+    bool useGraphMatching;
     size_t numProcessedFrames;
 
 public:
@@ -74,6 +75,7 @@ public:
     // trigger relocalization
     // TODO: this is currently in infinite mode
     void setSystemStateToLost();
+    void setGraphMatching(const bool &flag);
 
     // reset the system to its initial state
     void resetSystem();

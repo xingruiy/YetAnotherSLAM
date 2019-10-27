@@ -61,6 +61,7 @@ void MapViewer::setupDisplay()
     displayPointBox = std::make_shared<pangolin::Var<bool>>("Menu.Diplay Points", true, true);
     displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Keyframes", true, true);
     localizationMode = std::make_shared<pangolin::Var<bool>>("Menu.Localization Mode", false, true);
+    allowMatchingAmbiguity = std::make_shared<pangolin::Var<bool>>("Menu.Graph Matching Mode", false, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -288,6 +289,11 @@ bool MapViewer::paused() const
 bool MapViewer::isLocalizationMode() const
 {
     return *localizationMode;
+}
+
+bool MapViewer::isGraphMatchingMode() const
+{
+    return *allowMatchingAmbiguity;
 }
 
 bool MapViewer::mappingEnabled() const
