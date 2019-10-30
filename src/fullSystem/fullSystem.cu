@@ -26,8 +26,8 @@ FullSystem::FullSystem(
     lastTrackedPose = SE3(Mat44d::Identity());
     accumulateTransform = SE3(Mat44d::Identity());
 
-    bufferVec4wxh.create(h, w, CV_32FC4);
-    bufferFloatwxh.create(h, w, CV_32FC1);
+    gpuBufferVec4FloatWxH.create(h, w, CV_32FC4);
+    gpuBufferFloatWxH.create(h, w, CV_32FC1);
 
     localOptThread = std::thread(&LocalOptimizer::loop, localOptimizer.get());
 }
@@ -40,10 +40,15 @@ FullSystem::~FullSystem()
     printf("all threads finished!\n");
 }
 
+void FullSystem::setCurrentNormal(GMat nmap)
+{
+    nmap.download(cpuBufferVec4FloatWxH);
+}
+
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 {
-    rawImage.convertTo(cbufferFloatVec3wxh, CV_32FC3);
-    cv::cvtColor(cbufferFloatVec3wxh, cbufferFloatwxh, cv::COLOR_RGB2GRAY);
+    rawImage.convertTo(cpuBufferVec3FloatWxH, CV_32FC3);
+    cv::cvtColor(cpuBufferVec3FloatWxH, cpuBufferFloatWxH, cv::COLOR_RGB2GRAY);
 
     currentFrame = std::make_shared<Frame>(
         imageWidth,
@@ -51,7 +56,7 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         camIntrinsics,
         rawImage,
         rawDepth,
-        cbufferFloatwxh);
+        cpuBufferFloatWxH);
 
     switch (state)
     {
@@ -138,10 +143,10 @@ void FullSystem::fuseCurrentFrame()
 
 void FullSystem::raytraceCurrentFrame()
 {
-    localMapper->raytrace(bufferVec4wxh, currentFrame->getPoseInLocalMap());
-    coarseTracker->setReferenceInvDepth(bufferVec4wxh);
-    computeNormal(bufferVec4wxh, bufferVec4wxh2);
-    currentFrame->setNormalMap(Mat(bufferVec4wxh2));
+    localMapper->raytrace(gpuBufferVec4FloatWxH, currentFrame->getPoseInLocalMap());
+    coarseTracker->setReferenceInvDepth(gpuBufferVec4FloatWxH);
+    computeNormal(gpuBufferVec4FloatWxH, gpuBufferVec4FloatWxH2);
+    currentFrame->setNormalMap(Mat(gpuBufferVec4FloatWxH2));
 }
 
 bool FullSystem::tryRelocalizeCurrentFrame()
@@ -155,18 +160,8 @@ bool FullSystem::tryRelocalizeCurrentFrame()
     matcher->detectAndCompute(currentFrame->getImage(), cvKeyPoint, descriptor);
     matcher->computePointDepth(currentFrame->getDepth(), cvKeyPoint, keyPointDepth);
 
-    // if normal is used
     if (shouldCalculateNormal)
-    {
-        GMat vmap, nmap;
-        computeVMap(GMat(currentFrame->getDepth()), vmap, camIntrinsics);
-        computeNormal(vmap, nmap);
-        currentFrame->setNormalMap(Mat(nmap));
-        matcher->computePointNormal(currentFrame->getNormalMap(), cvKeyPoint, keyPointNormal);
-
-        // cv::imshow("namp", currentFrame->getNormalMap());
-        // cv::waitKey(1);
-    }
+        matcher->computePointNormal(cpuBufferVec4FloatWxH, cvKeyPoint, keyPointNormal);
 
     auto numFeatures = keyPointDepth.size();
     std::vector<Vec3d> keyPoint(numFeatures);
@@ -303,7 +298,7 @@ void FullSystem::setGraphMatching(const bool &flag)
     useGraphMatching = flag;
 }
 
-void FullSystem::setGraphMatchingMethod(const bool &flag)
+void FullSystem::setGraphGetNormal(const bool &flag)
 {
     shouldCalculateNormal = flag;
 }

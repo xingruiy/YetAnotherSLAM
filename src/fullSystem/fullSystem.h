@@ -43,11 +43,12 @@ class FullSystem
     SE3 lastTrackedPose;
     SE3 accumulateTransform;
 
-    GMat bufferFloatwxh;
-    GMat bufferVec4wxh;
-    GMat bufferVec4wxh2;
-    Mat cbufferFloatwxh;
-    Mat cbufferFloatVec3wxh;
+    GMat gpuBufferFloatWxH;
+    GMat gpuBufferVec4FloatWxH;
+    GMat gpuBufferVec4FloatWxH2;
+    Mat cpuBufferVec4FloatWxH;
+    Mat cpuBufferFloatWxH;
+    Mat cpuBufferVec3FloatWxH;
 
     SystemState state;
     SystemState lastState;
@@ -70,24 +71,26 @@ public:
 
     // allow viewing the map
     void setMapViewerPtr(MapViewer *viewer);
-
     // toggle mapping
     void setMappingEnable(const bool enable);
-
     // trigger relocalization
-    // TODO: this is currently in infinite mode
+    // TODO: can't resume from lost
     void setSystemStateToLost();
+    // relocalization related parameters
     void setGraphMatching(const bool &flag);
-    void setGraphMatchingMethod(const bool &flag);
-
+    void setGraphGetNormal(const bool &flag);
     // reset the system to its initial state
     void resetSystem();
-
     // main process function
+    void setCurrentNormal(GMat nmap);
     void processFrame(Mat rawImage, Mat rawDepth);
-    size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
 
     std::vector<SE3> getFramePoseHistory();
     std::vector<SE3> getKeyFramePoseHistory();
     std::vector<Vec3f> getMapPointPosAll();
+
+    size_t getMesh(
+        float *vbuffer,
+        float *nbuffer,
+        size_t bufferSize);
 };
