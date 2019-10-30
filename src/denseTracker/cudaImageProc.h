@@ -3,6 +3,7 @@
 #include <cuda_runtime_api.h>
 
 void renderScene(const GMat vmap, const GMat nmap, GMat &image);
+void computeVMap(const GMat depth, GMat &vmap, const Mat33d &K);
 void computeNormal(const GMat vmap, GMat &nmap);
 
 void computeImageGradientCentralDiff(GMat image, GMat &gx, GMat &gy);

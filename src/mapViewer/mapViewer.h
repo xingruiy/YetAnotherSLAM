@@ -28,8 +28,10 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> enableMappingBox;
     std::shared_ptr<pangolin::Var<bool>> displayKFHistoryBox;
     std::shared_ptr<pangolin::Var<bool>> displayFrameHistoryBox;
-    std::shared_ptr<pangolin::Var<bool>> displayActivePointsBox;
-    std::shared_ptr<pangolin::Var<bool>> displayStablePointsBox;
+    std::shared_ptr<pangolin::Var<bool>> displayPointBox;
+    std::shared_ptr<pangolin::Var<bool>> localizationMode;
+    std::shared_ptr<pangolin::Var<bool>> incorporateNormal;
+    std::shared_ptr<pangolin::Var<bool>> allowMatchingAmbiguity;
 
     GLuint vaoPhong;
     GLuint vaoColour;
@@ -53,10 +55,12 @@ class MapViewer
 
     std::vector<Vec3f> activePoints;
     std::vector<Vec3f> stablePoints;
+    std::vector<Vec3f> matchedPoints;
     std::vector<Vec3f> rawFrameHistory;
     std::vector<Mat44f> rawKeyFrameHistory;
     std::vector<Vec3f> frameHistory;
     std::vector<Mat44f> keyFrameHistory;
+    std::vector<Mat44f> relocHypotheses;
 
     bool requestSystemReset;
 
@@ -65,7 +69,8 @@ class MapViewer
 
     int systemState;
     Mat33d K, Kinv;
-    int frameWidth, frameHeight;
+    int frameWidth;
+    int frameHeight;
 
 public:
     MapViewer(int w, int h, int fW, int fH, Mat33d &K);
@@ -78,9 +83,15 @@ public:
     void setKeyFrameHistory(const std::vector<SE3> &history);
     void setActivePoints(const std::vector<Vec3f> &points);
     void setStablePoints(const std::vector<Vec3f> &points);
+    void setMatchedPoints(const std::vector<Vec3f> &points);
+    void setRelocalizationHypotheses(std::vector<SE3> &H);
 
     bool isResetRequested();
     bool paused() const;
+    bool isLocalizationMode() const;
+    bool mappingEnabled() const;
+    bool isGraphMatchingMode() const;
+    bool shouldCalculateNormal() const;
 
     void setColourImage(Mat image);
     void setDepthImage(Mat image);

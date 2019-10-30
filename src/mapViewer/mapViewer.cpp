@@ -56,11 +56,13 @@ void MapViewer::setupDisplay()
     displayColourBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Image", true, true);
     displayDepthBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Depth", true, true);
     displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.View Model", true, true);
-    enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Current Camera", false, true);
+    enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Enable Mapping", true, true);
     displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Trajectory", true, true);
-    displayActivePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Active Points", true, true);
-    displayStablePointsBox = std::make_shared<pangolin::Var<bool>>("Menu.Stable Points", true, true);
-    displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Key Frame Frustum", true, true);
+    displayPointBox = std::make_shared<pangolin::Var<bool>>("Menu.Diplay Points", true, true);
+    displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Keyframes", true, true);
+    localizationMode = std::make_shared<pangolin::Var<bool>>("Menu.Localization Mode", false, true);
+    allowMatchingAmbiguity = std::make_shared<pangolin::Var<bool>>("Menu.Graph Matching Mode", false, true);
+    incorporateNormal = std::make_shared<pangolin::Var<bool>>("Menu.Incorporate Normal", false, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -70,6 +72,15 @@ void MapViewer::setupKeyBindings()
     pangolin::RegisterKeyPressCallback('R', pangolin::SetVarFunctor<bool>("Menu.RESET", true));
     // pause / unpause the system
     pangolin::RegisterKeyPressCallback(ENTER_KEY, pangolin::ToggleVarFunctor("Menu.PAUSE"));
+    // toggle localization mode
+    pangolin::RegisterKeyPressCallback('l', pangolin::ToggleVarFunctor("Menu.Localization Mode"));
+    pangolin::RegisterKeyPressCallback('L', pangolin::ToggleVarFunctor("Menu.Localization Mode"));
+    // toggle graph matching mode
+    pangolin::RegisterKeyPressCallback('g', pangolin::ToggleVarFunctor("Menu.Graph Matching Mode"));
+    pangolin::RegisterKeyPressCallback('G', pangolin::ToggleVarFunctor("Menu.Graph Matching Mode"));
+    // toggle normal
+    pangolin::RegisterKeyPressCallback('n', pangolin::ToggleVarFunctor("Menu.Incorporate Normal"));
+    pangolin::RegisterKeyPressCallback('N', pangolin::ToggleVarFunctor("Menu.Incorporate Normal"));
 }
 
 void MapViewer::initializePrograms()
@@ -218,7 +229,7 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
-    if (*displayActivePointsBox && modelView)
+    if (*displayPointBox && modelView)
     {
         modelView->Activate(*mainCamera);
         // glPointSize(3.f);
@@ -228,26 +239,30 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
-    if (*displayStablePointsBox && modelView)
+    if (matchedPoints.size() > 0 && modelView)
     {
         modelView->Activate(*mainCamera);
-        // glPointSize(3.f);
         glColor3f(1.f, 0.f, 0.f);
-        pangolin::glDrawPoints(stablePoints);
-        // glPointSize(1.f);
+        glPointSize(3.f);
+        pangolin::glDrawPoints(matchedPoints);
+        glPointSize(1.f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
     if (*displayKFHistoryBox && modelView)
     {
         modelView->Activate(*mainCamera);
-        glColor3f(1.f, 0.f, 0.f);
-        for (auto T : rawKeyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.01f);
+        // glColor3f(1.f, 0.f, 0.f);
+        // for (auto T : rawKeyFrameHistory)
+        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
-        glColor3f(0.f, 1.f, 0.f);
-        for (auto T : keyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.01f);
+        // glColor3f(0.f, 1.f, 0.f);
+        // for (auto T : keyFrameHistory)
+        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+
+        glColor3f(1.f, 0.f, 0.f);
+        for (auto T : relocHypotheses)
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.1f);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
@@ -258,6 +273,11 @@ void MapViewer::checkButtonsAndBoxes()
 {
     if (pangolin::Pushed(*resetBtn))
         requestSystemReset = true;
+
+    if (*localizationMode)
+    {
+        *enableMappingBox = false;
+    }
 }
 
 bool MapViewer::isResetRequested()
@@ -274,6 +294,26 @@ bool MapViewer::isResetRequested()
 bool MapViewer::paused() const
 {
     return *pauseSystemBox;
+}
+
+bool MapViewer::isLocalizationMode() const
+{
+    return *localizationMode;
+}
+
+bool MapViewer::isGraphMatchingMode() const
+{
+    return *allowMatchingAmbiguity;
+}
+
+bool MapViewer::shouldCalculateNormal() const
+{
+    return *incorporateNormal;
+}
+
+bool MapViewer::mappingEnabled() const
+{
+    return *enableMappingBox;
 }
 
 void MapViewer::drawLocalMap()
@@ -325,9 +365,23 @@ void MapViewer::setStablePoints(const std::vector<Vec3f> &points)
     stablePoints = points;
 }
 
+void MapViewer::setMatchedPoints(const std::vector<Vec3f> &points)
+{
+    matchedPoints = points;
+}
+
 void MapViewer::setCurrentState(int state)
 {
     systemState = state;
+}
+
+void MapViewer::setRelocalizationHypotheses(std::vector<SE3> &H)
+{
+    relocHypotheses.clear();
+    for (auto h : H)
+    {
+        relocHypotheses.push_back(h.matrix().cast<float>());
+    }
 }
 
 void MapViewer::addTrackingResult(const SE3 &T)

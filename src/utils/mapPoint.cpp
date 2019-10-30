@@ -1,14 +1,22 @@
 #include "mapPoint.h"
+#include <cmath>
 
 size_t MapPoint::nextId = 0;
 
 MapPoint::MapPoint()
-    : id(nextId++)
+    : id(nextId++), bad(false)
 {
 }
 
-MapPoint::MapPoint(std::shared_ptr<Frame> hostKF, const Vec3d &posWorld, Mat desc)
-    : id(nextId++), hostKF(hostKF), position(posWorld), descriptor(desc)
+MapPoint::MapPoint(
+    std::shared_ptr<Frame> hostKF,
+    const Vec3d &posWorld,
+    Mat desc)
+    : id(nextId++),
+      hostKF(hostKF),
+      position(posWorld),
+      descriptor(desc),
+      bad(false)
 {
 }
 
@@ -41,8 +49,12 @@ std::unordered_map<std::shared_ptr<Frame>, Vec3d> MapPoint::getObservations() co
 
 void MapPoint::fusePoint(std::shared_ptr<MapPoint> &other)
 {
+  if (other)
+    std::unique_lock<std::mutex> lock(other->lock);
   auto obs = other->getObservations();
   observations.insert(obs.begin(), obs.end());
+  position = (position + other->position) / 2.0;
+  other->flagBad();
   other = NULL;
 }
 
@@ -54,6 +66,16 @@ size_t MapPoint::getNumObservations() const
 Vec3d MapPoint::getPosWorld() const
 {
   return position;
+}
+
+Vec3f MapPoint::getNormal() const
+{
+  return normal;
+}
+
+void MapPoint::setNormal(const Vec3f &n)
+{
+  normal = n;
 }
 
 std::shared_ptr<Frame> MapPoint::getHost() const
@@ -79,4 +101,14 @@ void MapPoint::setDescriptor(const Mat &desc)
 Mat MapPoint::getDescriptor() const
 {
   return descriptor;
+}
+
+bool MapPoint::isBad() const
+{
+  return bad;
+}
+
+void MapPoint::flagBad()
+{
+  bad = true;
 }

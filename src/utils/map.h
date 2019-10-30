@@ -10,6 +10,7 @@
 class Map
 {
     std::mutex mapMutex;
+    Mat pointDescriptorsAll;
     std::shared_ptr<Frame> currentKeyframe;
     std::vector<std::shared_ptr<Frame>> keyframesAll;
     std::vector<std::shared_ptr<MapPoint>> mapPointsAll;
@@ -25,8 +26,12 @@ class Map
 
 public:
     Map();
+
     void clear();
+    void writeToDisk(const char *fileName);
+    void readFromDisk(const char *fileName);
     void addKeyFrame(std::shared_ptr<Frame> kf);
+    Mat getPointDescriptorsAll() const;
     std::shared_ptr<Frame> getCurrentKeyframe() const;
     void setCurrentKeyframe(std::shared_ptr<Frame> kf);
     void addMapPoint(std::shared_ptr<MapPoint> pt);

@@ -1,4 +1,5 @@
 #include "fullSystem/fullSystem.h"
+#include "localizer/localizer.h"
 #include "denseTracker/cudaImageProc.h"
 
 FullSystem::FullSystem(
@@ -8,40 +9,54 @@ FullSystem::FullSystem(
     bool enableViewer)
     : state(SystemState::NotInitialized),
       lastState(SystemState::NotInitialized),
-      viewerEnabled(enableViewer)
+      viewerEnabled(enableViewer),
+      mappingEnabled(true),
+      imageWidth(w),
+      imageHeight(h),
+      camIntrinsics(K),
+      numProcessedFrames(0),
+      useGraphMatching(false),
+      shouldCalculateNormal(false)
 {
     map = std::make_shared<Map>();
     localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
     localMapper = std::make_shared<DenseMapping>(w, h, K);
-    loopCloser = std::make_shared<LoopCloser>(K, map);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
     accumulateTransform = SE3(Mat44d::Identity());
 
-    bufferVec4wxh.create(h, w, CV_32FC4);
-    bufferFloatwxh.create(h, w, CV_32FC1);
+    gpuBufferVec4FloatWxH.create(h, w, CV_32FC4);
+    gpuBufferFloatWxH.create(h, w, CV_32FC1);
 
-    loopThread = std::thread(&LoopCloser::loop, loopCloser.get());
     localOptThread = std::thread(&LocalOptimizer::loop, localOptimizer.get());
 }
 
 FullSystem::~FullSystem()
 {
-    std::cout << "wating other threads to finish..." << std::endl;
-    loopCloser->setShouldQuit();
     localOptimizer->setShouldQuit();
-    loopThread.join();
+    printf("wating other threads to finish...\n");
     localOptThread.join();
-    std::cout << "all threads finished!" << std::endl;
+    printf("all threads finished!\n");
+}
+
+void FullSystem::setCurrentNormal(GMat nmap)
+{
+    nmap.download(cpuBufferVec4FloatWxH);
 }
 
 void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 {
-    Mat rawImageFloat, rawIntensity;
-    rawImage.convertTo(rawImageFloat, CV_32FC3);
-    cv::cvtColor(rawImageFloat, rawIntensity, cv::COLOR_RGB2GRAY);
-    currentFrame = std::make_shared<Frame>(rawImage, rawDepth, rawIntensity);
+    rawImage.convertTo(cpuBufferVec3FloatWxH, CV_32FC3);
+    cv::cvtColor(cpuBufferVec3FloatWxH, cpuBufferFloatWxH, cv::COLOR_RGB2GRAY);
+
+    currentFrame = std::make_shared<Frame>(
+        imageWidth,
+        imageHeight,
+        camIntrinsics,
+        rawImage,
+        rawDepth,
+        cpuBufferFloatWxH);
 
     switch (state)
     {
@@ -91,22 +106,20 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         break;
     }
     case SystemState::Lost:
-
-        size_t numAttempted = 0;
+    {
         printf("tracking loast, attempt to resuming...\n");
-        while (numAttempted <= maxNumRelocAttempt)
+        if (tryRelocalizeCurrentFrame())
         {
-            if (tryRelocalizeCurrentFrame(numAttempted > 0))
-            {
-                if (viewerEnabled && viewer)
-                    viewer->setCurrentState(0);
-
-                break;
-            }
+            if (viewerEnabled && viewer)
+                viewer->setCurrentState(0);
         }
-
         break;
     }
+    }
+
+    lastState = state;
+    if (state == SystemState::OK)
+        numProcessedFrames++;
 }
 
 bool FullSystem::trackCurrentFrame()
@@ -123,18 +136,79 @@ bool FullSystem::trackCurrentFrame()
 
 void FullSystem::fuseCurrentFrame()
 {
+
     auto currDepth = coarseTracker->getReferenceDepth();
     localMapper->fuseFrame(currDepth, currentFrame->getPoseInLocalMap());
 }
 
 void FullSystem::raytraceCurrentFrame()
 {
-    localMapper->raytrace(bufferVec4wxh, currentFrame->getPoseInLocalMap());
-    coarseTracker->setReferenceInvDepth(bufferVec4wxh);
+    localMapper->raytrace(gpuBufferVec4FloatWxH, currentFrame->getPoseInLocalMap());
+    coarseTracker->setReferenceInvDepth(gpuBufferVec4FloatWxH);
+    computeNormal(gpuBufferVec4FloatWxH, gpuBufferVec4FloatWxH2);
+    currentFrame->setNormalMap(Mat(gpuBufferVec4FloatWxH2));
 }
 
-bool FullSystem::tryRelocalizeCurrentFrame(bool updatePoints)
+bool FullSystem::tryRelocalizeCurrentFrame()
 {
+    Mat descriptor;
+    std::vector<bool> valid;
+    std::vector<float> keyPointDepth;
+    std::vector<Vec3f> keyPointNormal;
+    std::vector<cv::KeyPoint> cvKeyPoint;
+    auto matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
+    matcher->detectAndCompute(currentFrame->getImage(), cvKeyPoint, descriptor);
+    matcher->computePointDepth(currentFrame->getDepth(), cvKeyPoint, keyPointDepth);
+
+    if (shouldCalculateNormal)
+        matcher->computePointNormal(cpuBufferVec4FloatWxH, cvKeyPoint, keyPointNormal);
+
+    auto numFeatures = keyPointDepth.size();
+    std::vector<Vec3d> keyPoint(numFeatures);
+
+    if (numFeatures < 10)
+    {
+        printf("too few points detected(%lu), relocalization failed...\n", numFeatures);
+        return false;
+    }
+
+    valid.resize(numFeatures);
+    std::fill(valid.begin(), valid.end(), true);
+    for (int n = 0; n < numFeatures; ++n)
+    {
+        auto &z = keyPointDepth[n];
+        if (z > FLT_EPSILON)
+        {
+            auto &kp = cvKeyPoint[n].pt;
+            keyPoint[n] = camIntrinsics.inverse() * Vec3d(kp.x, kp.y, 1.0) * z;
+        }
+        else
+        {
+            valid[n] = false;
+        }
+    }
+
+    Localizer relocalizer;
+    std::vector<SE3> hypothesesList;
+    if (!relocalizer.getRelocHypotheses(
+            map,
+            keyPoint,
+            keyPointNormal,
+            descriptor,
+            valid,
+            hypothesesList,
+            useGraphMatching))
+        return false;
+
+    if (hypothesesList.size() == 0)
+    {
+        printf("too few hypotheses(%lu), relocalization failed...\n", hypothesesList.size());
+        return false;
+    }
+
+    if (viewerEnabled && viewer)
+        viewer->setRelocalizationHypotheses(hypothesesList);
+
     return true;
 }
 
@@ -142,11 +216,11 @@ bool FullSystem::needNewKF()
 {
     auto dt = currentFrame->getTrackingResult();
     Vec3d t = dt.translation();
-    if (t.norm() >= 0.1)
+    if (t.norm() >= 0.3)
         return true;
 
     Vec3d r = dt.log().tail<3>();
-    if (r.norm() >= 0.1)
+    if (r.norm() >= 0.3)
         return true;
 
     return false;
@@ -159,10 +233,13 @@ void FullSystem::createNewKF()
     currentKeyframe->flagKeyFrame();
     lastTrackedPose = lastTrackedPose * accumulateTransform;
     currentKeyframe->setRawKeyframePose(lastTrackedPose);
-    map->addUnprocessedKeyframe(currentKeyframe);
-    map->setCurrentKeyframe(currentKeyframe);
-    map->addKeyframePoseRaw(lastTrackedPose);
-    map->addFramePose(SE3(), currentKeyframe);
+
+    if (mappingEnabled)
+    {
+        map->addUnprocessedKeyframe(currentKeyframe);
+        map->addKeyframePoseRaw(lastTrackedPose);
+        map->addFramePose(SE3(), currentKeyframe);
+    }
 
     if (viewerEnabled && viewer)
         viewer->addRawKeyFramePose(lastTrackedPose);
@@ -172,15 +249,12 @@ void FullSystem::createNewKF()
 
 void FullSystem::resetSystem()
 {
-
     map->clear();
     viewer->resetViewer();
     localMapper->reset();
-    localOptimizer->reset();
     lastTrackedPose = SE3(Mat44d::Identity());
     accumulateTransform = SE3(Mat44d::Identity());
     state = SystemState::NotInitialized;
-    lastState = SystemState::NotInitialized;
 }
 
 size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
@@ -206,4 +280,25 @@ std::vector<Vec3f> FullSystem::getMapPointPosAll()
 void FullSystem::setMapViewerPtr(MapViewer *viewer)
 {
     this->viewer = viewer;
+    this->localOptimizer->setViewer(viewer);
+}
+
+void FullSystem::setMappingEnable(const bool enable)
+{
+    mappingEnabled = enable;
+}
+
+void FullSystem::setSystemStateToLost()
+{
+    state = SystemState::Lost;
+}
+
+void FullSystem::setGraphMatching(const bool &flag)
+{
+    useGraphMatching = flag;
+}
+
+void FullSystem::setGraphGetNormal(const bool &flag)
+{
+    shouldCalculateNormal = flag;
 }

@@ -13,6 +13,7 @@ PRIVATE
     src/utils/map.cpp
     src/utils/frame.cpp
     src/utils/mapPoint.cpp
+    src/utils/mapCUDA.cu
     src/fullSystem/fullSystem.cu
     src/mapViewer/mapViewer.cpp
     src/denseTracker/denseTracker.cu
@@ -24,7 +25,7 @@ PRIVATE
     src/localMapper/depthFusion.cu
     src/localMapper/meshScene.cu
     src/localMapper/raytracing.cu
-    src/loopClosure/loopCloser.cpp
+    src/localizer/localizer.cpp
 )
 
 target_compile_features(athena

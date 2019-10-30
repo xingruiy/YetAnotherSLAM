@@ -1,6 +1,7 @@
 #include "oniCamera.h"
 #include "mapViewer/mapViewer.h"
 #include "fullSystem/fullSystem.h"
+#include "denseTracker/cudaImageProc.h"
 
 int main(int argc, char **argv)
 {
@@ -17,25 +18,43 @@ int main(int argc, char **argv)
     fullsystem.setMapViewerPtr(&viewer);
     float depthScale = 1.0 / 1000.0;
 
+    GMat gpuBufferFloatWxH;
+    GMat bufferVec4FloatWxH;
+    GMat bufferVec4FloatWxH2;
+    GMat bufferVec4ByteWxH;
+
     while (true && !pangolin::ShouldQuit())
     {
         if (camera.getNextImages(depth, image))
         {
             depth.convertTo(depthFloat, CV_32FC1, depthScale);
-            // depth.convertTo(depthImage, CV_8UC4);
+            gpuBufferFloatWxH.upload(depthFloat);
+            computeVMap(gpuBufferFloatWxH, bufferVec4FloatWxH, K);
+            computeNormal(bufferVec4FloatWxH, bufferVec4FloatWxH2);
+            renderScene(bufferVec4FloatWxH, bufferVec4FloatWxH2, bufferVec4ByteWxH);
+
             viewer.setColourImage(image);
-            // viewer.setDepthImage(depthImage);
+            viewer.setDepthImage(Mat(bufferVec4ByteWxH));
+
+            fullsystem.setMappingEnable(viewer.mappingEnabled());
+
+            if (viewer.isLocalizationMode())
+            {
+                fullsystem.setSystemStateToLost();
+                fullsystem.setGraphMatching(viewer.isGraphMatchingMode());
+                fullsystem.setGraphGetNormal(viewer.shouldCalculateNormal());
+            }
 
             if (!viewer.paused())
+            {
+                fullsystem.setCurrentNormal(bufferVec4FloatWxH2);
                 fullsystem.processFrame(image, depthFloat);
+            }
 
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
 
-            viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
-            viewer.setFrameHistory(fullsystem.getFramePoseHistory());
-
-            if (!viewer.paused())
+            if (!viewer.paused() && viewer.mappingEnabled())
             {
                 float *vbuffer;
                 float *nbuffer;
@@ -44,6 +63,8 @@ int main(int argc, char **argv)
                 size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
                 viewer.setMeshSizeToRender(size);
                 viewer.setActivePoints(fullsystem.getMapPointPosAll());
+                viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+                viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             }
         }
 

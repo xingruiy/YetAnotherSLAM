@@ -42,6 +42,7 @@ using Vec25f = Eigen::Matrix<float, 25, 1>;
 using Vec25d = Eigen::Matrix<double, 25, 1>;
 using Vec29f = Eigen::Matrix<float, 29, 1>;
 using Vec29d = Eigen::Matrix<double, 29, 1>;
+using Vec64b = Eigen::Matrix<char, 64, 1>;
 
 // Sophus Shortcuts
 using SE3 = Sophus::SE3d;
@@ -54,3 +55,4 @@ using GMat = cv::cuda::GpuMat;
 
 #define CV_32FC6 CV_32FC(6)
 #define CV_32FC7 CV_32FC(7)
+#define CV_8UC64 CV_8UC(64)
