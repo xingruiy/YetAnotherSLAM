@@ -31,6 +31,7 @@ int main(int argc, char **argv)
             {
                 fullsystem.setSystemStateToLost();
                 fullsystem.setGraphMatching(viewer.isGraphMatchingMode());
+                fullsystem.setGraphMatchingMethod(viewer.shouldCalculateNormal());
             }
 
             if (!viewer.paused())

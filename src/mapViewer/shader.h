@@ -29,20 +29,6 @@ const char vertexShader[] =
     "    shaded_colour = vec3(Ix, Ix, Ix);\n"
     "}\n";
 
-// const char vertexShader[] =
-//     "#version 330\n"
-//     "\n"
-//     "layout(location = 0) in vec3 position;\n"
-//     "layout(location = 1) in vec3 a_normal;\n"
-//     "\n"
-//     "uniform mat4 mvp_matrix;\n"
-//     "\n"
-//     "out vec3 shaded_colour;\n"
-//     "\n"
-//     "void main(void) {\n"
-//     "    gl_Position = vec4(position, 1.0);\n"
-//     "}\n";
-
 const char fragShader[] =
     "#version 330\n"
     "\n"
@@ -51,9 +37,3 @@ const char fragShader[] =
     "void main(void) {\n"
     "    colour_out = vec4(shaded_colour, 1);\n"
     "}\n";
-
-// const char fragShader[] =
-//     "#version 330\n"
-//     "\n"
-//     "void main(void) {\n"
-//     "}\n";

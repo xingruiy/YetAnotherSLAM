@@ -45,6 +45,7 @@ class FullSystem
 
     GMat bufferFloatwxh;
     GMat bufferVec4wxh;
+    GMat bufferVec4wxh2;
     Mat cbufferFloatwxh;
     Mat cbufferFloatVec3wxh;
 
@@ -56,6 +57,7 @@ class FullSystem
     Mat33d camIntrinsics;
     bool mappingEnabled;
     bool useGraphMatching;
+    bool shouldCalculateNormal;
     size_t numProcessedFrames;
 
 public:
@@ -76,6 +78,7 @@ public:
     // TODO: this is currently in infinite mode
     void setSystemStateToLost();
     void setGraphMatching(const bool &flag);
+    void setGraphMatchingMethod(const bool &flag);
 
     // reset the system to its initial state
     void resetSystem();

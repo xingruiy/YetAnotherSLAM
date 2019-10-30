@@ -53,11 +53,10 @@ FeatureMatcher::FeatureMatcher(PointType pType, DescType dType)
     }
 }
 
-void FeatureMatcher::detect(
-    Mat image, Mat depth,
+void FeatureMatcher::detectAndCompute(
+    const Mat image,
     std::vector<cv::KeyPoint> &keyPoints,
-    Mat &descriptor,
-    std::vector<float> &depthVec)
+    Mat &pointDesc)
 {
     switch (pointType)
     {
@@ -78,31 +77,15 @@ void FeatureMatcher::detect(
     switch (descType)
     {
     case DescType::ORB:
-        orbDetector->compute(image, keyPoints, descriptor);
+        orbDetector->compute(image, keyPoints, pointDesc);
         break;
     case DescType::BRISK:
-        briskDetector->compute(image, keyPoints, descriptor);
+        briskDetector->compute(image, keyPoints, pointDesc);
         break;
     case DescType::SURF:
-        surfDetector->compute(image, keyPoints, descriptor);
+        surfDetector->compute(image, keyPoints, pointDesc);
         break;
     }
-
-    extractDepth(depth, keyPoints, depthVec);
-}
-
-template <typename Derived>
-EIGEN_STRONG_INLINE float computePatchScoreL2Norm(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &b)
-{
-    return (a - b).norm() / 9;
-}
-
-void FeatureMatcher::compute(
-    Mat image,
-    std::vector<cv::KeyPoint> pt,
-    Mat &desc)
-{
-    orbDetector->compute(image, pt, desc);
 }
 
 float FeatureMatcher::computeMatchingScore(Mat desc, Mat refDesc)
@@ -255,14 +238,6 @@ void FeatureMatcher::matchByProjection2NN(
     }
 }
 
-void FeatureMatcher::matchByProjectionEpipolar(
-    const std::shared_ptr<Frame> kf,
-    const std::shared_ptr<Frame> frame,
-    const Mat33d &K,
-    std::vector<cv::DMatch> &matches)
-{
-}
-
 void FeatureMatcher::matchByProjection2NN(
     const std::shared_ptr<Frame> kf,
     const std::shared_ptr<Frame> frame,
@@ -311,7 +286,7 @@ void FeatureMatcher::matchByProjection2NN(
                     const auto &y = keyPoints[i].pt.y;
                     float dist = (Vec2f(x, y) - Vec2f(u, v)).norm();
                     // auto currentZ = currentDepth.ptr<float>((int)round(y))[(int)round(x)];
-                    auto currentZ = frame->depthVec[i];
+                    auto currentZ = frame->keyPointDepth[i];
 
                     if (dist <= MatchWindowDist && abs(ptWarped(2) - currentZ) < 0.1)
                     {
@@ -356,60 +331,15 @@ void FeatureMatcher::matchByProjection2NN(
     }
 }
 
-void FeatureMatcher::matchByDescriptor(
-    const std::shared_ptr<Frame> kf,
-    const std::shared_ptr<Frame> frame,
-    const Mat33d &K,
-    std::vector<cv::DMatch> &matches)
+void FeatureMatcher::computePointDepth(
+    const Mat depth,
+    const std::vector<cv::KeyPoint> &cvKeyPoint,
+    std::vector<float> &pointDepth)
 {
-    std::vector<std::vector<cv::DMatch>> rawMatches;
-    matcher->knnMatch(frame->pointDesc, kf->pointDesc, rawMatches, 2);
-
-    for (auto match2NN : rawMatches)
+    pointDepth.resize(cvKeyPoint.size());
+    for (int i = 0; i < cvKeyPoint.size(); ++i)
     {
-        if (match2NN[0].distance / match2NN[1].distance < 0.6)
-            matches.push_back(match2NN[0]);
-    }
-}
-
-void FeatureMatcher::computePatch3x3(
-    Mat image,
-    std::vector<cv::KeyPoint> &points,
-    std::vector<Vec9f> &patches)
-{
-    patches.resize(points.size());
-    auto ibegin = points.begin();
-
-    for (auto iter = ibegin, iend = points.end(); iter != iend; ++iter)
-    {
-        float &x = iter->pt.x;
-        float &y = iter->pt.y;
-        Vec9f hostPatch = Vec9f::Zero();
-
-        if (x > 1 && y > 1 && x < image.cols - 2 && y < image.rows - 2)
-        {
-            for (int i = 0; i < 9; ++i)
-            {
-                int v = i / 3 - 1;
-                int u = i - v * 3 - 1;
-                auto val = interpolateBiLinear(image, x + u, y + v);
-                hostPatch(i) = (val == val ? val : 0);
-            }
-        }
-
-        patches[iter - ibegin] = hostPatch;
-    }
-}
-
-void FeatureMatcher::extractDepth(
-    Mat depth,
-    std::vector<cv::KeyPoint> &points,
-    std::vector<float> &depthVec)
-{
-    depthVec.resize(points.size());
-    for (int i = 0; i < points.size(); ++i)
-    {
-        const auto &kp = points[i];
+        const auto &kp = cvKeyPoint[i];
         const float &x = kp.pt.x;
         const float &y = kp.pt.y;
         float z = 0.f;
@@ -424,6 +354,31 @@ void FeatureMatcher::extractDepth(
                 z = 0.f;
         }
 
-        depthVec[i] = z;
+        pointDepth[i] = z;
+    }
+}
+
+void FeatureMatcher::computePointNormal(
+    const Mat normal,
+    const std::vector<cv::KeyPoint> &cvKeyPoint,
+    std::vector<Vec3f> &pointNormal)
+{
+    std::cout << "normal map channel: " << normal.channels() << std::endl;
+    pointNormal.resize(cvKeyPoint.size());
+    for (int i = 0; i < cvKeyPoint.size(); ++i)
+    {
+        const auto &kp = cvKeyPoint[i];
+        const float &x = kp.pt.x;
+        const float &y = kp.pt.y;
+        Vec4f z = Vec4f(0, 0, 0, 0);
+
+        if (x > 0 && y > 0 && x < normal.cols && y < normal.rows)
+        {
+            z = normal.ptr<Vec4f>(static_cast<int>(round(y)))[static_cast<int>(round(x))];
+            if (!(std::isfinite(z(0)) && z == z))
+                z = Vec4f(0, 0, 0, 0);
+        }
+
+        pointNormal[i] = z.head<3>();
     }
 }

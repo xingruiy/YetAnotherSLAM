@@ -237,6 +237,9 @@ void Localizer::getWorldTransform(
 
     for (auto i = 0; i < numLists; ++i)
     {
+        if (src[i].size() == 0)
+            continue;
+
         SE3 estimate;
         size_t numInliers;
 
@@ -252,11 +255,12 @@ void Localizer::getWorldTransform(
     }
 }
 
-Mat Localizer::createAdjacencyMat(
+void Localizer::createAdjacencyMat(
     const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
     const std::vector<Vec3d> &framePoints,
     const std::vector<bool> &framePtValid,
-    const std::vector<cv::DMatch> &matches)
+    const std::vector<cv::DMatch> &matches,
+    Mat &adjacentMat)
 {
     auto numPointPairs = matches.size();
     Mat srcPointPos(1, numPointPairs, CV_32FC3);
@@ -282,14 +286,66 @@ Mat Localizer::createAdjacencyMat(
         dstPointPos.ptr<Vec3f>(0)[i] = framePt.cast<float>();
     }
 
-    auto adjacencyMat = ::createAdjacencyMat(
+    ::createAdjacencyMat(
         numPointPairs,
         descriptorDist,
         srcPointPos,
         dstPointPos,
-        validPairPt);
+        validPairPt,
+        adjacentMat);
+}
 
-    return adjacencyMat;
+void Localizer::createAdjacencyMat(
+    const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
+    const std::vector<Vec3d> &framePoints,
+    const std::vector<Vec3f> &frameNormal,
+    const std::vector<bool> &framePtValid,
+    const std::vector<cv::DMatch> &matches,
+    Mat &adjacentMat)
+{
+    auto numPointPairs = matches.size();
+    Mat srcPointPos(1, numPointPairs, CV_32FC3);
+    Mat dstPointPos(1, numPointPairs, CV_32FC3);
+    Mat srcPointNormal(1, numPointPairs, CV_32FC3);
+    Mat dstPointNormal(1, numPointPairs, CV_32FC3);
+    Mat descriptorDist(1, numPointPairs, CV_32FC3);
+    Mat validPairPt(1, numPointPairs, CV_8UC1);
+
+    for (auto i = 0; i < numPointPairs; ++i)
+    {
+        const auto &match = matches[i];
+        auto &mapPt = mapPoints[match.trainIdx];
+        auto &framePt = framePoints[match.queryIdx];
+        auto &n = frameNormal[match.queryIdx];
+
+        bool validPair = (n(0) > FLT_EPSILON) &&
+                         mapPt && !mapPt->isBad() &&
+                         framePtValid[match.queryIdx];
+
+        if (validPair)
+            validPairPt.ptr<uchar>(0)[i] = 1;
+        else
+            validPairPt.ptr<uchar>(0)[i] = 0;
+
+        descriptorDist.ptr<float>(0)[i] = match.distance;
+        srcPointPos.ptr<Vec3f>(0)[i] = mapPt->getPosWorld().cast<float>();
+        srcPointNormal.ptr<Vec3f>(0)[i] = mapPt->getNormal();
+        dstPointPos.ptr<Vec3f>(0)[i] = framePt.cast<float>();
+        dstPointNormal.ptr<Vec3f>(0)[i] = n;
+
+        if (validPair)
+            std::cout << "frame: " << n << "map: " << mapPt->getNormal() << std::endl;
+    }
+
+    ::createAdjacencyMatWithNormal(
+        numPointPairs,
+        descriptorDist,
+        srcPointPos,
+        dstPointPos,
+        srcPointNormal,
+        dstPointNormal,
+        validPairPt,
+        adjacentMat);
 }
 
 void Localizer::selectMatches(
@@ -401,6 +457,7 @@ void Localizer::selectMatches(
 bool Localizer::getRelocHypotheses(
     const std::shared_ptr<Map> map,
     const std::vector<Vec3d> &framePts,
+    const std::vector<Vec3f> &frameNormal,
     const Mat framePtDesc,
     const std::vector<bool> &framePtValid,
     std::vector<SE3> &estimateList,
@@ -424,11 +481,28 @@ bool Localizer::getRelocHypotheses(
 
     if (useGraphMatching)
     {
-        auto adjacentMat = createAdjacencyMat(
-            mapPts,
-            framePts,
-            framePtValid,
-            matches);
+        Mat adjacentMat;
+        bool calculateNormal = (frameNormal.size() != 0);
+        if (!calculateNormal)
+        {
+            createAdjacencyMat(
+                mapPts,
+                framePts,
+                framePtValid,
+                matches,
+                adjacentMat);
+        }
+        else
+        {
+            createAdjacencyMat(
+                mapPts,
+                framePts,
+                frameNormal,
+                framePtValid,
+                matches,
+                adjacentMat);
+        }
+
         selectMatches(adjacentMat, matches, subMatches);
     }
     else

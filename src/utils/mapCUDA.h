@@ -3,9 +3,20 @@
 #include "utils/mapPoint.h"
 #include "utils/numType.h"
 
-Mat createAdjacencyMat(
-    size_t numPairs,
-    Mat descriptorDist,
-    Mat srcPointPos,
-    Mat dstPointPos,
-    Mat validPairPt);
+void createAdjacencyMat(
+    const size_t numPairs,
+    const Mat descriptorDist,
+    const Mat srcPointPos,
+    const Mat dstPointPos,
+    const Mat validPairPt,
+    Mat &adjacentMat);
+
+void createAdjacencyMatWithNormal(
+    const size_t numPairs,
+    const Mat descriptorDist,
+    const Mat srcPointPos,
+    const Mat dstPointPos,
+    const Mat srcPtNormal,
+    const Mat dstPtNormal,
+    const Mat validPairPt,
+    Mat &adjacentMat);

@@ -30,6 +30,7 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> displayFrameHistoryBox;
     std::shared_ptr<pangolin::Var<bool>> displayPointBox;
     std::shared_ptr<pangolin::Var<bool>> localizationMode;
+    std::shared_ptr<pangolin::Var<bool>> incorporateNormal;
     std::shared_ptr<pangolin::Var<bool>> allowMatchingAmbiguity;
 
     GLuint vaoPhong;
@@ -90,6 +91,7 @@ public:
     bool isLocalizationMode() const;
     bool mappingEnabled() const;
     bool isGraphMatchingMode() const;
+    bool shouldCalculateNormal() const;
 
     void setColourImage(Mat image);
     void setDepthImage(Mat image);

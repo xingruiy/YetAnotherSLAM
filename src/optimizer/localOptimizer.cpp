@@ -88,7 +88,7 @@ void LocalOptimizer::matchFeatures(std::shared_ptr<Frame> kf)
             auto &pt = lastKF->mapPoints[m.queryIdx];
             auto &framePt = kf->mapPoints[m.trainIdx];
             auto &kp = kf->cvKeyPoints[m.trainIdx];
-            auto &z = kf->depthVec[m.trainIdx];
+            auto &z = kf->keyPointDepth[m.trainIdx];
 
             if (!framePt)
             {
@@ -119,15 +119,18 @@ void LocalOptimizer::createNewPoints(std::shared_ptr<Frame> kf)
         if (framePt)
             continue;
 
-        const auto &z = kf->depthVec[i];
-        if (z > FLT_EPSILON)
+        const auto &z = kf->keyPointDepth[i];
+        const auto &n = kf->keyPointNorm[i];
+        if (z > FLT_EPSILON && n(2) > FLT_EPSILON)
         {
             const auto &kp = kf->cvKeyPoints[i];
             Vec3d pos = kf->getPoseInGlobalMap() * (K.inverse() * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z);
+            Vec3f normal = (kf->getPoseInGlobalMap().rotationMatrix() * n.cast<double>()).cast<float>();
 
             auto pt = std::make_shared<MapPoint>();
             pt->setHost(kf);
             pt->setPosWorld(pos);
+            pt->setNormal(normal);
             pt->setDescriptor(kf->pointDesc.row(i));
             pt->addObservation(kf, Vec3d(kp.pt.x, kp.pt.y, z));
             framePt = pt;
@@ -148,7 +151,7 @@ void LocalOptimizer::detectLoop(std::shared_ptr<Frame> kf)
         if (framePt)
             continue;
 
-        const auto &z = kf->depthVec[i];
+        const auto &z = kf->keyPointDepth[i];
         if (z > FLT_EPSILON)
         {
             const auto &kp = kf->cvKeyPoints[i];
@@ -189,7 +192,7 @@ void LocalOptimizer::detectLoop(std::shared_ptr<Frame> kf)
             auto &pt = mapPointsAll[m.trainIdx];
             auto &framePt = kf->mapPoints[m.queryIdx];
             auto &kp = kf->cvKeyPoints[m.queryIdx];
-            auto &z = kf->depthVec[m.queryIdx];
+            auto &z = kf->keyPointDepth[m.queryIdx];
             framePt = pt;
             pt->addObservation(kf, Vec3d(kp.pt.x, kp.pt.y, z));
             pts.push_back(pt->getPosWorld().cast<float>());

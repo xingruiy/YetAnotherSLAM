@@ -38,11 +38,20 @@ class Localizer
         SE3 &estimate,
         std::vector<bool> &outliers);
 
-    Mat createAdjacencyMat(
+    void createAdjacencyMat(
         const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
         const std::vector<Vec3d> &framePoints,
         const std::vector<bool> &framePtValid,
-        const std::vector<cv::DMatch> &matches);
+        const std::vector<cv::DMatch> &matches,
+        Mat &adjacentMat);
+
+    void createAdjacencyMat(
+        const std::vector<std::shared_ptr<MapPoint>> &mapPoints,
+        const std::vector<Vec3d> &framePoints,
+        const std::vector<Vec3f> &frameNormal,
+        const std::vector<bool> &framePtValid,
+        const std::vector<cv::DMatch> &matches,
+        Mat &adjacentMat);
 
     void selectMatches(
         const Mat &adjacencyMat,
@@ -62,8 +71,9 @@ public:
     bool getRelocHypotheses(
         const std::shared_ptr<Map> map,
         const std::vector<Vec3d> &framePts,
+        const std::vector<Vec3f> &frameNormal,
         const Mat framePtDesc,
         const std::vector<bool> &framePtValid,
-        std::vector<SE3> &hypothesesList,
+        std::vector<SE3> &estimateList,
         const bool &useGraphMatching);
 };

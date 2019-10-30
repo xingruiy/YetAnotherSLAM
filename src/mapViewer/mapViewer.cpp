@@ -62,6 +62,7 @@ void MapViewer::setupDisplay()
     displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Keyframes", true, true);
     localizationMode = std::make_shared<pangolin::Var<bool>>("Menu.Localization Mode", false, true);
     allowMatchingAmbiguity = std::make_shared<pangolin::Var<bool>>("Menu.Graph Matching Mode", false, true);
+    incorporateNormal = std::make_shared<pangolin::Var<bool>>("Menu.Incorporate Normal", false, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -71,6 +72,15 @@ void MapViewer::setupKeyBindings()
     pangolin::RegisterKeyPressCallback('R', pangolin::SetVarFunctor<bool>("Menu.RESET", true));
     // pause / unpause the system
     pangolin::RegisterKeyPressCallback(ENTER_KEY, pangolin::ToggleVarFunctor("Menu.PAUSE"));
+    // toggle localization mode
+    pangolin::RegisterKeyPressCallback('l', pangolin::ToggleVarFunctor("Menu.Localization Mode"));
+    pangolin::RegisterKeyPressCallback('L', pangolin::ToggleVarFunctor("Menu.Localization Mode"));
+    // toggle graph matching mode
+    pangolin::RegisterKeyPressCallback('g', pangolin::ToggleVarFunctor("Menu.Graph Matching Mode"));
+    pangolin::RegisterKeyPressCallback('G', pangolin::ToggleVarFunctor("Menu.Graph Matching Mode"));
+    // toggle normal
+    pangolin::RegisterKeyPressCallback('n', pangolin::ToggleVarFunctor("Menu.Incorporate Normal"));
+    pangolin::RegisterKeyPressCallback('N', pangolin::ToggleVarFunctor("Menu.Incorporate Normal"));
 }
 
 void MapViewer::initializePrograms()
@@ -294,6 +304,11 @@ bool MapViewer::isLocalizationMode() const
 bool MapViewer::isGraphMatchingMode() const
 {
     return *allowMatchingAmbiguity;
+}
+
+bool MapViewer::shouldCalculateNormal() const
+{
+    return *incorporateNormal;
 }
 
 bool MapViewer::mappingEnabled() const

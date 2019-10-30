@@ -15,7 +15,8 @@ FullSystem::FullSystem(
       imageHeight(h),
       camIntrinsics(K),
       numProcessedFrames(0),
-      useGraphMatching(false)
+      useGraphMatching(false),
+      shouldCalculateNormal(false)
 {
     map = std::make_shared<Map>();
     localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
@@ -139,6 +140,8 @@ void FullSystem::raytraceCurrentFrame()
 {
     localMapper->raytrace(bufferVec4wxh, currentFrame->getPoseInLocalMap());
     coarseTracker->setReferenceInvDepth(bufferVec4wxh);
+    computeNormal(bufferVec4wxh, bufferVec4wxh2);
+    currentFrame->setNormalMap(Mat(bufferVec4wxh2));
 }
 
 bool FullSystem::tryRelocalizeCurrentFrame()
@@ -146,14 +149,24 @@ bool FullSystem::tryRelocalizeCurrentFrame()
     Mat descriptor;
     std::vector<bool> valid;
     std::vector<float> keyPointDepth;
+    std::vector<Vec3f> keyPointNormal;
     std::vector<cv::KeyPoint> cvKeyPoint;
     auto matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
-    matcher->detect(
-        currentFrame->getImage(),
-        currentFrame->getDepth(),
-        cvKeyPoint,
-        descriptor,
-        keyPointDepth);
+    matcher->detectAndCompute(currentFrame->getImage(), cvKeyPoint, descriptor);
+    matcher->computePointDepth(currentFrame->getDepth(), cvKeyPoint, keyPointDepth);
+
+    // if normal is used
+    if (shouldCalculateNormal)
+    {
+        GMat vmap, nmap;
+        computeVMap(GMat(currentFrame->getDepth()), vmap, camIntrinsics);
+        computeNormal(vmap, nmap);
+        currentFrame->setNormalMap(Mat(nmap));
+        matcher->computePointNormal(currentFrame->getNormalMap(), cvKeyPoint, keyPointNormal);
+
+        // cv::imshow("namp", currentFrame->getNormalMap());
+        // cv::waitKey(1);
+    }
 
     auto numFeatures = keyPointDepth.size();
     std::vector<Vec3d> keyPoint(numFeatures);
@@ -185,6 +198,7 @@ bool FullSystem::tryRelocalizeCurrentFrame()
     if (!relocalizer.getRelocHypotheses(
             map,
             keyPoint,
+            keyPointNormal,
             descriptor,
             valid,
             hypothesesList,
@@ -287,4 +301,9 @@ void FullSystem::setSystemStateToLost()
 void FullSystem::setGraphMatching(const bool &flag)
 {
     useGraphMatching = flag;
+}
+
+void FullSystem::setGraphMatchingMethod(const bool &flag)
+{
+    shouldCalculateNormal = flag;
 }

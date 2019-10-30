@@ -166,7 +166,9 @@ void Frame::detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher)
 {
     if (numPointsDetectd == 0)
     {
-        matcher->detect(rawImage, rawDepth, cvKeyPoints, pointDesc, depthVec);
+        matcher->detectAndCompute(rawImage, cvKeyPoints, pointDesc);
+        matcher->computePointDepth(rawDepth, cvKeyPoints, keyPointDepth);
+        matcher->computePointNormal(normalMap, cvKeyPoints, keyPointNorm);
         numPointsDetectd = cvKeyPoints.size();
         mapPoints.resize(numPointsDetectd);
     }
@@ -174,7 +176,7 @@ void Frame::detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher)
 
 std::shared_ptr<MapPoint> Frame::createMapPoint(size_t idx)
 {
-    const auto z = depthVec[idx];
+    const auto z = keyPointDepth[idx];
     if (z > FLT_EPSILON)
     {
         auto pt = std::make_shared<MapPoint>();
@@ -186,4 +188,14 @@ std::shared_ptr<MapPoint> Frame::createMapPoint(size_t idx)
     }
 
     return NULL;
+}
+
+Mat Frame::getNormalMap() const
+{
+    return normalMap;
+}
+
+void Frame::setNormalMap(const Mat nmap)
+{
+    normalMap = nmap;
 }

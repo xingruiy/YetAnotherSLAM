@@ -259,3 +259,46 @@ void pyrdownInvDepth(const GMat src, GMat &dst)
     pyrdownInvDepthKernel<<<grid, block>>>(src, dst);
     // cudaCheckError();
 }
+
+__global__ void computeVMapKernel(
+    const cv::cuda::PtrStep<float> depth,
+    cv::cuda::PtrStepSz<Vec4f> vmap,
+    const float invfx, const float invfy,
+    const float cx, const float cy)
+{
+    const int x = threadIdx.x + blockDim.x * blockIdx.x;
+    const int y = threadIdx.y + blockDim.y * blockIdx.y;
+    if (x >= vmap.cols || y >= vmap.rows)
+        return;
+
+    const auto &z = depth.ptr(y)[x];
+    Vec4f v = Vec4f(0, 0, 0, 0);
+    if (z == z && z > FLT_EPSILON)
+    {
+        v(0) = (x - cx) * invfx * z;
+        v(1) = (y - cy) * invfy * z;
+        v(2) = z;
+        v(3) = 1.0;
+    }
+    else
+    {
+        v(0) = nanf("error");
+    }
+
+    vmap.ptr(y)[x] = v;
+}
+
+void computeVMap(const GMat depth, GMat &vmap, const Mat33d &K)
+{
+    if (vmap.empty())
+        vmap.create(depth.rows, depth.cols, CV_32FC4);
+
+    const float invfx = 1.0 / K(0, 0);
+    const float invfy = 1.0 / K(1, 1);
+    const float cx = K(0, 2);
+    const float cy = K(1, 2);
+
+    dim3 block(8, 8);
+    dim3 grid(div_up(vmap.cols, block.x), div_up(vmap.rows, block.y));
+    computeVMapKernel<<<grid, block>>>(depth, vmap, invfx, invfy, cx, cy);
+}

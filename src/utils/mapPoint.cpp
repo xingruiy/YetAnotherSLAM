@@ -68,6 +68,16 @@ Vec3d MapPoint::getPosWorld() const
   return position;
 }
 
+Vec3f MapPoint::getNormal() const
+{
+  return normal;
+}
+
+void MapPoint::setNormal(const Vec3f &n)
+{
+  normal = n;
+}
+
 std::shared_ptr<Frame> MapPoint::getHost() const
 {
   return hostKF;

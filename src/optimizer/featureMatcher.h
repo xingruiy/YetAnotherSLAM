@@ -34,24 +34,8 @@ class FeatureMatcher
     cv::Ptr<cv::FastFeatureDetector> fastDetector;
     cv::Ptr<cv::DescriptorMatcher> matcher;
 
-    void computePatch3x3(
-        Mat image,
-        std::vector<cv::KeyPoint> &points,
-        std::vector<Vec9f> &patches);
-
-    void extractDepth(
-        Mat depth,
-        std::vector<cv::KeyPoint> &points,
-        std::vector<float> &depthVec);
-
 public:
     FeatureMatcher(PointType pType, DescType dType);
-
-    void detect(
-        Mat image, Mat depth,
-        std::vector<cv::KeyPoint> &keyPoints,
-        Mat &descriptor,
-        std::vector<float> &depthVec);
 
     void matchByProjection(
         const std::shared_ptr<Frame> kf,
@@ -74,24 +58,23 @@ public:
         std::vector<cv::DMatch> &matches,
         std::vector<bool> *matchesFound = NULL);
 
-    void matchByProjectionEpipolar(
-        const std::shared_ptr<Frame> kf,
-        const std::shared_ptr<Frame> frame,
-        const Mat33d &K,
-        std::vector<cv::DMatch> &matches);
-
-    void matchByDescriptor(
-        const std::shared_ptr<Frame> kf,
-        const std::shared_ptr<Frame> frame,
-        const Mat33d &K,
-        std::vector<cv::DMatch> &matches);
-
-    void compute(
-        Mat image,
-        std::vector<cv::KeyPoint> pt,
-        Mat &desc);
-
     float computeMatchingScore(
         Mat desc,
         Mat refDesc);
+
+    // Feature Detection
+    void detectAndCompute(
+        const Mat image,
+        std::vector<cv::KeyPoint> &cvKeyPoint,
+        Mat &pointDesc);
+
+    void computePointDepth(
+        const Mat depth,
+        const std::vector<cv::KeyPoint> &cvKeyPoint,
+        std::vector<float> &pointDepth);
+
+    void computePointNormal(
+        const Mat normal,
+        const std::vector<cv::KeyPoint> &cvKeyPoint,
+        std::vector<Vec3f> &pointNormal);
 };

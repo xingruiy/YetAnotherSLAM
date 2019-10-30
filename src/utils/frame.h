@@ -12,6 +12,7 @@ class Frame
 {
     Mat rawDepth;
     Mat rawImage;
+    Mat normalMap;
     Mat rawIntensity;
     bool keyframeFlag;
 
@@ -60,18 +61,19 @@ public:
     SE3 getPoseInGlobalMap() const;
     SE3 getPoseInLocalMap() const;
     Vec3d getPositionWorld() const;
-    size_t getNumPointsDetected() const;
-
     void setReferenceKF(std::shared_ptr<Frame> kf);
     std::shared_ptr<Frame> getReferenceKF() const;
 
+    // map related operations
     bool hasMapPoint() const;
     std::shared_ptr<MapPoint> createMapPoint(size_t idx);
     void setMapPoint(std::shared_ptr<MapPoint> pt, size_t idx);
     void eraseMapPoint(size_t idx);
+    size_t getNumPointsDetected() const;
     void detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher);
     const std::vector<std::shared_ptr<MapPoint>> &getMapPoints() const;
 
+    // used for bundle adjustment
     double *getParameterBlock();
     void setTrackingResult(const SE3 &T);
     void setRawKeyframePose(const SE3 &T);
@@ -79,9 +81,11 @@ public:
 
     // TODO : refactory this
     Mat pointDesc;
-    int kfIdLocalRoot;
-    std::mutex keyframeLock;
-    std::vector<float> depthVec;
+    std::vector<Vec3f> keyPointNorm;
+    std::vector<float> keyPointDepth;
     std::vector<cv::KeyPoint> cvKeyPoints;
     std::vector<std::shared_ptr<MapPoint>> mapPoints;
+
+    Mat getNormalMap() const;
+    void setNormalMap(const Mat nmap);
 };
