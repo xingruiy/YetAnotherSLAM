@@ -48,6 +48,7 @@ class FullSystem
     GMat gpuBufferVec4FloatWxH2;
     Mat cpuBufferVec4FloatWxH;
     Mat cpuBufferFloatWxH;
+    Mat cpuBufferVec3ByteWxH;
     Mat cpuBufferVec3FloatWxH;
 
     SystemState state;

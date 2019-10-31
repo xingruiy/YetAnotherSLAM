@@ -40,12 +40,18 @@ void MapViewer::setupDisplay()
     sidebarView = &pangolin::Display("Right Side Bar");
     sidebarView->SetBounds(0, 1, RightSideBarDividerLeft, 1);
     colourView = &pangolin::Display("RGB");
-    colourView->SetBounds(0, 0.5, 0, 1);
+    colourView->SetBounds(0.25, 0.5, 0, 0.5);
+    keyPointView = &pangolin::Display("Key Point");
+    keyPointView->SetBounds(0, 0.25, 0, 0.5);
+    matchedView = &pangolin::Display("Matched Point");
+    matchedView->SetBounds(0, 0.25, 0.5, 1);
     depthView = &pangolin::Display("Depth");
     depthView->SetBounds(0.5, 1, 0, 1);
 
     sidebarView->AddDisplay(*colourView);
     sidebarView->AddDisplay(*depthView);
+    sidebarView->AddDisplay(*keyPointView);
+    sidebarView->AddDisplay(*matchedView);
 
     pangolin::CreatePanel("Menu").SetBounds(0, 1, 0, MenuDividerLeft);
 
@@ -99,6 +105,24 @@ void MapViewer::initializePrograms()
 void MapViewer::initializeTextures()
 {
     colourImage.Reinitialise(
+        640, 480,
+        GL_RGB,
+        true,
+        0,
+        GL_RGB,
+        GL_UNSIGNED_BYTE,
+        NULL);
+
+    keyPointImage.Reinitialise(
+        640, 480,
+        GL_RGB,
+        true,
+        0,
+        GL_RGB,
+        GL_UNSIGNED_BYTE,
+        NULL);
+
+    matchedImage.Reinitialise(
         640, 480,
         GL_RGB,
         true,
@@ -182,6 +206,16 @@ void MapViewer::setColourImage(Mat image)
     colourImage.Upload(image.data, GL_RGB, GL_UNSIGNED_BYTE);
 }
 
+void MapViewer::setKeyPointImage(Mat image)
+{
+    keyPointImage.Upload(image.data, GL_RGB, GL_UNSIGNED_BYTE);
+}
+
+void MapViewer::setMatchedPointImage(Mat image)
+{
+    matchedImage.Upload(image.data, GL_RGB, GL_UNSIGNED_BYTE);
+}
+
 void MapViewer::setDepthImage(Mat image)
 {
     depthImage.Upload(image.data, GL_RGBA, GL_UNSIGNED_BYTE);
@@ -203,6 +237,12 @@ void MapViewer::renderView()
     {
         colourView->Activate();
         colourImage.RenderToViewportFlipY();
+
+        keyPointView->Activate();
+        keyPointImage.RenderToViewportFlipY();
+
+        matchedView->Activate();
+        matchedImage.RenderToViewportFlipY();
     }
 
     if (*displayDepthBox && depthView)

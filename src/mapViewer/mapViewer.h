@@ -7,13 +7,16 @@
 class MapViewer
 {
     pangolin::GlTexture colourImage;
+    pangolin::GlTexture keyPointImage;
+    pangolin::GlTexture matchedImage;
     pangolin::GlTexture depthImage;
     pangolin::GlTexture denseMapImage;
 
     pangolin::View *sidebarView;
     pangolin::View *colourView;
+    pangolin::View *keyPointView;
+    pangolin::View *matchedView;
     pangolin::View *depthView;
-    pangolin::View *localMapView;
     pangolin::View *modelView;
     pangolin::View *menuView;
     std::shared_ptr<pangolin::OpenGlRenderState> mainCamera;
@@ -96,6 +99,8 @@ public:
     void setColourImage(Mat image);
     void setDepthImage(Mat image);
     void setDenseMapImage(Mat image);
+    void setKeyPointImage(Mat image);
+    void setMatchedPointImage(Mat image);
 
     void setMeshSizeToRender(size_t size);
     void getMeshBuffer(float *&vbuffer, float *&nbuffer, size_t &bufferSize);

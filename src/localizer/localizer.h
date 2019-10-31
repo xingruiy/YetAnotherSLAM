@@ -12,12 +12,14 @@ class Localizer
     void getWorldTransform(
         const std::vector<std::vector<Vec3d>> &src,
         const std::vector<std::vector<Vec3d>> &dst,
+        std::vector<std::vector<bool>> &filter,
         std::vector<SE3> &result);
 
     void runRansacAO(
-        const std::vector<Vec3d> &ref,
         const std::vector<Vec3d> &src,
-        SE3 &finalEstimate,
+        const std::vector<Vec3d> &dst,
+        std::vector<bool> &outliers,
+        SE3 &bestEsimate,
         size_t &numInliers,
         const int maxIterations);
 
@@ -75,5 +77,7 @@ public:
         const Mat framePtDesc,
         const std::vector<bool> &framePtValid,
         std::vector<SE3> &estimateList,
+        std::vector<std::vector<cv::DMatch>> &subMatches,
+        std::vector<std::vector<bool>> &filter,
         const bool &useGraphMatching);
 };

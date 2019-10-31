@@ -160,6 +160,12 @@ bool FullSystem::tryRelocalizeCurrentFrame()
     matcher->detectAndCompute(currentFrame->getImage(), cvKeyPoint, descriptor);
     matcher->computePointDepth(currentFrame->getDepth(), cvKeyPoint, keyPointDepth);
 
+    if (viewerEnabled && viewer)
+    {
+        cv::drawKeypoints(currentFrame->getImage(), cvKeyPoint, cpuBufferVec3ByteWxH, cv::Scalar(255, 0, 0));
+        viewer->setKeyPointImage(cpuBufferVec3ByteWxH);
+    }
+
     if (shouldCalculateNormal)
         matcher->computePointNormal(cpuBufferVec4FloatWxH, cvKeyPoint, keyPointNormal);
 
@@ -190,6 +196,8 @@ bool FullSystem::tryRelocalizeCurrentFrame()
 
     Localizer relocalizer;
     std::vector<SE3> hypothesesList;
+    std::vector<std::vector<bool>> filter;
+    std::vector<std::vector<cv::DMatch>> matches;
     if (!relocalizer.getRelocHypotheses(
             map,
             keyPoint,
@@ -197,6 +205,8 @@ bool FullSystem::tryRelocalizeCurrentFrame()
             descriptor,
             valid,
             hypothesesList,
+            matches,
+            filter,
             useGraphMatching))
         return false;
 
@@ -204,6 +214,27 @@ bool FullSystem::tryRelocalizeCurrentFrame()
     {
         printf("too few hypotheses(%lu), relocalization failed...\n", hypothesesList.size());
         return false;
+    }
+
+    if (matches.size() != 0 &&
+        filter.size() != 0 &&
+        viewerEnabled && viewer)
+    {
+        std::vector<cv::KeyPoint> ptMatched;
+        const auto &mlist = matches[0];
+        const auto &outlier = filter[0];
+        for (auto i = 0; i < mlist.size(); ++i)
+        {
+            if (!outlier[i])
+            {
+                const auto &m = mlist[i];
+                ptMatched.push_back(cvKeyPoint[m.queryIdx]);
+            }
+        }
+
+        std::cout << matches.size() << std::endl;
+        cv::drawKeypoints(currentFrame->getImage(), ptMatched, cpuBufferVec3ByteWxH, cv::Scalar(0, 255, 0));
+        viewer->setMatchedPointImage(cpuBufferVec3ByteWxH);
     }
 
     if (viewerEnabled && viewer)

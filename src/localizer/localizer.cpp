@@ -114,6 +114,7 @@ int Localizer::evaluateOutlier(
 void Localizer::runRansacAO(
     const std::vector<Vec3d> &src,
     const std::vector<Vec3d> &dst,
+    std::vector<bool> &outliers,
     SE3 &bestEsimate,
     size_t &numInliers,
     const int maxIterations)
@@ -122,7 +123,6 @@ void Localizer::runRansacAO(
     if (nPointPairs < 3)
         return;
 
-    std::vector<bool> outliers(nPointPairs);
     size_t bestNumInliers = 0;
     size_t numIter = 0;
 
@@ -229,8 +229,10 @@ std::vector<cv::DMatch> Localizer::getMatches2NN(Mat src, Mat dst, bool allowAmb
 void Localizer::getWorldTransform(
     const std::vector<std::vector<Vec3d>> &src,
     const std::vector<std::vector<Vec3d>> &dst,
+    std::vector<std::vector<bool>> &filter,
     std::vector<SE3> &result)
 {
+    filter.clear();
     result.clear();
     const auto &numLists = src.size();
     printf("total of %lu hypotheses need to be computed...\n", numLists);
@@ -242,16 +244,19 @@ void Localizer::getWorldTransform(
 
         SE3 estimate;
         size_t numInliers;
+        std::vector<bool> outliers(src[i].size());
 
         runRansacAO(
             src[i],
             dst[i],
+            outliers,
             estimate,
             numInliers,
             200);
 
         printf("hypothesis %i has an inlier ratio of %lu / %lu...\n", i, numInliers, src[i].size());
         result.push_back(estimate);
+        filter.push_back(outliers);
     }
 }
 
@@ -333,8 +338,8 @@ void Localizer::createAdjacencyMat(
         dstPointPos.ptr<Vec3f>(0)[i] = framePt.cast<float>();
         dstPointNormal.ptr<Vec3f>(0)[i] = n;
 
-        if (validPair)
-            std::cout << "frame: " << n << "map: " << mapPt->getNormal() << std::endl;
+        // if (validPair)
+        // std::cout << "frame: " << n << "map: " << mapPt->getNormal() << std::endl;
     }
 
     ::createAdjacencyMatWithNormal(
@@ -461,8 +466,11 @@ bool Localizer::getRelocHypotheses(
     const Mat framePtDesc,
     const std::vector<bool> &framePtValid,
     std::vector<SE3> &estimateList,
+    std::vector<std::vector<cv::DMatch>> &subMatches,
+    std::vector<std::vector<bool>> &filter,
     const bool &useGraphMatching)
 {
+    subMatches.clear();
     estimateList.clear();
     auto &mapPts = map->getMapPointsAll();
     auto mapPtDesc = map->getPointDescriptorsAll();
@@ -476,8 +484,6 @@ bool Localizer::getRelocHypotheses(
         printf("Too few points matched(%lu)! abort...\n", numPointPairs);
         return false;
     }
-
-    std::vector<std::vector<cv::DMatch>> subMatches;
 
     if (useGraphMatching)
     {
@@ -532,6 +538,6 @@ bool Localizer::getRelocHypotheses(
         dst.push_back(dstTemp);
     }
 
-    getWorldTransform(src, dst, estimateList);
+    getWorldTransform(src, dst, filter, estimateList);
     return true;
 }

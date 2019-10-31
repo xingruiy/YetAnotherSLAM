@@ -363,7 +363,6 @@ void FeatureMatcher::computePointNormal(
     const std::vector<cv::KeyPoint> &cvKeyPoint,
     std::vector<Vec3f> &pointNormal)
 {
-    std::cout << "normal map channel: " << normal.channels() << std::endl;
     pointNormal.resize(cvKeyPoint.size());
     for (int i = 0; i < cvKeyPoint.size(); ++i)
     {
