@@ -35,6 +35,7 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> localizationMode;
     std::shared_ptr<pangolin::Var<bool>> incorporateNormal;
     std::shared_ptr<pangolin::Var<bool>> allowMatchingAmbiguity;
+    std::shared_ptr<pangolin::Var<bool>> displayMatchedPoints;
 
     GLuint vaoPhong;
     GLuint vaoColour;
@@ -59,6 +60,8 @@ class MapViewer
     std::vector<Vec3f> activePoints;
     std::vector<Vec3f> stablePoints;
     std::vector<Vec3f> matchedPoints;
+    std::vector<Vec3f> matchingLines;
+    std::vector<Vec3f> matchedFramePoints;
     std::vector<Vec3f> rawFrameHistory;
     std::vector<Mat44f> rawKeyFrameHistory;
     std::vector<Vec3f> frameHistory;
@@ -87,6 +90,8 @@ public:
     void setActivePoints(const std::vector<Vec3f> &points);
     void setStablePoints(const std::vector<Vec3f> &points);
     void setMatchedPoints(const std::vector<Vec3f> &points);
+    void setMatchingLines(const std::vector<Vec3f> &lines);
+    void setMatchedFramePoints(const std::vector<Vec3f> &points);
     void setRelocalizationHypotheses(std::vector<SE3> &H);
 
     bool isResetRequested();

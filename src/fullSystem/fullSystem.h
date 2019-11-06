@@ -62,6 +62,10 @@ class FullSystem
     bool shouldCalculateNormal;
     size_t numProcessedFrames;
 
+    // for debugging relocalization
+    std::vector<Vec3f> lastMatchedKeyPoints;
+    std::vector<Vec3f> lastDetectedKeyPoints;
+
 public:
     ~FullSystem();
     FullSystem(

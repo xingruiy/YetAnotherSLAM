@@ -69,6 +69,7 @@ void MapViewer::setupDisplay()
     localizationMode = std::make_shared<pangolin::Var<bool>>("Menu.Localization Mode", false, true);
     allowMatchingAmbiguity = std::make_shared<pangolin::Var<bool>>("Menu.Graph Matching Mode", false, true);
     incorporateNormal = std::make_shared<pangolin::Var<bool>>("Menu.Incorporate Normal", false, true);
+    displayMatchedPoints = std::make_shared<pangolin::Var<bool>>("Menu.Display Matchings", false, true);
 }
 
 void MapViewer::setupKeyBindings()
@@ -279,13 +280,17 @@ void MapViewer::renderView()
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
-    if (matchedPoints.size() > 0 && modelView)
+    if (*displayMatchedPoints && modelView)
     {
         modelView->Activate(*mainCamera);
         glColor3f(1.f, 0.f, 0.f);
         glPointSize(3.f);
         pangolin::glDrawPoints(matchedPoints);
+        glColor3f(1.f, 0.3f, 1.f);
+        pangolin::glDrawPoints(matchedFramePoints);
         glPointSize(1.f);
+        glColor3f(0.f, 1.0f, 0.f);
+        pangolin::glDrawLines(matchingLines);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
@@ -408,6 +413,16 @@ void MapViewer::setStablePoints(const std::vector<Vec3f> &points)
 void MapViewer::setMatchedPoints(const std::vector<Vec3f> &points)
 {
     matchedPoints = points;
+}
+
+void MapViewer::setMatchedFramePoints(const std::vector<Vec3f> &points)
+{
+    matchedFramePoints = points;
+}
+
+void MapViewer::setMatchingLines(const std::vector<Vec3f> &lines)
+{
+    matchingLines = lines;
 }
 
 void MapViewer::setCurrentState(int state)

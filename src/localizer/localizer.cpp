@@ -541,3 +541,31 @@ bool Localizer::getRelocHypotheses(
     getWorldTransform(src, dst, filter, estimateList);
     return true;
 }
+
+bool Localizer::evalHypotheses(
+    const std::shared_ptr<Map> map,
+    const std::vector<SE3> &estimateList,
+    const std::vector<cv::KeyPoint> &cvKeyPoint,
+    const Mat33d &camIntrinsics,
+    SE3 &bestEstimate)
+{
+    auto &mapPoints = map->getMapPointsAll();
+    const auto fx = camIntrinsics(0, 0);
+    const auto fy = camIntrinsics(1, 1);
+    const auto cx = camIntrinsics(0, 2);
+    const auto cy = camIntrinsics(1, 2);
+
+    for (auto &h : estimateList)
+    {
+        for (auto &pt : mapPoints)
+        {
+            auto pos = pt->getPosWorld();
+            auto posLocal = h.inverse() * pos;
+            const auto x = posLocal(0) / posLocal(2) * fx + cx;
+            const auto y = posLocal(1) / posLocal(2) * fy + cy;
+            if (x >= 0 && y >= 0 && x < 640 && y < 480)
+            {
+            }
+        }
+    }
+}

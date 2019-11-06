@@ -80,4 +80,12 @@ public:
         std::vector<std::vector<cv::DMatch>> &subMatches,
         std::vector<std::vector<bool>> &filter,
         const bool &useGraphMatching);
+
+    // TODO
+    bool evalHypotheses(
+        const std::shared_ptr<Map> map,
+        const std::vector<SE3> &estimateList,
+        const std::vector<cv::KeyPoint> &cvKeyPoint,
+        const Mat33d &camIntrinsics,
+        SE3 &bestEstimate);
 };
