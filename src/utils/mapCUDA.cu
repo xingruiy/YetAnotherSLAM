@@ -25,6 +25,7 @@ __global__ void createAdjacencyMatKernel(
     const bool &isValid = valid.ptr(0)[x];
     if (!isValid)
     {
+        // adjacencyMat.ptr(x)[y] = 1000;
         return;
     }
 
@@ -97,6 +98,7 @@ __global__ void createAdjacencyMatKernel(
     const bool &isValid = valid.ptr(0)[x];
     if (!isValid)
     {
+        // adjacencyMat.ptr(x)[y] = 1000;
         return;
     }
 
@@ -133,8 +135,8 @@ __global__ void createAdjacencyMatKernel(
         }
     }
 
-    adjacencyMat.ptr(y)[x] = score;
     adjacencyMat.ptr(x)[y] = score;
+    adjacencyMat.ptr(y)[x] = score;
 }
 
 void createAdjacencyMatWithNormal(

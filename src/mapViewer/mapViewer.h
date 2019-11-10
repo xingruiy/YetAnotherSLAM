@@ -36,6 +36,8 @@ class MapViewer
     std::shared_ptr<pangolin::Var<bool>> incorporateNormal;
     std::shared_ptr<pangolin::Var<bool>> allowMatchingAmbiguity;
     std::shared_ptr<pangolin::Var<bool>> displayMatchedPoints;
+    std::shared_ptr<pangolin::Var<bool>> enteringDebuggingModeBtn;
+    std::shared_ptr<pangolin::Var<bool>> testNextKeyframeBtn;
 
     GLuint vaoPhong;
     GLuint vaoColour;
@@ -69,6 +71,8 @@ class MapViewer
     std::vector<Mat44f> relocHypotheses;
 
     bool requestSystemReset;
+    bool requestDebugMode;
+    bool requestTestNextKF;
 
     // draw calls
     void drawLocalMap();
@@ -95,6 +99,8 @@ public:
     void setRelocalizationHypotheses(std::vector<SE3> &H);
 
     bool isResetRequested();
+    bool isDebugRequested();
+    bool isNextKFRequested();
     bool paused() const;
     bool isLocalizationMode() const;
     bool mappingEnabled() const;

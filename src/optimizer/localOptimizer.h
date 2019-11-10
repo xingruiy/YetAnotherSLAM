@@ -35,7 +35,6 @@ public:
 
     void loop();
     void setShouldQuit();
-    bool pauseMapping;
     void setViewer(MapViewer *viewer);
     void setMap(std::shared_ptr<Map> map);
 };

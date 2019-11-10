@@ -60,3 +60,17 @@ target_link_libraries(drawCam
 PRIVATE
     athena
 )
+
+# test
+
+add_executable(testGen)
+
+target_sources(testGen 
+PRIVATE
+    unitTest/testGeneralProgramming.cpp
+)
+
+target_link_libraries(testGen
+PRIVATE
+    athena
+)

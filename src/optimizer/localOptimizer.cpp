@@ -21,8 +21,7 @@ LocalOptimizer::LocalOptimizer(
     std::shared_ptr<Map> map)
     : K(K),
       shouldQuit(false),
-      map(map),
-      pauseMapping(false)
+      map(map)
 {
     matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
 }
@@ -34,11 +33,7 @@ void LocalOptimizer::loop()
         if (auto frameUnProc = getNewKeyframe())
         {
             matchFeatures(frameUnProc);
-
             createNewPoints(frameUnProc);
-
-            // detectLoop(frameUnProc);
-
             map->addKeyFrame(frameUnProc);
             map->setCurrentKeyframe(frameUnProc);
         }
@@ -135,6 +130,7 @@ void LocalOptimizer::createNewPoints(std::shared_ptr<Frame> kf)
             pt->addObservation(kf, Vec3d(kp.pt.x, kp.pt.y, z));
             framePt = pt;
             map->addMapPoint(pt);
+            std::cout << i << std::endl;
         }
     }
 }

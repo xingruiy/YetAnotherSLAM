@@ -7,7 +7,7 @@
 
 MapViewer::MapViewer(int w, int h, int fW, int fH, Mat33d &K)
     : numTriangles(0), maxNumTriangles(20000000), K(K), Kinv(K.inverse()),
-      frameWidth(fW), frameHeight(fH)
+      frameWidth(fW), frameHeight(fH), requestDebugMode(false), requestTestNextKF(false)
 {
     pangolin::CreateWindowAndBind("MAP VIEWER", w, h);
 
@@ -70,6 +70,8 @@ void MapViewer::setupDisplay()
     allowMatchingAmbiguity = std::make_shared<pangolin::Var<bool>>("Menu.Graph Matching Mode", false, true);
     incorporateNormal = std::make_shared<pangolin::Var<bool>>("Menu.Incorporate Normal", false, true);
     displayMatchedPoints = std::make_shared<pangolin::Var<bool>>("Menu.Display Matchings", false, true);
+    enteringDebuggingModeBtn = std::make_shared<pangolin::Var<bool>>("Menu.Debug Mode", false, false);
+    testNextKeyframeBtn = std::make_shared<pangolin::Var<bool>>("Menu.Test Next", false, false);
 }
 
 void MapViewer::setupKeyBindings()
@@ -301,9 +303,9 @@ void MapViewer::renderView()
         // for (auto T : rawKeyFrameHistory)
         //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
-        // glColor3f(0.f, 1.f, 0.f);
-        // for (auto T : keyFrameHistory)
-        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+        glColor3f(0.f, 1.f, 0.f);
+        for (auto T : keyFrameHistory)
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
         glColor3f(1.f, 0.f, 0.f);
         for (auto T : relocHypotheses)
@@ -319,6 +321,12 @@ void MapViewer::checkButtonsAndBoxes()
     if (pangolin::Pushed(*resetBtn))
         requestSystemReset = true;
 
+    if (pangolin::Pushed(*enteringDebuggingModeBtn))
+        requestDebugMode = true;
+
+    if (pangolin::Pushed(*testNextKeyframeBtn))
+        requestTestNextKF = true;
+
     if (*localizationMode)
     {
         *enableMappingBox = false;
@@ -330,6 +338,28 @@ bool MapViewer::isResetRequested()
     if (requestSystemReset)
     {
         requestSystemReset = false;
+        return true;
+    }
+    else
+        return false;
+}
+
+bool MapViewer::isDebugRequested()
+{
+    if (requestDebugMode)
+    {
+        requestDebugMode = false;
+        return true;
+    }
+    else
+        return false;
+}
+
+bool MapViewer::isNextKFRequested()
+{
+    if (requestTestNextKF)
+    {
+        requestTestNextKF = false;
         return true;
     }
     else

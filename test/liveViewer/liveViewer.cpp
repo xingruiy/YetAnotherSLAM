@@ -37,13 +37,20 @@ int main(int argc, char **argv)
             viewer.setDepthImage(Mat(bufferVec4ByteWxH));
 
             fullsystem.setMappingEnable(viewer.mappingEnabled());
+            fullsystem.setGraphMatching(viewer.isGraphMatchingMode());
+            fullsystem.setGraphGetNormal(viewer.shouldCalculateNormal());
 
             if (viewer.isLocalizationMode())
-            {
                 fullsystem.setSystemStateToLost();
-                fullsystem.setGraphMatching(viewer.isGraphMatchingMode());
-                fullsystem.setGraphGetNormal(viewer.shouldCalculateNormal());
-            }
+
+            if (viewer.isDebugRequested())
+                fullsystem.setSystemStateToTest();
+
+            if (viewer.isNextKFRequested())
+                fullsystem.testNextKF();
+
+            if (viewer.isResetRequested())
+                fullsystem.resetSystem();
 
             if (!viewer.paused())
             {
@@ -51,10 +58,7 @@ int main(int argc, char **argv)
                 fullsystem.processFrame(image, depthFloat);
             }
 
-            if (viewer.isResetRequested())
-                fullsystem.resetSystem();
-
-            if (!viewer.paused() && viewer.mappingEnabled())
+            if (!viewer.paused())
             {
                 float *vbuffer;
                 float *nbuffer;

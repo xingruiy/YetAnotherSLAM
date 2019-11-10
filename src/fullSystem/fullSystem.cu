@@ -10,6 +10,9 @@ FullSystem::FullSystem(
     : state(SystemState::NotInitialized),
       lastState(SystemState::NotInitialized),
       viewerEnabled(enableViewer),
+      numTimesRun(0),
+      testKFId(0),
+      lastTestedKFId(0),
       mappingEnabled(true),
       imageWidth(w),
       imageHeight(h),
@@ -50,13 +53,14 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
     rawImage.convertTo(cpuBufferVec3FloatWxH, CV_32FC3);
     cv::cvtColor(cpuBufferVec3FloatWxH, cpuBufferFloatWxH, cv::COLOR_RGB2GRAY);
 
-    currentFrame = std::make_shared<Frame>(
-        imageWidth,
-        imageHeight,
-        camIntrinsics,
-        rawImage,
-        rawDepth,
-        cpuBufferFloatWxH);
+    if (lastState != SystemState::Lost)
+        currentFrame = std::make_shared<Frame>(
+            imageWidth,
+            imageHeight,
+            camIntrinsics,
+            rawImage,
+            rawDepth,
+            cpuBufferFloatWxH);
 
     switch (state)
     {
@@ -68,6 +72,8 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         coarseTracker->setReferenceFrame(currentFrame);
         createNewKF();
         fuseCurrentFrame();
+        raytraceCurrentFrame();
+
         state = SystemState::OK;
 
         if (viewerEnabled && viewer)
@@ -75,6 +81,7 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 
         break;
     }
+
     case SystemState::OK:
     {
         auto rval = trackCurrentFrame();
@@ -105,6 +112,7 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 
         break;
     }
+
     case SystemState::Lost:
     {
         printf("tracking loast, attempt to resuming...\n");
@@ -115,6 +123,19 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
         }
         break;
     }
+
+    case SystemState::Test:
+    {
+        if (lastState == SystemState::Test && testKFId == lastTestedKFId)
+            break;
+
+        auto KFs = map->getKeyframesAll();
+        auto &kf = KFs[testKFId];
+        std::cout << "testing kf: " << kf->getId() << std::endl;
+        tryRelocalizeKeyframe(KFs[testKFId]);
+        lastTestedKFId = testKFId;
+    }
+    break;
     }
 
     lastState = state;
@@ -147,6 +168,118 @@ void FullSystem::raytraceCurrentFrame()
     coarseTracker->setReferenceInvDepth(gpuBufferVec4FloatWxH);
     computeNormal(gpuBufferVec4FloatWxH, gpuBufferVec4FloatWxH2);
     currentFrame->setNormalMap(Mat(gpuBufferVec4FloatWxH2));
+}
+
+bool FullSystem::tryRelocalizeKeyframe(std::shared_ptr<Frame> kf)
+{
+    // draw detected keypoints
+    if (viewerEnabled && viewer)
+    {
+        cv::drawKeypoints(kf->getImage(), kf->cvKeyPoints, cpuBufferVec3ByteWxH, cv::Scalar(255, 0, 0));
+        viewer->setKeyPointImage(cpuBufferVec3ByteWxH);
+    }
+
+    auto numFeatures = kf->getNumPointsDetected();
+    if (numFeatures < 10)
+    {
+        printf("too few points detected(%lu), relocalization failed...\n", numFeatures);
+        return false;
+    }
+
+    std::vector<bool> valid(numFeatures);
+    std::vector<Vec3d> keyPoint(numFeatures);
+    std::fill(valid.begin(), valid.end(), false);
+    for (int n = 0; n < numFeatures; ++n)
+    {
+        auto &z = kf->keyPointDepth[n];
+        if (z)
+        {
+            valid[n] = true;
+            auto &kp = kf->cvKeyPoints[n].pt;
+            keyPoint[n] = camIntrinsics.inverse() * Vec3d(kp.x, kp.y, 1.0) * z;
+        }
+    }
+
+    Localizer relocalizer;
+    std::vector<SE3> hypothesesList;
+    std::vector<std::vector<bool>> filter;
+    std::vector<std::vector<cv::DMatch>> matches;
+    if (!relocalizer.getRelocHypotheses(
+            map,
+            keyPoint,
+            kf->keyPointNorm,
+            kf->pointDesc,
+            valid,
+            hypothesesList,
+            matches,
+            filter,
+            useGraphMatching))
+        return false;
+
+    if (hypothesesList.size() == 0)
+    {
+        printf("too few hypotheses(%lu), relocalization failed...\n", hypothesesList.size());
+        return false;
+    }
+
+    cv::Mat test;
+    // display matched points in the image
+    if (matches.size() != 0 &&
+        filter.size() != 0 &&
+        viewerEnabled && viewer)
+    {
+        std::vector<cv::KeyPoint> ptMatched;
+        std::vector<cv::KeyPoint> ptMatchedDst;
+        std::vector<cv::DMatch> ptMatch;
+        std::vector<cv::Point> matchingLines;
+        auto mapPoints = map->getMapPointsAll();
+        const auto &mlist = matches[0];
+        const auto &outlier = filter[0];
+        const auto &T = hypothesesList[0];
+        const auto fx = camIntrinsics(0, 0);
+        const auto fy = camIntrinsics(1, 1);
+        const auto cx = camIntrinsics(0, 2);
+        const auto cy = camIntrinsics(1, 2);
+        int counter = 0;
+        for (auto i = 0; i < mlist.size(); ++i)
+        {
+            if (!outlier[i])
+            {
+                const auto &m = mlist[i];
+                const auto &pos = kf->getPoseInGlobalMap().inverse() * mapPoints[m.trainIdx]->getPosWorld();
+                const int x = fx * pos(0) / pos(2) + cx;
+                const int y = fy * pos(1) / pos(2) + cy;
+                if (x >= 0 && y >= 0 && x < 640 && y < 480)
+                {
+                    ptMatched.push_back(kf->cvKeyPoints[m.queryIdx]);
+                    ptMatchedDst.push_back(cv::KeyPoint(x, y, 1));
+                    ptMatch.push_back(cv::DMatch(counter, counter, 0));
+                    matchingLines.push_back(cv::Point2f(x, y));
+                    matchingLines.push_back(kf->cvKeyPoints[m.queryIdx].pt);
+                    counter++;
+                }
+            }
+        }
+
+        // display matched points in a image;
+        cv::drawKeypoints(kf->getImage(), ptMatched, cpuBufferVec3ByteWxH, cv::Scalar(0, 255, 0));
+        cv::drawKeypoints(cpuBufferVec3ByteWxH, ptMatchedDst, test, cv::Scalar(255, 0, 0));
+        for (int i = 0; i < counter - 1; ++i)
+        {
+            cv::line(test, matchingLines[2 * i], matchingLines[2 * i + 1], cv::Scalar(0, 0, 255));
+        }
+        // cv::drawMatches(kf->getImage(), ptMatched, kf->getImage(), ptMatchedDst, ptMatch, test);
+        viewer->setMatchedPointImage(test);
+    }
+
+    // display pose proposals
+    if (viewerEnabled && viewer)
+        viewer->setRelocalizationHypotheses(hypothesesList);
+
+    cv::imshow("img", test);
+    cv::waitKey(1);
+
+    return true;
 }
 
 bool FullSystem::tryRelocalizeCurrentFrame()
@@ -252,7 +385,7 @@ bool FullSystem::tryRelocalizeCurrentFrame()
         for (int i = 0; i < ptMatched.size(); ++i)
         {
             const auto kp = ptMatched[i];
-            const auto kp3d = T * (camIntrinsics.inverse() * Vec3d(kp.pt.x - cx, kp.pt.y - cy, 0));
+            const auto kp3d = T * (camIntrinsics.inverse() * Vec3d(kp.pt.x / 640.0, kp.pt.y / 480.0, 0.01));
             ptMatched3d.push_back(kp3d.cast<float>());
             lines.push_back(ptMatchedDst3d[i]);
             lines.push_back(ptMatched3d[i]);
@@ -350,6 +483,17 @@ void FullSystem::setMappingEnable(const bool enable)
 void FullSystem::setSystemStateToLost()
 {
     state = SystemState::Lost;
+}
+
+void FullSystem::setSystemStateToTest()
+{
+    state = SystemState::Test;
+}
+
+void FullSystem::testNextKF()
+{
+    auto &KFs = map->getKeyframesAll();
+    testKFId = (testKFId + 1) % KFs.size();
 }
 
 void FullSystem::setGraphMatching(const bool &flag)
