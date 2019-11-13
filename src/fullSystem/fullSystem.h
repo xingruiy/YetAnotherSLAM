@@ -4,10 +4,10 @@
 #include <iostream>
 #include "dataStruct/map.h"
 #include "utils/numType.h"
-#include "localMapper/localMapper.h"
-#include "optimizer/localOptimizer.h"
-#include "denseTracker/denseTracker.h"
 #include "mapViewer/mapViewer.h"
+#include "denseMapper/denseMapper.h"
+#include "localMapper/localMapper.h"
+#include "denseTracker/denseTracker.h"
 
 enum class SystemState
 {
@@ -21,12 +21,7 @@ class FullSystem
 {
 public:
     ~FullSystem();
-    FullSystem(
-        int w, int h,
-        Mat33d K,
-        int numLvl,
-        bool enableViewer = true);
-
+    FullSystem(int w, int h, Mat33d K, int numLvl, bool enableViewer = true);
     // allow viewing the map
     void setMapViewerPtr(MapViewer *viewer);
     // toggle mapping
@@ -43,7 +38,7 @@ public:
     void testNextKF();
     // main process function
     void setCurrentNormal(GMat nmap);
-    void processFrame(Mat rawImage, Mat rawDepth);
+    void processFrame(Mat imRGB, Mat imDepth);
 
     std::vector<SE3> getFramePoseHistory();
     std::vector<SE3> getKeyFramePoseHistory();
@@ -71,9 +66,9 @@ public:
     MapViewer *viewer;
 
     std::shared_ptr<Map> map;
-    std::shared_ptr<DenseMapping> localMapper;
+    std::shared_ptr<DenseMapping> denseMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
-    std::shared_ptr<LocalOptimizer> localOptimizer;
+    std::shared_ptr<FeatureMapper> localMapper;
 
     std::shared_ptr<Frame> currentFrame;
     std::shared_ptr<Frame> currentKeyframe;
@@ -81,6 +76,21 @@ public:
     SE3 lastTrackedPose;
     SE3 accumulateTransform;
 
+    // State machine
+    SystemState state, lastState;
+
+    int imageWidth;
+    int imageHeight;
+    Mat33d camIntrinsics;
+    bool mappingEnabled;
+    bool useGraphMatching;
+    bool shouldCalculateNormal;
+
+    // **For debugging relocalization
+    size_t testKFId;
+    size_t lastTestedKFId;
+
+    // Reusable buffers
     GMat gpuBufferFloatWxH;
     GMat gpuBufferVec4FloatWxH;
     GMat gpuBufferVec4FloatWxH2;
@@ -89,20 +99,6 @@ public:
     Mat cpuBufferVec3ByteWxH;
     Mat cpuBufferVec3FloatWxH;
 
-    SystemState state;
-    SystemState lastState;
-
-    int imageWidth;
-    int imageHeight;
-    Mat33d camIntrinsics;
-    bool mappingEnabled;
-    bool useGraphMatching;
-    bool shouldCalculateNormal;
+    // System statistics
     size_t numProcessedFrames;
-
-    // for debugging relocalization
-    size_t testKFId;
-    size_t lastTestedKFId;
-    std::vector<Vec3f> lastMatchedKeyPoints;
-    std::vector<Vec3f> lastDetectedKeyPoints;
 };

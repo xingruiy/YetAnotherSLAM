@@ -14,7 +14,7 @@ void Map::clear()
 
     currentKeyframe = NULL;
     descriptorsriptorsAll.release();
-    keyframesAll.clear();
+    keyFrameDB.clear();
     mapPointsAll.clear();
     framePoseOptimized.clear();
     keyframePoseRawAll.clear();
@@ -26,7 +26,7 @@ void Map::clear()
 void Map::addKeyFrame(std::shared_ptr<Frame> kf)
 {
     std::unique_lock<std::mutex> lock(mapMutex);
-    keyframesAll.push_back(kf);
+    keyFrameDB.push_back(kf);
     std::unique_lock<std::mutex> lock2(histMutex);
 }
 
@@ -55,14 +55,14 @@ void Map::addMapPoint(std::shared_ptr<MapPoint> pt)
 const std::vector<std::shared_ptr<Frame>> &Map::getKeyframesAll()
 {
     std::unique_lock<std::mutex> lock(mapMutex);
-    return keyframesAll;
+    return keyFrameDB;
 }
 
 std::vector<std::shared_ptr<Frame>> Map::getLastNKeyframes(const size_t N)
 {
     std::unique_lock<std::mutex> lock(mapMutex);
-    size_t Ni = std::min(N, keyframesAll.size());
-    return std::vector<std::shared_ptr<Frame>>(keyframesAll.end() - Ni, keyframesAll.end());
+    size_t Ni = std::min(N, keyFrameDB.size());
+    return std::vector<std::shared_ptr<Frame>>(keyFrameDB.end() - Ni, keyFrameDB.end());
 }
 
 const std::vector<std::shared_ptr<MapPoint>> &Map::getMapPointsAll()
@@ -119,7 +119,7 @@ std::vector<SE3> Map::getKeyframePoseOptimized()
 {
     std::unique_lock<std::mutex> lock(mapMutex);
     std::vector<SE3> output;
-    for (auto kf : keyframesAll)
+    for (auto kf : keyFrameDB)
         output.push_back(kf->getPoseInGlobalMap());
 
     return output;

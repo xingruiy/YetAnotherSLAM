@@ -1,28 +1,37 @@
 #pragma once
 #include <memory>
+#include <mutex>
+#include "dataStruct/map.h"
 #include "utils/numType.h"
-#include "localMapper/denseMap.h"
+#include "mapViewer/mapViewer.h"
+#include "localMapper/featureMatcher.h"
 
-class DenseMapping
+class FeatureMapper
 {
-  Mat33d intrinsics;
-  MapStruct deviceMap;
-
-  // for map udate
-  uint count_visible_block;
-
-  // for raycast
-  GMat zRangeX;
-  GMat zRangeY;
-  uint count_rendering_block;
-  RenderingBlock *listRenderingBlock;
-
 public:
-  ~DenseMapping();
-  DenseMapping(int w, int h, Mat33d &K);
+    FeatureMapper(Mat33d &K, std::shared_ptr<Map> map);
+    void loop();
+    void setShouldQuit();
+    void setViewer(MapViewer *viewer);
+    void setMap(std::shared_ptr<Map> map);
 
-  void reset();
-  void fuseFrame(GMat depth, const SE3 &T);
-  void raytrace(GMat &vertex, const SE3 &T);
-  size_t fetchMeshWithNormal(void *vertex, void *normal);
+private:
+    void optimize(std::shared_ptr<Frame> kf);
+    void optimizePoints(std::shared_ptr<Frame> kf);
+    void optimize(
+        std::vector<std::shared_ptr<Frame>> kfs,
+        std::vector<std::shared_ptr<MapPoint>> pts,
+        const int maxIter);
+
+    void matchFeatures(std::shared_ptr<Frame> kf);
+    void detectLoop(std::shared_ptr<Frame> kf);
+    void createNewPoints(std::shared_ptr<Frame> kf);
+    std::shared_ptr<Frame> getNewKeyframe();
+
+    Mat33d K;
+    MapViewer *viewer;
+    bool shouldQuit;
+
+    std::shared_ptr<Map> map;
+    std::shared_ptr<FeatureMatcher> matcher;
 };

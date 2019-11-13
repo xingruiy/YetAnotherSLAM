@@ -120,4 +120,7 @@ public:
 
     void addTrackingResult(const SE3 &T);
     void addRawKeyFramePose(const SE3 &T);
+
+    inline bool displayImageRGB() const { return *displayColourBox; }
+    inline bool displayImageDepth() const { return *displayDepthBox; }
 };

@@ -1,5 +1,5 @@
 #include "fullSystem/fullSystem.h"
-#include "localizer/localizer.h"
+#include "localMapper/localizer.h"
 #include "denseTracker/cudaImageProc.h"
 
 FullSystem::FullSystem(
@@ -22,8 +22,8 @@ FullSystem::FullSystem(
       shouldCalculateNormal(false)
 {
     map = std::make_shared<Map>();
-    localOptimizer = std::make_shared<LocalOptimizer>(K, 3, map);
-    localMapper = std::make_shared<DenseMapping>(w, h, K);
+    localMapper = std::make_shared<FeatureMapper>(K, map);
+    denseMapper = std::make_shared<DenseMapping>(w, h, K);
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
     lastTrackedPose = SE3(Mat44d::Identity());
@@ -32,12 +32,12 @@ FullSystem::FullSystem(
     gpuBufferVec4FloatWxH.create(h, w, CV_32FC4);
     gpuBufferFloatWxH.create(h, w, CV_32FC1);
 
-    localOptThread = std::thread(&LocalOptimizer::loop, localOptimizer.get());
+    localOptThread = std::thread(&FeatureMapper::loop, localMapper.get());
 }
 
 FullSystem::~FullSystem()
 {
-    localOptimizer->setShouldQuit();
+    localMapper->setShouldQuit();
     printf("wating other threads to finish...\n");
     localOptThread.join();
     printf("all threads finished!\n");
@@ -48,9 +48,9 @@ void FullSystem::setCurrentNormal(GMat nmap)
     nmap.download(cpuBufferVec4FloatWxH);
 }
 
-void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
+void FullSystem::processFrame(Mat imRGB, Mat imDepth)
 {
-    rawImage.convertTo(cpuBufferVec3FloatWxH, CV_32FC3);
+    imRGB.convertTo(cpuBufferVec3FloatWxH, CV_32FC3);
     cv::cvtColor(cpuBufferVec3FloatWxH, cpuBufferFloatWxH, cv::COLOR_RGB2GRAY);
 
     if (lastState != SystemState::Lost)
@@ -58,8 +58,8 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
             imageWidth,
             imageHeight,
             camIntrinsics,
-            rawImage,
-            rawDepth,
+            imRGB,
+            imDepth,
             cpuBufferFloatWxH);
 
     switch (state)
@@ -126,21 +126,26 @@ void FullSystem::processFrame(Mat rawImage, Mat rawDepth)
 
     case SystemState::Test:
     {
+        // Update only when testKFId changed
         if (lastState == SystemState::Test && testKFId == lastTestedKFId)
             break;
 
-        auto KFs = map->getKeyframesAll();
-        auto &kf = KFs[testKFId];
-        std::cout << "testing kf: " << kf->getId() << std::endl;
-        tryRelocalizeKeyframe(KFs[testKFId]);
-        lastTestedKFId = testKFId;
+        printf("testing kf: %lu / %lu\n", testKFId, map->keyFrameDB.size());
+        auto &testKF = map->keyFrameDB[testKFId];
+
+        if (tryRelocalizeKeyframe(testKF))
+            lastTestedKFId = testKFId;
+
+        break;
     }
-    break;
     }
 
+    // Copy state
     lastState = state;
+
+    // Update statistics
     if (state == SystemState::OK)
-        numProcessedFrames++;
+        numProcessedFrames += 1;
 }
 
 bool FullSystem::trackCurrentFrame()
@@ -159,12 +164,12 @@ void FullSystem::fuseCurrentFrame()
 {
 
     auto currDepth = coarseTracker->getReferenceDepth();
-    localMapper->fuseFrame(currDepth, currentFrame->getPoseInLocalMap());
+    denseMapper->fuseFrame(currDepth, currentFrame->getPoseInLocalMap());
 }
 
 void FullSystem::raytraceCurrentFrame()
 {
-    localMapper->raytrace(gpuBufferVec4FloatWxH, currentFrame->getPoseInLocalMap());
+    denseMapper->raytrace(gpuBufferVec4FloatWxH, currentFrame->getPoseInLocalMap());
     coarseTracker->setReferenceInvDepth(gpuBufferVec4FloatWxH);
     computeNormal(gpuBufferVec4FloatWxH, gpuBufferVec4FloatWxH2);
     currentFrame->setNormalMap(Mat(gpuBufferVec4FloatWxH2));
@@ -469,7 +474,7 @@ void FullSystem::resetSystem()
 {
     map->clear();
     viewer->resetViewer();
-    localMapper->reset();
+    denseMapper->reset();
     lastTrackedPose = SE3(Mat44d::Identity());
     accumulateTransform = SE3(Mat44d::Identity());
     state = SystemState::NotInitialized;
@@ -477,7 +482,7 @@ void FullSystem::resetSystem()
 
 size_t FullSystem::getMesh(float *vbuffer, float *nbuffer, size_t bufferSize)
 {
-    return localMapper->fetchMeshWithNormal(vbuffer, nbuffer);
+    return denseMapper->fetchMeshWithNormal(vbuffer, nbuffer);
 }
 
 std::vector<SE3> FullSystem::getKeyFramePoseHistory()
@@ -498,7 +503,7 @@ std::vector<Vec3f> FullSystem::getMapPointPosAll()
 void FullSystem::setMapViewerPtr(MapViewer *viewer)
 {
     this->viewer = viewer;
-    this->localOptimizer->setViewer(viewer);
+    this->localMapper->setViewer(viewer);
 }
 
 void FullSystem::setMappingEnable(const bool enable)

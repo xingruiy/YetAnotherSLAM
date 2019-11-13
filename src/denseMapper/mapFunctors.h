@@ -1,6 +1,6 @@
 #pragma once
 #include "utils/numType.h"
-#include "localMapper/denseMap.h"
+#include "denseMapper/denseMap.h"
 
 void fuseDepth(
     MapStruct map,

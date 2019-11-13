@@ -1,6 +1,6 @@
 #include <ceres/ceres.h>
 #include "utils/numType.h"
-#include "optimizer/costFunctors.h"
+#include "utils/costFunctors.h"
 
 bool test(SE3 &a, SE3 &b, Vec3d &pt, const Vec2d &proj0, const Vec2d &proj1, Vec4d &K)
 {

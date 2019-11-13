@@ -1,4 +1,4 @@
-#include "localMapper/denseMap.h"
+#include "denseMapper/denseMap.h"
 #include <fstream>
 
 __global__ void resetHashKernel(HashEntry *hashTable, int numEntry)

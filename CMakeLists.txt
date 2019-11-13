@@ -21,19 +21,20 @@ PRIVATE
 
     src/mapViewer/mapViewer.cpp
 
+    src/loopCloser/loopCloser.cpp
+
     src/denseTracker/denseTracker.cu
     src/denseTracker/cudaImageProc.cu
 
-    src/optimizer/localOptimizer.cpp
-    src/optimizer/featureMatcher.cpp
-
-    src/localMapper/denseMap.cu
+    src/localMapper/localizer.cpp
     src/localMapper/localMapper.cpp
-    src/localMapper/depthFusion.cu
-    src/localMapper/meshScene.cu
-    src/localMapper/raytracing.cu
-    
-    src/localizer/localizer.cpp
+    src/localMapper/featureMatcher.cpp
+
+    src/denseMapper/denseMap.cu
+    src/denseMapper/denseMapper.cpp
+    src/denseMapper/depthFusion.cu
+    src/denseMapper/meshScene.cu
+    src/denseMapper/raytracing.cu
 )
 
 target_compile_features(athena

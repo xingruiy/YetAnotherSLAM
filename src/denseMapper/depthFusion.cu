@@ -3,7 +3,7 @@
 #include "utils/numType.h"
 #include "utils/prefixSum.h"
 #include "utils/cudaUtils.h"
-#include "localMapper/mapFunctors.h"
+#include "denseMapper/mapFunctors.h"
 
 struct CreateBlockLineTracingFunctor
 {

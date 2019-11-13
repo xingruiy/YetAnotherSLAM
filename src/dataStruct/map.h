@@ -45,7 +45,7 @@ public:
     std::mutex mapMutex;
     Mat descriptorsriptorsAll;
     std::shared_ptr<Frame> currentKeyframe;
-    std::vector<std::shared_ptr<Frame>> keyframesAll;
+    std::vector<std::shared_ptr<Frame>> keyFrameDB;
     std::vector<std::shared_ptr<MapPoint>> mapPointsAll;
 
     std::mutex mutexkf, mutexloop;

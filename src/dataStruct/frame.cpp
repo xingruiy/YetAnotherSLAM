@@ -20,8 +20,8 @@ Frame::Frame(int w,
       keyframeFlag(false),
       camIntrinsics(K)
 {
-    colourImage.copyTo(rawImage);
-    depthImage.copyTo(rawDepth);
+    colourImage.copyTo(imRGB);
+    depthImage.copyTo(imDepth);
     depthImage.copyTo(ogDepth);
     intensityImage.copyTo(rawIntensity);
 }
@@ -43,12 +43,12 @@ Mat33d Frame::getIntrinsics() const
 
 Mat Frame::getDepth() const
 {
-    return rawDepth;
+    return imDepth;
 }
 
 Mat Frame::getImage() const
 {
-    return rawImage;
+    return imRGB;
 }
 
 Mat Frame::getIntensity() const
@@ -172,9 +172,9 @@ void Frame::detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher)
 {
     if (numPointsDetectd == 0)
     {
-        matcher->detectAndCompute(rawImage, cvKeyPoints, descriptors);
-        matcher->computePointDepth(rawDepth, cvKeyPoints, keyPointDepth);
-        matcher->computePointNormal(normalMap, cvKeyPoints, keyPointNorm);
+        matcher->detectAndCompute(imRGB, cvKeyPoints, descriptors);
+        matcher->computePointDepth(imDepth, cvKeyPoints, keyPointDepth);
+        matcher->computePointNormal(nmap, cvKeyPoints, keyPointNorm);
         numPointsDetectd = cvKeyPoints.size();
         mapPoints.resize(numPointsDetectd);
     }
@@ -198,10 +198,10 @@ std::shared_ptr<MapPoint> Frame::createMapPoint(size_t idx)
 
 Mat Frame::getNormalMap() const
 {
-    return normalMap;
+    return nmap;
 }
 
 void Frame::setNormalMap(const Mat nmap)
 {
-    normalMap = nmap;
+    this->nmap = nmap;
 }

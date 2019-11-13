@@ -1,6 +1,6 @@
 #include "utils/mapCUDA.h"
-#include "localizer/localizer.h"
-#include "optimizer/featureMatcher.h"
+#include "localMapper/localizer.h"
+#include "localMapper/featureMatcher.h"
 
 #define MinimumNumMatches 3
 

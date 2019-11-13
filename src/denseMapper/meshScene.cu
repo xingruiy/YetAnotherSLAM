@@ -1,8 +1,8 @@
 #include "utils/prefixSum.h"
 #include "utils/cudaUtils.h"
 #include "utils/triangleTable.h"
-#include "localMapper/localMapper.h"
-#include "localMapper/mapFunctors.h"
+#include "denseMapper/denseMapper.h"
+#include "denseMapper/mapFunctors.h"
 
 #define MAX_NUM_MESH_TRIANGLES 20000000
 

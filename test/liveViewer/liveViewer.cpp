@@ -29,16 +29,17 @@ int main(int argc, char **argv)
         {
             depth.convertTo(depthFloat, CV_32FC1, depthScale);
             gpuBufferFloatWxH.upload(depthFloat);
-            computeVMap(gpuBufferFloatWxH, bufferVec4FloatWxH, K);
-            computeNormal(bufferVec4FloatWxH, bufferVec4FloatWxH2);
-            renderScene(bufferVec4FloatWxH, bufferVec4FloatWxH2, bufferVec4ByteWxH);
 
-            viewer.setColourImage(image);
-            viewer.setDepthImage(Mat(bufferVec4ByteWxH));
+            if (viewer.displayImageDepth())
+            {
+                computeVMap(gpuBufferFloatWxH, bufferVec4FloatWxH, K);
+                computeNormal(bufferVec4FloatWxH, bufferVec4FloatWxH2);
+                renderScene(bufferVec4FloatWxH, bufferVec4FloatWxH2, bufferVec4ByteWxH);
+                viewer.setDepthImage(Mat(bufferVec4ByteWxH));
+            }
 
-            fullsystem.setMappingEnable(viewer.mappingEnabled());
-            fullsystem.setGraphMatching(viewer.isGraphMatchingMode());
-            fullsystem.setGraphGetNormal(viewer.shouldCalculateNormal());
+            if (viewer.displayImageRGB())
+                viewer.setColourImage(image);
 
             if (viewer.isLocalizationMode())
                 fullsystem.setSystemStateToLost();
@@ -51,6 +52,10 @@ int main(int argc, char **argv)
 
             if (viewer.isResetRequested())
                 fullsystem.resetSystem();
+
+            fullsystem.setMappingEnable(viewer.mappingEnabled());
+            fullsystem.setGraphMatching(viewer.isGraphMatchingMode());
+            fullsystem.setGraphGetNormal(viewer.shouldCalculateNormal());
 
             if (!viewer.paused())
             {

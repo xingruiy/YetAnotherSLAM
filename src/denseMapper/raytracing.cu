@@ -1,7 +1,7 @@
-#include "localMapper/denseMap.h"
+#include "denseMapper/denseMap.h"
 #include "utils/cudaUtils.h"
 #include "utils/prefixSum.h"
-#include "localMapper/mapFunctors.h"
+#include "denseMapper/mapFunctors.h"
 
 #define RenderingBlockSizeX 16
 #define RenderingBlockSizeY 16
