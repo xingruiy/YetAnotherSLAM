@@ -1,8 +1,8 @@
 #pragma once
 #include <mutex>
 #include <memory>
-#include "dataStruct/mapPoint.h"
 #include "utils/numType.h"
+#include "dataStruct/mapPoint.h"
 #include "localMapper/featureMatcher.h"
 
 class MapPoint;
@@ -10,20 +10,10 @@ class FeatureMatcher;
 
 class Frame
 {
-
 public:
-    Frame(Mat imRGB, Mat imDepth, const Mat33d &K);
-
     Frame();
-    Frame(int w,
-          int h,
-          Mat33d &K,
-          Mat colourImage,
-          Mat depthImage,
-          Mat intensityImage);
+    Frame(Mat imRGB, Mat imDepth, Mat imGray, Mat33d &K);
 
-    int getImageWidth() const;
-    int getImageHeight() const;
     Mat33d getIntrinsics() const;
 
     Mat getDepth() const;
@@ -47,7 +37,6 @@ public:
     std::shared_ptr<MapPoint> createMapPoint(size_t idx);
     void setMapPoint(std::shared_ptr<MapPoint> pt, size_t idx);
     void eraseMapPoint(size_t idx);
-    size_t getNumPointsDetected() const;
     void detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher);
     const std::vector<std::shared_ptr<MapPoint>> &getMapPoints() const;
 
@@ -87,10 +76,6 @@ public:
     size_t kfId;
     static size_t nextKFId;
 
-    int imgWidth;
-    int imgHeight;
-    Mat33d camIntrinsics;
-    size_t numPointsCreated;
-    size_t numPointsDetectd;
+    Mat33d K;
     std::shared_ptr<Frame> referenceKF;
 };

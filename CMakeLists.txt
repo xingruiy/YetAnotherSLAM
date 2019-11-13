@@ -17,7 +17,7 @@ PRIVATE
 
     src/utils/mapCUDA.cu
 
-    src/fullSystem/fullSystem.cu
+    src/fullSystem/fullSystem.cpp
 
     src/mapViewer/mapViewer.cpp
 

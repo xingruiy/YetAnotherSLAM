@@ -14,21 +14,28 @@ public:
     Map();
 
     void clear();
+
+    // TODO: not yet implemented
     void writeToDisk(const char *fileName);
+
+    // TODO: not yet implemented
     void readFromDisk(const char *fileName);
-    void addKeyFrame(std::shared_ptr<Frame> kf);
-    Mat getdescriptorsriptorsAll() const;
-    std::shared_ptr<Frame> getCurrentKeyframe() const;
-    void setCurrentKeyframe(std::shared_ptr<Frame> kf);
+
+    // Insert new key frame into the map
+    void addKeyFrame(std::shared_ptr<Frame> keyFrame);
+
+    // Insert new map point into the map
     void addMapPoint(std::shared_ptr<MapPoint> pt);
 
     void addFramePoseRaw(const SE3 &T);
     void addKeyframePoseRaw(const SE3 &T);
-    void addFramePose(const SE3 &T, std::shared_ptr<Frame> kf);
+    void addFramePose(const SE3 &T, std::shared_ptr<Frame> keyFrame);
 
-    void addUnprocessedKeyframe(std::shared_ptr<Frame> kf);
+    std::shared_ptr<Frame> getCurrentKeyframe() const;
+    void setCurrentKeyframe(std::shared_ptr<Frame> keyFrame);
+    void addUnprocessedKeyframe(std::shared_ptr<Frame> keyFrame);
     std::shared_ptr<Frame> getUnprocessedKeyframe();
-    void addLoopClosingKeyframe(std::shared_ptr<Frame> kf);
+    void addLoopClosingKeyframe(std::shared_ptr<Frame> keyFrame);
     std::shared_ptr<Frame> getLoopClosingKeyframe();
 
     std::vector<SE3> getKeyframePoseRaw();
@@ -37,16 +44,12 @@ public:
     std::vector<SE3> getFramePoseOptimized();
     std::vector<Vec3f> getMapPointVec3All();
 
-    const std::vector<std::shared_ptr<Frame>> &getKeyframesAll();
-    const std::vector<std::shared_ptr<MapPoint>> &getMapPointsAll();
-    std::vector<std::shared_ptr<Frame>> getLastNKeyframes(const size_t N);
+    Mat descriptorDB;
+    shared_vector<MapPoint> mapPointDB;
+    shared_vector<Frame> keyFrameDB;
 
-public:
     std::mutex mapMutex;
-    Mat descriptorsriptorsAll;
     std::shared_ptr<Frame> currentKeyframe;
-    std::vector<std::shared_ptr<Frame>> keyFrameDB;
-    std::vector<std::shared_ptr<MapPoint>> mapPointsAll;
 
     std::mutex mutexkf, mutexloop;
     std::queue<std::shared_ptr<Frame>> unprocessedKeyframeQueue;

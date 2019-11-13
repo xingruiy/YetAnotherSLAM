@@ -472,8 +472,8 @@ bool Localizer::getRelocHypotheses(
 {
     subMatches.clear();
     estimateList.clear();
-    auto &mapPts = map->getMapPointsAll();
-    auto mapPtDesc = map->getdescriptorsriptorsAll();
+    auto &mapPts = map->mapPointDB;
+    auto &mapPtDesc = map->descriptorDB;
 
     // get a rough match of the map points and frame points
     auto matches = getMatches2NN(framePtDesc, mapPtDesc, useGraphMatching);
@@ -549,7 +549,7 @@ bool Localizer::evalHypotheses(
     const Mat33d &camIntrinsics,
     SE3 &bestEstimate)
 {
-    auto &mapPoints = map->getMapPointsAll();
+    auto &mapPoints = map->mapPointDB;
     const auto fx = camIntrinsics(0, 0);
     const auto fy = camIntrinsics(1, 1);
     const auto cx = camIntrinsics(0, 2);

@@ -75,47 +75,37 @@ void DenseTracker::setReferenceInvDepth(GMat vmap)
     }
 }
 
-void DenseTracker::setReferenceFrame(std::shared_ptr<Frame> frame)
+void DenseTracker::setReferenceFrame(const Frame &F)
 {
-    cudaCheckError();
-    auto depth = frame->getDepth();
-    auto rawIntensity = frame->getIntensity();
-
     for (int lvl = 0; lvl < numTrackingLvl; ++lvl)
     {
         if (lvl == 0)
         {
-            rawDepthBuffer.upload(depth);
+            rawDepthBuffer.upload(F.imDepth);
             convertDepthToInvDepth(rawDepthBuffer, referenceInvDepth[lvl]);
-            referenceIntensity[0].upload(rawIntensity);
+            referenceIntensity[0].upload(F.rawIntensity);
         }
         else
         {
-            // cv::cuda::pyrDown(referenceDepth[lvl - 1], referenceDepth[lvl]);
             pyrdownInvDepth(referenceInvDepth[lvl - 1], referenceInvDepth[lvl]);
-            // cv::cuda::pyrDown(referenceInvDepth[lvl - 1], referenceInvDepth[lvl]);
             cv::cuda::pyrDown(referenceIntensity[lvl - 1], referenceIntensity[lvl]);
         }
     }
 }
 
-void DenseTracker::setTrackingFrame(std::shared_ptr<Frame> frame)
+void DenseTracker::setTrackingFrame(const Frame &F)
 {
-    auto depth = frame->getDepth();
-    auto rawIntensity = frame->getIntensity();
-
     for (int lvl = 0; lvl < numTrackingLvl; ++lvl)
     {
         if (lvl == 0)
         {
-            rawDepthBuffer.upload(depth);
+            rawDepthBuffer.upload(F.imDepth);
             convertDepthToInvDepth(rawDepthBuffer, currentInvDepth[lvl]);
-            currentIntensity[lvl].upload(rawIntensity);
+            currentIntensity[lvl].upload(F.rawIntensity);
         }
         else
         {
             pyrdownInvDepth(currentInvDepth[lvl - 1], currentInvDepth[lvl]);
-            // cv::cuda::pyrDown(currentInvDepth[lvl - 1], currentInvDepth[lvl]);
             cv::cuda::pyrDown(currentIntensity[lvl - 1], currentIntensity[lvl]);
         }
 

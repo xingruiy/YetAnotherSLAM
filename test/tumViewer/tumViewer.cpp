@@ -26,8 +26,7 @@ int main(int argc, char **argv)
         Mat depth, image;
         Mat depthFloat;
         viewer.resetViewer();
-        FullSystem fullsystem(640, 480, K, 5, true);
-        fullsystem.setMapViewerPtr(&viewer);
+        FullSystem fullsystem(640, 480, K, 5, viewer);
 
         printf("Trying: %s...\n", iter->c_str());
 

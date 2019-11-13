@@ -15,17 +15,19 @@ std::vector<size_t> sortIndex(const std::vector<T> &v)
     return idx;
 }
 
-FeatureMapper::FeatureMapper(
+LocalMapper::LocalMapper(
     Mat33d &K,
-    std::shared_ptr<Map> map)
+    std::shared_ptr<Map> map,
+    MapViewer &viewer)
     : K(K),
       shouldQuit(false),
       map(map)
 {
     matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
+    this->viewer = &viewer;
 }
 
-void FeatureMapper::loop()
+void LocalMapper::loop()
 {
     while (!shouldQuit)
     {
@@ -36,10 +38,21 @@ void FeatureMapper::loop()
             map->addKeyFrame(frameUnProc);
             map->setCurrentKeyframe(frameUnProc);
         }
+
+        // if (hasNewKeyFrame())
+        // {
+        //     checkKeyFramePose();
+
+        //     processNewKeyFrame();
+        // }
+        // else
+        // {
+        //     usleep(3000);
+        // }
     }
 }
 
-std::shared_ptr<Frame> FeatureMapper::getNewKeyframe()
+std::shared_ptr<Frame> LocalMapper::getNewKeyframe()
 {
     auto frameUnProc = map->getUnprocessedKeyframe();
 
@@ -59,12 +72,12 @@ std::shared_ptr<Frame> FeatureMapper::getNewKeyframe()
     return frameUnProc;
 }
 
-void FeatureMapper::matchFeatures(std::shared_ptr<Frame> kf)
+void LocalMapper::matchFeatures(std::shared_ptr<Frame> kf)
 {
-    if (kf->getNumPointsDetected() == 0)
+    if (kf->cvKeyPoints.size() == 0)
         kf->detectKeyPoints(matcher);
 
-    auto numPointsDetected = kf->getNumPointsDetected();
+    auto numPointsDetected = kf->cvKeyPoints.size();
     if (numPointsDetected == 0)
     {
         printf("Error: no features detected! THe new keyframe not accepted.\n");
@@ -76,7 +89,6 @@ void FeatureMapper::matchFeatures(std::shared_ptr<Frame> kf)
     {
         std::vector<cv::DMatch> matches;
         matcher->matchByProjection2NN(lastKF, kf, K, matches, NULL);
-
         for (auto m : matches)
         {
             auto &pt = lastKF->mapPoints[m.queryIdx];
@@ -104,9 +116,76 @@ void FeatureMapper::matchFeatures(std::shared_ptr<Frame> kf)
     }
 }
 
-void FeatureMapper::createNewPoints(std::shared_ptr<Frame> kf)
+void LocalMapper::addKeyFrame(std::shared_ptr<Frame> keyFrame)
 {
-    auto numKeyPoints = kf->getNumPointsDetected();
+    std::unique_lock<std::mutex> lock(newKeyFrameMutex);
+    newKeyFrames.push_back(keyFrame);
+}
+
+bool LocalMapper::hasNewKeyFrame()
+{
+    std::unique_lock<std::mutex> lock(newKeyFrameMutex);
+    return !newKeyFrames.empty();
+}
+
+void LocalMapper::checkKeyFramePose()
+{
+    auto reference = currKeyFrame->getReferenceKF();
+    if (reference)
+    {
+        auto dT = currKeyFrame->getTrackingResult();
+        auto refT = reference->getPoseInGlobalMap();
+        auto T = refT * dT;
+        currKeyFrame->setOptimizationResult(T);
+    }
+}
+
+void LocalMapper::processNewKeyFrame()
+{
+    {
+        std::unique_lock<std::mutex> lock(newKeyFrameMutex);
+        currKeyFrame = newKeyFrames.front();
+        newKeyFrames.pop_front();
+    }
+
+    matchFeatures(currKeyFrame);
+    createNewPoints(currKeyFrame);
+    lastKeyFrame = currKeyFrame;
+    map->addKeyFrame(currKeyFrame);
+}
+
+void LocalMapper::createNewMapPoints()
+{
+    auto nPoints = currKeyFrame->cvKeyPoints.size();
+    for (int i = 0; i < nPoints; i += 1)
+    {
+        auto &framePt = currKeyFrame->mapPoints[i];
+        if (framePt)
+            continue;
+
+        const auto &z = currKeyFrame->keyPointDepth[i];
+        const auto &n = currKeyFrame->keyPointNorm[i];
+        if (z > FLT_EPSILON && n(2) > FLT_EPSILON)
+        {
+            const auto &kp = currKeyFrame->cvKeyPoints[i];
+            Vec3d pos = currKeyFrame->getPoseInGlobalMap() * (K.inverse() * Vec3d(kp.pt.x, kp.pt.y, 1.0) * z);
+            Vec3f normal = (currKeyFrame->getPoseInGlobalMap().rotationMatrix() * n.cast<double>()).cast<float>();
+
+            auto pt = std::make_shared<MapPoint>();
+            pt->setHost(currKeyFrame);
+            pt->setPosWorld(pos);
+            pt->setNormal(normal);
+            pt->setDescriptor(currKeyFrame->descriptors.row(i));
+            pt->addObservation(currKeyFrame, Vec3d(kp.pt.x, kp.pt.y, z));
+            framePt = pt;
+            map->addMapPoint(pt);
+        }
+    }
+}
+
+void LocalMapper::createNewPoints(std::shared_ptr<Frame> kf)
+{
+    auto numKeyPoints = kf->cvKeyPoints.size();
     for (int i = 0; i < numKeyPoints; i += 1)
     {
         auto &framePt = kf->mapPoints[i];
@@ -134,12 +213,12 @@ void FeatureMapper::createNewPoints(std::shared_ptr<Frame> kf)
     }
 }
 
-void FeatureMapper::detectLoop(std::shared_ptr<Frame> kf)
+void LocalMapper::detectLoop(std::shared_ptr<Frame> kf)
 {
     Mat freePtDesc;
     std::vector<std::shared_ptr<MapPoint>> freePts;
 
-    auto numKeyPoints = kf->getNumPointsDetected();
+    auto numKeyPoints = kf->cvKeyPoints.size();
     for (int i = 0; i < numKeyPoints; i += 1)
     {
         const auto &framePt = kf->mapPoints[i];
@@ -165,7 +244,7 @@ void FeatureMapper::detectLoop(std::shared_ptr<Frame> kf)
     }
 
     std::cout << "searching correspondence in the map." << std::endl;
-    Mat mapdescriptors = map->getdescriptorsriptorsAll();
+    Mat &mapdescriptors = map->descriptorDB;
 
     if (mapdescriptors.rows != 0)
     {
@@ -181,10 +260,10 @@ void FeatureMapper::detectLoop(std::shared_ptr<Frame> kf)
         }
 
         std::vector<Vec3f> pts;
-        auto &mapPointsAll = map->getMapPointsAll();
+        auto &mapPointDB = map->mapPointDB;
         for (auto &m : matches)
         {
-            auto &pt = mapPointsAll[m.trainIdx];
+            auto &pt = mapPointDB[m.trainIdx];
             auto &framePt = kf->mapPoints[m.queryIdx];
             auto &kp = kf->cvKeyPoints[m.queryIdx];
             auto &z = kf->keyPointDepth[m.queryIdx];
@@ -195,128 +274,118 @@ void FeatureMapper::detectLoop(std::shared_ptr<Frame> kf)
     }
 }
 
-void FeatureMapper::setViewer(MapViewer *viewer)
-{
-    this->viewer = viewer;
-}
-
-void FeatureMapper::setMap(std::shared_ptr<Map> map)
-{
-    this->map = map;
-}
-
-void FeatureMapper::setShouldQuit()
+void LocalMapper::setShouldQuit()
 {
     shouldQuit = true;
 }
 
-void FeatureMapper::optimize(std::shared_ptr<Frame> kf)
-{
-    ceres::Problem problem;
-    problem.AddParameterBlock(kf->getParameterBlock(), SE3::num_parameters, new LocalParameterizationSE3);
-    // problem.SetParameterBlockConstant(kf->getParameterBlock());
+// void LocalMapper::optimize(std::shared_ptr<Frame> kf)
+// {
+//     ceres::Problem problem;
+//     problem.AddParameterBlock(kf->getParameterBlock(), SE3::num_parameters, new LocalParameterizationSE3);
+//     // problem.SetParameterBlockConstant(kf->getParameterBlock());
 
-    double KBlock[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
-    problem.AddParameterBlock(&KBlock[0], 4);
-    problem.SetParameterBlockConstant(&KBlock[0]);
+//     double KBlock[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
+//     problem.AddParameterBlock(&KBlock[0], 4);
+//     problem.SetParameterBlockConstant(&KBlock[0]);
 
-    std::vector<Vec3d> before;
-    for (auto pt : kf->mapPoints)
-    {
-        if (pt)
-            before.push_back(pt->getPosWorld());
-        else
-            before.push_back(Vec3d());
-    }
+//     std::vector<Vec3d> before;
+//     for (auto pt : kf->mapPoints)
+//     {
+//         if (pt)
+//             before.push_back(pt->getPosWorld());
+//         else
+//             before.push_back(Vec3d());
+//     }
 
-    std::set<std::shared_ptr<Frame>> fixedKFs;
-    for (auto pt : kf->mapPoints)
-    {
-        if (pt && !pt->isBad())
-        {
-            std::unique_lock<std::mutex> lock(pt->lock);
-            for (auto obs : pt->getObservations())
-            {
-                if (obs.first != kf && fixedKFs.find(obs.first) == fixedKFs.end())
-                    fixedKFs.insert(obs.first);
-            }
-        }
-    }
+//     std::set<std::shared_ptr<Frame>> fixedKFs;
+//     for (auto pt : kf->mapPoints)
+//     {
+//         if (pt && !pt->isBad())
+//         {
+//             std::unique_lock<std::mutex> lock(pt->lock);
+//             for (auto obs : pt->getObservations())
+//             {
+//                 if (obs.first != kf && fixedKFs.find(obs.first) == fixedKFs.end())
+//                     fixedKFs.insert(obs.first);
+//             }
+//         }
+//     }
 
-    if (fixedKFs.size() == 0)
-        return;
+//     if (fixedKFs.size() == 0)
+//         return;
 
-    // std::cout << fixedKFs.size() << std::endl;
+//     // std::cout << fixedKFs.size() << std::endl;
 
-    for (auto frame : fixedKFs)
-    {
-        problem.AddParameterBlock(frame->getParameterBlock(), SE3::num_parameters, new LocalParameterizationSE3);
-        problem.SetParameterBlockConstant(frame->getParameterBlock());
-    }
+//     for (auto frame : fixedKFs)
+//     {
+//         problem.AddParameterBlock(frame->getParameterBlock(), SE3::num_parameters, new LocalParameterizationSE3);
+//         problem.SetParameterBlockConstant(frame->getParameterBlock());
+//     }
 
-    size_t numResidualBlocks = 0;
-    for (auto pt : kf->mapPoints)
-    {
-        if (pt && !pt->isBad())
-        {
-            std::unique_lock<std::mutex> lock(pt->lock);
-            for (auto obs : pt->getObservations())
-            {
-                problem.AddResidualBlock(
-                    ReprojectionErrorFunctor::create(obs.second(0), obs.second(1)),
-                    NULL,
-                    &KBlock[0],
-                    obs.first->getParameterBlock(),
-                    pt->getParameterBlock());
+//     size_t numResidualBlocks = 0;
+//     for (auto pt : kf->mapPoints)
+//     {
+//         if (pt && !pt->isBad())
+//         {
+//             std::unique_lock<std::mutex> lock(pt->lock);
+//             for (auto obs : pt->getObservations())
+//             {
+//                 problem.AddResidualBlock(
+//                     ReprojectionErrorFunctor::create(obs.second(0), obs.second(1)),
+//                     NULL,
+//                     &KBlock[0],
+//                     obs.first->getParameterBlock(),
+//                     pt->getParameterBlock());
 
-                numResidualBlocks++;
-            }
+//                 numResidualBlocks++;
+//             }
 
-            problem.SetParameterBlockConstant(pt->getParameterBlock());
-        }
-    }
+//             problem.SetParameterBlockConstant(pt->getParameterBlock());
+//         }
+//     }
 
-    // std::cout << numResidualBlocks << std::endl;
-    ceres::Solver::Options options;
-    ceres::Solver::Summary summary;
-    options.linear_solver_type = ceres::DENSE_SCHUR;
-    Solve(options, &problem, &summary);
-    std::cout << summary.BriefReport() << std::endl;
+//     // std::cout << numResidualBlocks << std::endl;
+//     ceres::Solver::Options options;
+//     ceres::Solver::Summary summary;
+//     options.linear_solver_type = ceres::DENSE_SCHUR;
+//     Solve(options, &problem, &summary);
+//     std::cout << summary.BriefReport() << std::endl;
 
-    // for (int i = 0; i < kf->mapPoints.size(); ++i)
-    // {
-    //     auto pt = kf->mapPoints[i];
-    //     if (!pt)
-    //         continue;
-    //     auto b = before[i];
-    //     auto c = pt->getPosWorld();
-    //     auto diff = (b - c).norm();
-    //     if (diff > 0.4)
-    //     {
-    //         std::cout << "pt before : " << b << std::endl;
-    //         std::cout << "pt after : " << c << std::endl;
+//     // for (int i = 0; i < kf->mapPoints.size(); ++i)
+//     // {
+//     //     auto pt = kf->mapPoints[i];
+//     //     if (!pt)
+//     //         continue;
+//     //     auto b = before[i];
+//     //     auto c = pt->getPosWorld();
+//     //     auto diff = (b - c).norm();
+//     //     if (diff > 0.4)
+//     //     {
+//     //         std::cout << "pt before : " << b << std::endl;
+//     //         std::cout << "pt after : " << c << std::endl;
 
-    //         auto obs = pt->getObservations();
-    //         std::cout << "Num obs: " << obs.size() << std::endl;
-    //         for (auto ob : obs)
-    //         {
-    //             auto &kf = ob.first;
-    //             auto &d = ob.second;
-    //             std::cout << kf->getPoseInGlobalMap().matrix3x4() << std::endl;
-    //             std::cout << d << std::endl;
-    //             Vec2d val = d.head<2>();
+//     //         auto obs = pt->getObservations();
+//     //         std::cout << "Num obs: " << obs.size() << std::endl;
+//     //         for (auto ob : obs)
+//     //         {
+//     //             auto &kf = ob.first;
+//     //             auto &d = ob.second;
+//     //             std::cout << kf->getPoseInGlobalMap().matrix3x4() << std::endl;
+//     //             std::cout << d << std::endl;
+//     //             Vec2d val = d.head<2>();
 
-    //             auto e = kf->getPoseInGlobalMap().inverse() * b;
-    //             Vec2d proj = {KBlock[0] * e(0) / e(2) + KBlock[2], KBlock[1] * e(1) / e(2) + KBlock[3]};
+//     //             auto e = kf->getPoseInGlobalMap().inverse() * b;
+//     //             Vec2d proj = {KBlock[0] * e(0) / e(2) + KBlock[2], KBlock[1] * e(1) / e(2) + KBlock[3]};
 
-    //             std::cout << "before : " << (proj - val).norm() << std::endl;
-    //             std::cout << proj << std::endl;
+//     //             std::cout << "before : " << (proj - val).norm() << std::endl;
+//     //             std::cout << proj << std::endl;
 
-    //             e = kf->getPoseInGlobalMap().inverse() * pt->getPosWorld();
-    //             proj = {KBlock[0] * e(0) / e(2) + KBlock[2], KBlock[1] * e(1) / e(2) + KBlock[3]};
-    //             std::cout << "after: " << (proj - val).norm() << std::endl;
-    //             std::cout << proj << std::endl;
-    //         }
-    //     }
-    // }
-}
+//     //             e = kf->getPoseInGlobalMap().inverse() * pt->getPosWorld();
+//     //             proj = {KBlock[0] * e(0) / e(2) + KBlock[2], KBlock[1] * e(1) / e(2) + KBlock[3]};
+//     //             std::cout << "after: " << (proj - val).norm() << std::endl;
+//     //             std::cout << proj << std::endl;
+//     //         }
+//     //     }
+//     // }
+// }

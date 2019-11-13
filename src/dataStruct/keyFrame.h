@@ -1,3 +1,4 @@
+#pragma once
 #include "dataStruct/frame.h"
 #include "dataStruct/mapPoint.h"
 #include "utils/numType.h"
@@ -17,4 +18,7 @@ public:
     cv::Mat descriptors;
     shared_vector<MapPoint> mapPoints;
     std::vector<cv::KeyPoint> keyPoints;
+
+    std::shared_ptr<KeyFrame> parent;
+    SE3 RT, RTinv;
 };

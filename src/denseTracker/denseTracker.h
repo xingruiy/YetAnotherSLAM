@@ -73,11 +73,10 @@ class DenseTracker
 public:
     DenseTracker(int w, int h, Mat33d &K, int numLvl);
 
+    void setReferenceFrame(const Frame &F);
+    void setTrackingFrame(const Frame &F);
     void setReferenceInvDepth(GMat refInvDepth);
-    void setReferenceFrame(std::shared_ptr<Frame> frame);
-    void setTrackingFrame(std::shared_ptr<Frame> frame);
 
     SE3 getIncrementalTransform(SE3 initAlign = SE3(), bool switchBuffer = true);
-
     GMat getReferenceDepth(const int lvl = 0) const;
 };

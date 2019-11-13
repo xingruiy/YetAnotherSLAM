@@ -2,8 +2,10 @@
 #include <memory>
 #include <thread>
 #include <iostream>
-#include "dataStruct/map.h"
 #include "utils/numType.h"
+#include "dataStruct/map.h"
+#include "dataStruct/frame.h"
+#include "dataStruct/keyFrame.h"
 #include "mapViewer/mapViewer.h"
 #include "denseMapper/denseMapper.h"
 #include "localMapper/localMapper.h"
@@ -21,38 +23,37 @@ class FullSystem
 {
 public:
     ~FullSystem();
-    FullSystem(int w, int h, Mat33d K, int numLvl, bool enableViewer = true);
-    // allow viewing the map
-    void setMapViewerPtr(MapViewer *viewer);
-    // toggle mapping
-    void setMappingEnable(const bool enable);
-    // trigger relocalization
-    // TODO: can't resume from lost
-    void setSystemStateToLost();
-    void setSystemStateToTest();
-    // relocalization related parameters
-    void setGraphMatching(const bool &flag);
-    void setGraphGetNormal(const bool &flag);
-    // reset the system to its initial state
-    void resetSystem();
-    void testNextKF();
-    // main process function
-    void setCurrentNormal(GMat nmap);
+    FullSystem(int w, int h, Mat33d K, int numLvl, MapViewer &viewer);
+
+    // Main entry point
     void processFrame(Mat imRGB, Mat imDepth);
 
+    // Reset the system to its initial state
+    void resetSystem();
+
+    // toggle mapping
+    void setMappingEnable(const bool enable);
+
+    // Set system to relocalisation mode
+    // TODO: can't resume from lost yet
+    void setSystemStateToLost();
+
+    // Set system to debugging mode
+    void setSystemStateToTest();
+    void setGraphMatching(const bool &flag);
+    void setGraphGetNormal(const bool &flag);
+    void testNextKF();
+
+    // Reuse some of the data
+    void setCpuBufferVec4FloatWxH(Mat buffer);
+
+    // For visualization
+    size_t getMesh(float *vbuffer, float *nbuffer, size_t bufferSize);
     std::vector<SE3> getFramePoseHistory();
     std::vector<SE3> getKeyFramePoseHistory();
     std::vector<Vec3f> getMapPointPosAll();
 
-    size_t getMesh(
-        float *vbuffer,
-        float *nbuffer,
-        size_t bufferSize);
-
 public:
-    const bool viewerEnabled;
-    int numTimesRun;
-
     bool needNewKF();
     void createNewKF();
     bool trackCurrentFrame();
@@ -61,34 +62,23 @@ public:
     bool tryRelocalizeCurrentFrame();
     bool tryRelocalizeKeyframe(std::shared_ptr<Frame> kf);
 
-    std::thread loopThread;
-    std::thread localOptThread;
-    MapViewer *viewer;
-
+    // System components
+    std::thread loopClosureThread;
+    std::thread localMappingThread;
     std::shared_ptr<Map> map;
     std::shared_ptr<DenseMapping> denseMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
-    std::shared_ptr<FeatureMapper> localMapper;
+    std::shared_ptr<LocalMapper> localMapper;
+
+    MapViewer *viewer;
 
     std::shared_ptr<Frame> currentFrame;
     std::shared_ptr<Frame> currentKeyframe;
 
-    SE3 lastTrackedPose;
-    SE3 accumulateTransform;
-
-    // State machine
-    SystemState state, lastState;
-
+    // System parameters
     int imageWidth;
     int imageHeight;
-    Mat33d camIntrinsics;
-    bool mappingEnabled;
-    bool useGraphMatching;
-    bool shouldCalculateNormal;
-
-    // **For debugging relocalization
-    size_t testKFId;
-    size_t lastTestedKFId;
+    Mat33d K;
 
     // Reusable buffers
     GMat gpuBufferFloatWxH;
@@ -100,5 +90,25 @@ public:
     Mat cpuBufferVec3FloatWxH;
 
     // System statistics
-    size_t numProcessedFrames;
+    void resetStatistics();
+    size_t numFramesProcessed;
+    size_t numRelocalisationAttempted;
+
+    // Accumulated States
+    // these needs to be cleared when reset
+    SE3 rawTransformation;
+    SE3 lastTrackedPose;
+
+    // State machine
+    SystemState lastState, state;
+    std::shared_ptr<KeyFrame> currKeyFrame;
+    std::shared_ptr<KeyFrame> lastKeyFrame;
+
+    // **For debugging relocalization
+    // will be removed later
+    size_t testKFId;
+    size_t lastTestedKFId;
+    bool mappingEnabled;
+    bool useGraphMatching;
+    bool shouldCalculateNormal;
 };

@@ -6,39 +6,18 @@ Frame::Frame()
 {
 }
 
-Frame::Frame(int w,
-             int h,
-             Mat33d &K,
-             Mat colourImage,
-             Mat depthImage,
-             Mat intensityImage)
-    : kfId(0),
-      numPointsDetectd(0),
-      numPointsCreated(0),
-      imgWidth(w),
-      imgHeight(h),
-      keyframeFlag(false),
-      camIntrinsics(K)
+Frame::Frame(Mat imRGB, Mat imDepth, Mat imGray, Mat33d &K)
+    : kfId(0), keyframeFlag(false), K(K)
 {
-    colourImage.copyTo(imRGB);
-    depthImage.copyTo(imDepth);
-    depthImage.copyTo(ogDepth);
-    intensityImage.copyTo(rawIntensity);
-}
-
-int Frame::getImageWidth() const
-{
-    return imgWidth;
-}
-
-int Frame::getImageHeight() const
-{
-    return imgHeight;
+    imRGB.copyTo(this->imRGB);
+    imDepth.copyTo(this->imDepth);
+    imDepth.copyTo(ogDepth);
+    imGray.copyTo(rawIntensity);
 }
 
 Mat33d Frame::getIntrinsics() const
 {
-    return camIntrinsics;
+    return K;
 }
 
 Mat Frame::getDepth() const
@@ -104,11 +83,6 @@ SE3 Frame::getPoseInLocalMap() const
     }
 }
 
-size_t Frame::getNumPointsDetected() const
-{
-    return numPointsDetectd;
-}
-
 Vec3d Frame::getPositionWorld() const
 {
     SE3 T = getPoseInGlobalMap();
@@ -149,13 +123,12 @@ double *Frame::getParameterBlock()
 
 bool Frame::hasMapPoint() const
 {
-    numPointsCreated != 0;
+    return !cvKeyPoints.empty();
 }
 
 void Frame::setMapPoint(std::shared_ptr<MapPoint> pt, size_t idx)
 {
     mapPoints[idx] = pt;
-    numPointsCreated++;
 }
 
 void Frame::eraseMapPoint(size_t idx)
@@ -170,13 +143,12 @@ const std::vector<std::shared_ptr<MapPoint>> &Frame::getMapPoints() const
 
 void Frame::detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher)
 {
-    if (numPointsDetectd == 0)
+    if (cvKeyPoints.size() == 0)
     {
         matcher->detectAndCompute(imRGB, cvKeyPoints, descriptors);
         matcher->computePointDepth(imDepth, cvKeyPoints, keyPointDepth);
         matcher->computePointNormal(nmap, cvKeyPoints, keyPointNorm);
-        numPointsDetectd = cvKeyPoints.size();
-        mapPoints.resize(numPointsDetectd);
+        mapPoints.resize(cvKeyPoints.size());
     }
 }
 
@@ -189,7 +161,7 @@ std::shared_ptr<MapPoint> Frame::createMapPoint(size_t idx)
         const auto &kp = cvKeyPoints[idx].pt;
         const auto &desc = descriptors.row(idx);
         pt->setDescriptor(desc);
-        pt->setPosWorld(optimizedPose * (camIntrinsics.inverse() * Vec3d(kp.x, kp.y, 1.0) * z));
+        pt->setPosWorld(optimizedPose * (K.inverse() * Vec3d(kp.x, kp.y, 1.0) * z));
         return pt;
     }
 

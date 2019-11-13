@@ -13,9 +13,9 @@ void Map::clear()
     std::unique_lock<std::mutex> lock4(mutexkf);
 
     currentKeyframe = NULL;
-    descriptorsriptorsAll.release();
+    descriptorDB.release();
     keyFrameDB.clear();
-    mapPointsAll.clear();
+    mapPointDB.clear();
     framePoseOptimized.clear();
     keyframePoseRawAll.clear();
     framePoseRawAll.clear();
@@ -28,11 +28,6 @@ void Map::addKeyFrame(std::shared_ptr<Frame> kf)
     std::unique_lock<std::mutex> lock(mapMutex);
     keyFrameDB.push_back(kf);
     std::unique_lock<std::mutex> lock2(histMutex);
-}
-
-Mat Map::getdescriptorsriptorsAll() const
-{
-    return descriptorsriptorsAll;
 }
 
 std::shared_ptr<Frame> Map::getCurrentKeyframe() const
@@ -48,27 +43,8 @@ void Map::setCurrentKeyframe(std::shared_ptr<Frame> kf)
 void Map::addMapPoint(std::shared_ptr<MapPoint> pt)
 {
     std::unique_lock<std::mutex> lock(mapMutex);
-    descriptorsriptorsAll.push_back(pt->getDescriptor());
-    mapPointsAll.push_back(pt);
-}
-
-const std::vector<std::shared_ptr<Frame>> &Map::getKeyframesAll()
-{
-    std::unique_lock<std::mutex> lock(mapMutex);
-    return keyFrameDB;
-}
-
-std::vector<std::shared_ptr<Frame>> Map::getLastNKeyframes(const size_t N)
-{
-    std::unique_lock<std::mutex> lock(mapMutex);
-    size_t Ni = std::min(N, keyFrameDB.size());
-    return std::vector<std::shared_ptr<Frame>>(keyFrameDB.end() - Ni, keyFrameDB.end());
-}
-
-const std::vector<std::shared_ptr<MapPoint>> &Map::getMapPointsAll()
-{
-    std::unique_lock<std::mutex> lock(mapMutex);
-    return mapPointsAll;
+    descriptorDB.push_back(pt->getDescriptor());
+    mapPointDB.push_back(pt);
 }
 
 void Map::addUnprocessedKeyframe(std::shared_ptr<Frame> kf)
@@ -150,7 +126,7 @@ std::vector<Vec3f> Map::getMapPointVec3All()
     std::vector<Vec3f> pts;
     std::unique_lock<std::mutex> lock(mapMutex);
 
-    for (auto pt : mapPointsAll)
+    for (auto pt : mapPointDB)
         if (pt && !pt->isBad())
             pts.push_back(pt->getPosWorld().cast<float>());
 

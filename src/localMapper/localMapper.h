@@ -6,14 +6,14 @@
 #include "mapViewer/mapViewer.h"
 #include "localMapper/featureMatcher.h"
 
-class FeatureMapper
+class LocalMapper
 {
 public:
-    FeatureMapper(Mat33d &K, std::shared_ptr<Map> map);
+    LocalMapper(Mat33d &K, std::shared_ptr<Map> map, MapViewer &viewer);
+    void addKeyFrame(std::shared_ptr<Frame> keyFrame);
+
     void loop();
     void setShouldQuit();
-    void setViewer(MapViewer *viewer);
-    void setMap(std::shared_ptr<Map> map);
 
 private:
     void optimize(std::shared_ptr<Frame> kf);
@@ -34,4 +34,14 @@ private:
 
     std::shared_ptr<Map> map;
     std::shared_ptr<FeatureMatcher> matcher;
+
+    bool hasNewKeyFrame();
+    void checkKeyFramePose();
+    void processNewKeyFrame();
+    void createNewMapPoints();
+
+    std::shared_ptr<Frame> lastKeyFrame;
+    std::shared_ptr<Frame> currKeyFrame;
+    std::deque<std::shared_ptr<Frame>> newKeyFrames;
+    std::mutex newKeyFrameMutex;
 };

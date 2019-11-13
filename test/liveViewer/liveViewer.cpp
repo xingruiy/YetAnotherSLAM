@@ -14,8 +14,7 @@ int main(int argc, char **argv)
 
     Mat depth, image;
     Mat depthFloat, depthImage;
-    FullSystem fullsystem(640, 480, K, 5, true);
-    fullsystem.setMapViewerPtr(&viewer);
+    FullSystem fullsystem(640, 480, K, 5, viewer);
     float depthScale = 1.0 / 1000.0;
 
     GMat gpuBufferFloatWxH;
@@ -59,7 +58,7 @@ int main(int argc, char **argv)
 
             if (!viewer.paused())
             {
-                fullsystem.setCurrentNormal(bufferVec4FloatWxH2);
+                fullsystem.setCpuBufferVec4FloatWxH(Mat(bufferVec4FloatWxH2));
                 fullsystem.processFrame(image, depthFloat);
             }
 
