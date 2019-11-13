@@ -1,6 +1,6 @@
 #pragma once
-#include "utils/frame.h"
-#include "utils/mapPoint.h"
+#include "dataStruct/frame.h"
+#include "dataStruct/mapPoint.h"
 #include "utils/numType.h"
 
 void createAdjacencyMat(

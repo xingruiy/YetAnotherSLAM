@@ -1,4 +1,4 @@
-#include "utils/map.h"
+#include "dataStruct/map.h"
 #include <fstream>
 
 Map::Map()
@@ -13,7 +13,7 @@ void Map::clear()
     std::unique_lock<std::mutex> lock4(mutexkf);
 
     currentKeyframe = NULL;
-    pointDescriptorsAll.release();
+    descriptorsriptorsAll.release();
     keyframesAll.clear();
     mapPointsAll.clear();
     framePoseOptimized.clear();
@@ -30,9 +30,9 @@ void Map::addKeyFrame(std::shared_ptr<Frame> kf)
     std::unique_lock<std::mutex> lock2(histMutex);
 }
 
-Mat Map::getPointDescriptorsAll() const
+Mat Map::getdescriptorsriptorsAll() const
 {
-    return pointDescriptorsAll;
+    return descriptorsriptorsAll;
 }
 
 std::shared_ptr<Frame> Map::getCurrentKeyframe() const
@@ -48,7 +48,7 @@ void Map::setCurrentKeyframe(std::shared_ptr<Frame> kf)
 void Map::addMapPoint(std::shared_ptr<MapPoint> pt)
 {
     std::unique_lock<std::mutex> lock(mapMutex);
-    pointDescriptorsAll.push_back(pt->getDescriptor());
+    descriptorsriptorsAll.push_back(pt->getDescriptor());
     mapPointsAll.push_back(pt);
 }
 

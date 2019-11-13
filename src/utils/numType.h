@@ -2,6 +2,9 @@
 #include <Eigen/Core>
 #include <sophus/se3.hpp>
 #include <opencv2/opencv.hpp>
+#include <memory>
+#include <vector>
+#include <iostream>
 
 #undef EIGEN_DEFAULT_DENSE_INDEX_TYPE
 #define EIGEN_DEFAULT_DENSE_INDEX_TYPE int
@@ -56,3 +59,6 @@ using GMat = cv::cuda::GpuMat;
 #define CV_32FC6 CV_32FC(6)
 #define CV_32FC7 CV_32FC(7)
 #define CV_8UC64 CV_8UC(64)
+
+template <class T>
+using shared_vector = std::vector<std::shared_ptr<T>>;

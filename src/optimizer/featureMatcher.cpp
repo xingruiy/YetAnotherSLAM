@@ -56,7 +56,7 @@ FeatureMatcher::FeatureMatcher(PointType pType, DescType dType)
 void FeatureMatcher::detectAndCompute(
     const Mat image,
     std::vector<cv::KeyPoint> &keyPoints,
-    Mat &pointDesc)
+    Mat &descriptors)
 {
     switch (pointType)
     {
@@ -77,13 +77,13 @@ void FeatureMatcher::detectAndCompute(
     switch (descType)
     {
     case DescType::ORB:
-        orbDetector->compute(image, keyPoints, pointDesc);
+        orbDetector->compute(image, keyPoints, descriptors);
         break;
     case DescType::BRISK:
-        briskDetector->compute(image, keyPoints, pointDesc);
+        briskDetector->compute(image, keyPoints, descriptors);
         break;
     case DescType::SURF:
-        surfDetector->compute(image, keyPoints, pointDesc);
+        surfDetector->compute(image, keyPoints, descriptors);
         break;
     }
 }
@@ -112,7 +112,7 @@ void FeatureMatcher::matchByProjection(
 
     auto &mapPoints = kf->mapPoints;
     auto &keyPoints = frame->cvKeyPoints;
-    auto &descriptors = frame->pointDesc;
+    auto &descriptors = frame->descriptors;
     auto framePoseInv = frame->getPoseInGlobalMap().inverse();
 
     for (auto iter = mapPoints.begin(), iend = mapPoints.end(); iter != iend; ++iter)
@@ -187,7 +187,7 @@ void FeatureMatcher::matchByProjection2NN(
     const float cy = K(1, 2);
 
     auto &keyPoints = frame->cvKeyPoints;
-    auto &descriptors = frame->pointDesc;
+    auto &descriptors = frame->descriptors;
     auto framePoseInv = frame->getPoseInGlobalMap().inverse();
 
     for (auto iter = mapPoints.begin(), iend = mapPoints.end(); iter != iend; ++iter)
@@ -255,7 +255,7 @@ void FeatureMatcher::matchByProjection2NN(
 
     auto &mapPoints = kf->mapPoints;
     auto &keyPoints = frame->cvKeyPoints;
-    auto &descriptors = frame->pointDesc;
+    auto &descriptors = frame->descriptors;
     auto currentDepth = frame->getDepth();
     auto framePoseInv = frame->getPoseInGlobalMap().inverse();
 

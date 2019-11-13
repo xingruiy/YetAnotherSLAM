@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include "utils/frame.h"
+#include "dataStruct/frame.h"
 #include "utils/numType.h"
 
 class DenseTracker

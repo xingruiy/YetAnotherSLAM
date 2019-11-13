@@ -1,4 +1,4 @@
-#include "utils/frame.h"
+#include "dataStruct/frame.h"
 
 size_t Frame::nextKFId = 0;
 
@@ -172,7 +172,7 @@ void Frame::detectKeyPoints(std::shared_ptr<FeatureMatcher> matcher)
 {
     if (numPointsDetectd == 0)
     {
-        matcher->detectAndCompute(rawImage, cvKeyPoints, pointDesc);
+        matcher->detectAndCompute(rawImage, cvKeyPoints, descriptors);
         matcher->computePointDepth(rawDepth, cvKeyPoints, keyPointDepth);
         matcher->computePointNormal(normalMap, cvKeyPoints, keyPointNorm);
         numPointsDetectd = cvKeyPoints.size();
@@ -187,7 +187,7 @@ std::shared_ptr<MapPoint> Frame::createMapPoint(size_t idx)
     {
         auto pt = std::make_shared<MapPoint>();
         const auto &kp = cvKeyPoints[idx].pt;
-        const auto &desc = pointDesc.row(idx);
+        const auto &desc = descriptors.row(idx);
         pt->setDescriptor(desc);
         pt->setPosWorld(optimizedPose * (camIntrinsics.inverse() * Vec3d(kp.x, kp.y, 1.0) * z));
         return pt;

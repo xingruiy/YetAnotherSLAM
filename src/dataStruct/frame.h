@@ -1,7 +1,7 @@
 #pragma once
 #include <mutex>
 #include <memory>
-#include "utils/mapPoint.h"
+#include "dataStruct/mapPoint.h"
 #include "utils/numType.h"
 #include "optimizer/featureMatcher.h"
 
@@ -38,6 +38,8 @@ class Frame
     std::shared_ptr<Frame> referenceKF;
 
 public:
+    Frame(Mat imRGB, Mat imDepth, const Mat33d &K);
+
     Frame();
     Frame(int w,
           int h,
@@ -82,7 +84,7 @@ public:
     void setOptimizationResult(const SE3 &T);
 
     // TODO : refactory this
-    Mat pointDesc;
+    Mat descriptors;
     std::vector<Vec3f> keyPointNorm;
     std::vector<float> keyPointDepth;
     std::vector<cv::KeyPoint> cvKeyPoints;

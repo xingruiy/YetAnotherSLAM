@@ -473,7 +473,7 @@ bool Localizer::getRelocHypotheses(
     subMatches.clear();
     estimateList.clear();
     auto &mapPts = map->getMapPointsAll();
-    auto mapPtDesc = map->getPointDescriptorsAll();
+    auto mapPtDesc = map->getdescriptorsriptorsAll();
 
     // get a rough match of the map points and frame points
     auto matches = getMatches2NN(framePtDesc, mapPtDesc, useGraphMatching);

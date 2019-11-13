@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
 #include <mutex>
-#include "utils/map.h"
+#include "dataStruct/map.h"
 #include "utils/numType.h"
 #include "mapViewer/mapViewer.h"
 #include "optimizer/featureMatcher.h"

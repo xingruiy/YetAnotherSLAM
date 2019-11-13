@@ -1,6 +1,6 @@
 #pragma once
 #include "utils/numType.h"
-#include "utils/frame.h"
+#include "dataStruct/frame.h"
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -9,15 +9,6 @@ class Frame;
 
 class MapPoint
 {
-    size_t id;
-    bool bad;
-    Vec3d position;
-    Vec3f normal;
-    Mat descriptor;
-    std::shared_ptr<Frame> hostKF;
-    static size_t nextId;
-    std::unordered_map<std::shared_ptr<Frame>, Vec3d> observations;
-
 public:
     MapPoint();
     MapPoint(std::shared_ptr<Frame> hostKF, const Vec3d &posWorld, Mat desc);
@@ -44,4 +35,14 @@ public:
     void flagBad();
 
     std::mutex lock;
+
+public:
+    size_t id;
+    bool bad;
+    Vec3d position;
+    Vec3f normal;
+    Mat descriptor;
+    std::shared_ptr<Frame> hostKF;
+    static size_t nextId;
+    std::unordered_map<std::shared_ptr<Frame>, Vec3d> observations;
 };

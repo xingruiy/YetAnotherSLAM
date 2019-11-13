@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include "utils/frame.h"
+#include "dataStruct/frame.h"
 #include "utils/numType.h"
 #include <opencv2/features2d.hpp>
 #include <opencv2/xfeatures2d.hpp>
@@ -66,7 +66,7 @@ public:
     void detectAndCompute(
         const Mat image,
         std::vector<cv::KeyPoint> &cvKeyPoint,
-        Mat &pointDesc);
+        Mat &descriptors);
 
     void computePointDepth(
         const Mat depth,

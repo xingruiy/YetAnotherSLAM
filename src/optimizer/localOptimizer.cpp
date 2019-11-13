@@ -126,7 +126,7 @@ void LocalOptimizer::createNewPoints(std::shared_ptr<Frame> kf)
             pt->setHost(kf);
             pt->setPosWorld(pos);
             pt->setNormal(normal);
-            pt->setDescriptor(kf->pointDesc.row(i));
+            pt->setDescriptor(kf->descriptors.row(i));
             pt->addObservation(kf, Vec3d(kp.pt.x, kp.pt.y, z));
             framePt = pt;
             map->addMapPoint(pt);
@@ -156,24 +156,24 @@ void LocalOptimizer::detectLoop(std::shared_ptr<Frame> kf)
             auto pt = std::make_shared<MapPoint>();
             pt->setHost(kf);
             pt->setPosWorld(pos);
-            pt->setDescriptor(kf->pointDesc.row(i));
+            pt->setDescriptor(kf->descriptors.row(i));
             pt->addObservation(kf, Vec3d(kp.pt.x, kp.pt.y, z));
             kf->mapPoints[i] = pt;
 
-            freePtDesc.push_back(kf->pointDesc.row(i));
+            freePtDesc.push_back(kf->descriptors.row(i));
             freePts.push_back(pt);
         }
     }
 
     std::cout << "searching correspondence in the map." << std::endl;
-    Mat mapPointDesc = map->getPointDescriptorsAll();
+    Mat mapdescriptors = map->getdescriptorsriptorsAll();
 
-    if (mapPointDesc.rows != 0)
+    if (mapdescriptors.rows != 0)
     {
         cv::Ptr<cv::DescriptorMatcher> matcher2 = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
         std::vector<std::vector<cv::DMatch>> rawMatches;
         std::vector<cv::DMatch> matches;
-        matcher2->knnMatch(freePtDesc, mapPointDesc, rawMatches, 2);
+        matcher2->knnMatch(freePtDesc, mapdescriptors, rawMatches, 2);
 
         for (auto mlist : rawMatches)
         {

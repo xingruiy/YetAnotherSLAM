@@ -1,7 +1,7 @@
 #pragma once
-#include "utils/map.h"
-#include "utils/frame.h"
-#include "utils/mapPoint.h"
+#include "dataStruct/map.h"
+#include "dataStruct/frame.h"
+#include "dataStruct/mapPoint.h"
 
 class Localizer
 {
