@@ -16,6 +16,7 @@ class MapViewer
     pangolin::View *colourView;
     pangolin::View *keyPointView;
     pangolin::View *matchedView;
+    pangolin::View *subBarView;
     pangolin::View *depthView;
     pangolin::View *modelView;
     pangolin::View *menuView;

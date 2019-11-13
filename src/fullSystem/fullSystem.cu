@@ -172,10 +172,20 @@ void FullSystem::raytraceCurrentFrame()
 
 bool FullSystem::tryRelocalizeKeyframe(std::shared_ptr<Frame> kf)
 {
+    Mat descriptor;
+    std::vector<float> keyPointDepth;
+    std::vector<Vec3f> keyPointNormal;
+    std::vector<cv::KeyPoint> cvKeyPoints;
+
+    // detect features for the current frame
+    auto matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
+    matcher->detectAndCompute(kf->getImage(), cvKeyPoints, descriptor);
+    matcher->computePointDepth(kf->getOGDepth(), cvKeyPoints, keyPointDepth);
+
     // draw detected keypoints
     if (viewerEnabled && viewer)
     {
-        cv::drawKeypoints(kf->getImage(), kf->cvKeyPoints, cpuBufferVec3ByteWxH, cv::Scalar(255, 0, 0));
+        cv::drawKeypoints(kf->getImage(), cvKeyPoints, cpuBufferVec3ByteWxH, cv::Scalar(255, 0, 0));
         viewer->setKeyPointImage(cpuBufferVec3ByteWxH);
     }
 
@@ -195,7 +205,7 @@ bool FullSystem::tryRelocalizeKeyframe(std::shared_ptr<Frame> kf)
         if (z)
         {
             valid[n] = true;
-            auto &kp = kf->cvKeyPoints[n].pt;
+            auto &kp = cvKeyPoints[n].pt;
             keyPoint[n] = camIntrinsics.inverse() * Vec3d(kp.x, kp.y, 1.0) * z;
         }
     }
@@ -207,8 +217,8 @@ bool FullSystem::tryRelocalizeKeyframe(std::shared_ptr<Frame> kf)
     if (!relocalizer.getRelocHypotheses(
             map,
             keyPoint,
-            kf->keyPointNorm,
-            kf->pointDesc,
+            keyPointNormal,
+            descriptor,
             valid,
             hypothesesList,
             matches,
@@ -251,18 +261,34 @@ bool FullSystem::tryRelocalizeKeyframe(std::shared_ptr<Frame> kf)
                 const int y = fy * pos(1) / pos(2) + cy;
                 if (x >= 0 && y >= 0 && x < 640 && y < 480)
                 {
-                    ptMatched.push_back(kf->cvKeyPoints[m.queryIdx]);
+                    ptMatched.push_back(cvKeyPoints[m.queryIdx]);
                     ptMatchedDst.push_back(cv::KeyPoint(x, y, 1));
                     ptMatch.push_back(cv::DMatch(counter, counter, 0));
                     matchingLines.push_back(cv::Point2f(x, y));
-                    matchingLines.push_back(kf->cvKeyPoints[m.queryIdx].pt);
+                    matchingLines.push_back(cvKeyPoints[m.queryIdx].pt);
                     counter++;
                 }
             }
         }
 
+        std::vector<cv::KeyPoint> vcMapPoints;
+        for (auto &mp : mapPoints)
+        {
+            if (mp)
+            {
+                const auto &pos = kf->getPoseInGlobalMap().inverse() * mp->getPosWorld();
+                const int x = fx * pos(0) / pos(2) + cx;
+                const int y = fy * pos(1) / pos(2) + cy;
+                if (x >= 0 && y >= 0 && x < 640 && y < 480)
+                {
+                    vcMapPoints.push_back(cv::KeyPoint(x, y, 1));
+                }
+            }
+        }
+
         // display matched points in a image;
-        cv::drawKeypoints(kf->getImage(), ptMatched, cpuBufferVec3ByteWxH, cv::Scalar(0, 255, 0));
+        cv::drawKeypoints(kf->getImage(), vcMapPoints, cpuBufferVec3ByteWxH, cv::Scalar(0, 0, 255));
+        cv::drawKeypoints(cpuBufferVec3ByteWxH, ptMatched, cpuBufferVec3ByteWxH, cv::Scalar(0, 255, 0));
         cv::drawKeypoints(cpuBufferVec3ByteWxH, ptMatchedDst, test, cv::Scalar(255, 0, 0));
         for (int i = 0; i < counter - 1; ++i)
         {
@@ -276,8 +302,8 @@ bool FullSystem::tryRelocalizeKeyframe(std::shared_ptr<Frame> kf)
     if (viewerEnabled && viewer)
         viewer->setRelocalizationHypotheses(hypothesesList);
 
-    cv::imshow("img", test);
-    cv::waitKey(1);
+    // cv::imshow("img", test);
+    // cv::waitKey(1);
 
     return true;
 }
@@ -359,9 +385,9 @@ bool FullSystem::tryRelocalizeCurrentFrame()
         viewerEnabled && viewer)
     {
         std::vector<cv::KeyPoint> ptMatched;
-        std::vector<Vec3f> ptMatched3d;
-        std::vector<Vec3f> ptMatchedDst3d;
-        std::vector<Vec3f> lines;
+        // std::vector<Vec3f> ptMatched3d;
+        // std::vector<Vec3f> ptMatchedDst3d;
+        // std::vector<Vec3f> lines;
         auto mapPoints = map->getMapPointsAll();
         const auto &mlist = matches[0];
         const auto &outlier = filter[0];
@@ -372,7 +398,7 @@ bool FullSystem::tryRelocalizeCurrentFrame()
             {
                 const auto &m = mlist[i];
                 ptMatched.push_back(cvKeyPoint[m.queryIdx]);
-                ptMatchedDst3d.push_back(mapPoints[m.trainIdx]->getPosWorld().cast<float>());
+                // ptMatchedDst3d.push_back(mapPoints[m.trainIdx]->getPosWorld().cast<float>());
             }
         }
 
@@ -386,15 +412,15 @@ bool FullSystem::tryRelocalizeCurrentFrame()
         {
             const auto kp = ptMatched[i];
             const auto kp3d = T * (camIntrinsics.inverse() * Vec3d(kp.pt.x / 640.0, kp.pt.y / 480.0, 0.01));
-            ptMatched3d.push_back(kp3d.cast<float>());
-            lines.push_back(ptMatchedDst3d[i]);
-            lines.push_back(ptMatched3d[i]);
+            // ptMatched3d.push_back(kp3d.cast<float>());
+            // lines.push_back(ptMatchedDst3d[i]);
+            // lines.push_back(ptMatched3d[i]);
         }
 
         // display matched points in 3d
-        viewer->setMatchedPoints(ptMatchedDst3d);
-        viewer->setMatchedFramePoints(ptMatched3d);
-        viewer->setMatchingLines(lines);
+        // viewer->setMatchedPoints(ptMatchedDst3d);
+        // viewer->setMatchedFramePoints(ptMatched3d);
+        // viewer->setMatchingLines(lines);
     }
 
     // display pose proposals

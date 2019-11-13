@@ -11,6 +11,7 @@ class FeatureMatcher;
 class Frame
 {
     Mat rawDepth;
+    Mat ogDepth;
     Mat rawImage;
     Mat normalMap;
     Mat rawIntensity;
@@ -51,6 +52,7 @@ public:
 
     Mat getDepth() const;
     Mat getImage() const;
+    Mat getOGDepth() const;
     Mat getIntensity() const;
 
     void flagKeyFrame();

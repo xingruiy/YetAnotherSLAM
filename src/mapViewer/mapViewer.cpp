@@ -33,24 +33,29 @@ MapViewer::~MapViewer()
 void MapViewer::setupDisplay()
 {
     auto MenuDividerLeft = pangolin::Attach::Pix(200);
-    float RightSideBarDividerLeft = 0.7f;
+    float RightSideBarDividerLeft = 0.75f;
 
     modelView = &pangolin::Display("Local Map");
     modelView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft).SetHandler(new pangolin::Handler3D(*mainCamera));
     sidebarView = &pangolin::Display("Right Side Bar");
     sidebarView->SetBounds(0, 1, RightSideBarDividerLeft, 1);
-    colourView = &pangolin::Display("RGB");
-    colourView->SetBounds(0.25, 0.5, 0, 0.5);
-    keyPointView = &pangolin::Display("Key Point");
-    keyPointView->SetBounds(0, 0.25, 0, 0.5);
-    matchedView = &pangolin::Display("Matched Point");
-    matchedView->SetBounds(0, 0.25, 0.5, 1);
-    depthView = &pangolin::Display("Depth");
-    depthView->SetBounds(0.5, 1, 0, 1);
 
-    sidebarView->AddDisplay(*colourView);
+    colourView = &pangolin::Display("RGB");
+    colourView->SetBounds(0, 0.5, 0, 0.5);
+    keyPointView = &pangolin::Display("Key Point");
+    keyPointView->SetBounds(0, 0.5, 0.5, 1);
+
+    subBarView = &pangolin::Display("Sub Side Bar");
+    subBarView->SetBounds(0, 0.33, 0, 1);
+    matchedView = &pangolin::Display("Matched Point");
+    matchedView->SetBounds(0.33, 0.66, 0, 1);
+    depthView = &pangolin::Display("Depth");
+    depthView->SetBounds(0.66, 1, 0, 1);
+
+    subBarView->AddDisplay(*colourView);
+    subBarView->AddDisplay(*keyPointView);
     sidebarView->AddDisplay(*depthView);
-    sidebarView->AddDisplay(*keyPointView);
+    sidebarView->AddDisplay(*subBarView);
     sidebarView->AddDisplay(*matchedView);
 
     pangolin::CreatePanel("Menu").SetBounds(0, 1, 0, MenuDividerLeft);

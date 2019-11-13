@@ -347,7 +347,7 @@ struct MapRenderingDelegate
             if (sdfValid)
                 step = max(sdf * raytraceStep, 1.0f);
             else
-                step = BlockSize;
+                step = 1;
 
             result += step * dir;
             dist_s += step;

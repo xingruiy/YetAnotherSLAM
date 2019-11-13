@@ -22,6 +22,7 @@ Frame::Frame(int w,
 {
     colourImage.copyTo(rawImage);
     depthImage.copyTo(rawDepth);
+    depthImage.copyTo(ogDepth);
     intensityImage.copyTo(rawIntensity);
 }
 
@@ -53,6 +54,11 @@ Mat Frame::getImage() const
 Mat Frame::getIntensity() const
 {
     return rawIntensity;
+}
+
+Mat Frame::getOGDepth() const
+{
+    return ogDepth;
 }
 
 void Frame::flagKeyFrame()
