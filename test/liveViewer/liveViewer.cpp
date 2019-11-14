@@ -9,12 +9,13 @@ int main(int argc, char **argv)
     K(0, 0) = K(1, 1) = 570;
     K(0, 2) = 319.5;
     K(1, 2) = 239.5;
+
     ONICamera camera(640, 480, 30);
     MapViewer viewer(1920, 920, 640, 480, K);
-
+    FullSystem fullsystem(640, 480, K, 5, viewer);
     Mat depth, image;
     Mat depthFloat, depthImage;
-    FullSystem fullsystem(640, 480, K, 5, viewer);
+
     float depthScale = 1.0 / 1000.0;
 
     GMat gpuBufferFloatWxH;
@@ -68,11 +69,10 @@ int main(int argc, char **argv)
                 float *nbuffer;
                 size_t bufferSize;
                 viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
-                size_t size = fullsystem.getMesh(vbuffer, nbuffer, bufferSize);
-                viewer.setMeshSizeToRender(size);
+                viewer.setMeshSizeToRender(fullsystem.getMesh(vbuffer, nbuffer, bufferSize));
                 viewer.setActivePoints(fullsystem.getMapPointPosAll());
-                viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
-                viewer.setFrameHistory(fullsystem.getFramePoseHistory());
+                // viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
+                // viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             }
         }
 

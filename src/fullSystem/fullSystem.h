@@ -55,7 +55,7 @@ public:
 
 public:
     bool needNewKF();
-    void createNewKF();
+    void createNewKeyFrame();
     bool trackCurrentFrame();
     void fuseCurrentFrame();
     void raytraceCurrentFrame();
@@ -71,9 +71,7 @@ public:
     std::shared_ptr<LocalMapper> localMapper;
 
     MapViewer *viewer;
-
-    std::shared_ptr<Frame> currentFrame;
-    std::shared_ptr<Frame> currentKeyframe;
+    Frame currentFrame;
 
     // System parameters
     int imageWidth;
@@ -111,4 +109,6 @@ public:
     bool mappingEnabled;
     bool useGraphMatching;
     bool shouldCalculateNormal;
+
+    bool enableLocalMapping;
 };

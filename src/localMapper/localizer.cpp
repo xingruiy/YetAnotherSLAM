@@ -182,18 +182,18 @@ SE3 Localizer::getWorldTransform(
     std::vector<cv::DMatch> &matches,
     std::vector<std::shared_ptr<MapPoint>> &pts)
 {
-    std::vector<Vec3d> referencePts;
-    std::vector<Vec3d> currentPts;
-    for (auto match : matches)
-    {
-        auto &refPt = pts[match.trainIdx];
-        auto &currPt = frame->mapPoints[match.queryIdx];
-        if (refPt && !refPt->isBad() && currPt && !currPt->isBad())
-        {
-            referencePts.push_back(refPt->getPosWorld());
-            currentPts.push_back(currPt->getPosWorld());
-        }
-    }
+    // std::vector<Vec3d> referencePts;
+    // std::vector<Vec3d> currentPts;
+    // for (auto match : matches)
+    // {
+    //     auto &refPt = pts[match.trainIdx];
+    //     auto &currPt = frame->mapPoints[match.queryIdx];
+    //     if (refPt && !refPt->setToRemove && currPt && !currPt->setToRemove)
+    //     {
+    //         referencePts.push_back(refPt->pos);
+    //         currentPts.push_back(currPt->pos);
+    //     }
+    // }
 }
 
 template <class Derived>
@@ -279,15 +279,14 @@ void Localizer::createAdjacencyMat(
         auto &mapPt = mapPoints[match.trainIdx];
         auto &framePt = framePoints[match.queryIdx];
 
-        if (!mapPt ||
-            mapPt->isBad() ||
+        if (!mapPt || mapPt->setToRemove ||
             !framePtValid[match.queryIdx])
             validPairPt.ptr<uchar>(0)[i] = 0;
         else
             validPairPt.ptr<uchar>(0)[i] = 1;
 
         descriptorDist.ptr<float>(0)[i] = match.distance;
-        srcPointPos.ptr<Vec3f>(0)[i] = mapPt->getPosWorld().cast<float>();
+        srcPointPos.ptr<Vec3f>(0)[i] = mapPt->pos.cast<float>();
         dstPointPos.ptr<Vec3f>(0)[i] = framePt.cast<float>();
     }
 
@@ -324,7 +323,7 @@ void Localizer::createAdjacencyMat(
         auto &n = frameNormal[match.queryIdx];
 
         bool validPair = (n(0) > FLT_EPSILON) &&
-                         mapPt && !mapPt->isBad() &&
+                         mapPt && !mapPt->setToRemove &&
                          framePtValid[match.queryIdx];
 
         if (validPair)
@@ -333,13 +332,10 @@ void Localizer::createAdjacencyMat(
             validPairPt.ptr<uchar>(0)[i] = 0;
 
         descriptorDist.ptr<float>(0)[i] = match.distance;
-        srcPointPos.ptr<Vec3f>(0)[i] = mapPt->getPosWorld().cast<float>();
-        srcPointNormal.ptr<Vec3f>(0)[i] = mapPt->getNormal();
+        srcPointPos.ptr<Vec3f>(0)[i] = mapPt->pos.cast<float>();
+        srcPointNormal.ptr<Vec3f>(0)[i] = mapPt->normal.cast<float>();
         dstPointPos.ptr<Vec3f>(0)[i] = framePt.cast<float>();
         dstPointNormal.ptr<Vec3f>(0)[i] = n;
-
-        // if (validPair)
-        // std::cout << "frame: " << n << "map: " << mapPt->getNormal() << std::endl;
     }
 
     ::createAdjacencyMatWithNormal(
@@ -525,13 +521,11 @@ bool Localizer::getRelocHypotheses(
             auto &mapPt = mapPts[match.trainIdx];
             auto &framePt = framePts[match.queryIdx];
 
-            if (!mapPt ||
-                (mapPt && mapPt->isBad()) ||
-                !framePtValid[match.queryIdx])
+            if (!mapPt || mapPt->setToRemove || !framePtValid[match.queryIdx])
                 continue;
 
             srcTemp.push_back(framePt);
-            dstTemp.push_back(mapPt->getPosWorld());
+            dstTemp.push_back(mapPt->pos);
         }
 
         src.push_back(srcTemp);
@@ -540,32 +534,4 @@ bool Localizer::getRelocHypotheses(
 
     getWorldTransform(src, dst, filter, estimateList);
     return true;
-}
-
-bool Localizer::evalHypotheses(
-    const std::shared_ptr<Map> map,
-    const std::vector<SE3> &estimateList,
-    const std::vector<cv::KeyPoint> &cvKeyPoint,
-    const Mat33d &camIntrinsics,
-    SE3 &bestEstimate)
-{
-    auto &mapPoints = map->mapPointDB;
-    const auto fx = camIntrinsics(0, 0);
-    const auto fy = camIntrinsics(1, 1);
-    const auto cx = camIntrinsics(0, 2);
-    const auto cy = camIntrinsics(1, 2);
-
-    for (auto &h : estimateList)
-    {
-        for (auto &pt : mapPoints)
-        {
-            auto pos = pt->getPosWorld();
-            auto posLocal = h.inverse() * pos;
-            const auto x = posLocal(0) / posLocal(2) * fx + cx;
-            const auto y = posLocal(1) / posLocal(2) * fy + cy;
-            if (x >= 0 && y >= 0 && x < 640 && y < 480)
-            {
-            }
-        }
-    }
 }

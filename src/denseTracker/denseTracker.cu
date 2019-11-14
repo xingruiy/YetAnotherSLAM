@@ -83,7 +83,7 @@ void DenseTracker::setReferenceFrame(const Frame &F)
         {
             rawDepthBuffer.upload(F.imDepth);
             convertDepthToInvDepth(rawDepthBuffer, referenceInvDepth[lvl]);
-            referenceIntensity[0].upload(F.rawIntensity);
+            referenceIntensity[0].upload(F.imGray);
         }
         else
         {
@@ -101,7 +101,7 @@ void DenseTracker::setTrackingFrame(const Frame &F)
         {
             rawDepthBuffer.upload(F.imDepth);
             convertDepthToInvDepth(rawDepthBuffer, currentInvDepth[lvl]);
-            currentIntensity[lvl].upload(F.rawIntensity);
+            currentIntensity[lvl].upload(F.imGray);
         }
         else
         {

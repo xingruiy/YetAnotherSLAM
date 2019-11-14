@@ -83,6 +83,8 @@ class MapViewer
     int frameWidth;
     int frameHeight;
 
+    SE3 currentCameraPose;
+
 public:
     MapViewer(int w, int h, int fW, int fH, Mat33d &K);
     ~MapViewer();
@@ -120,6 +122,7 @@ public:
 
     void addTrackingResult(const SE3 &T);
     void addRawKeyFramePose(const SE3 &T);
+    void setCurrentCamera(const SE3 &T);
 
     inline bool displayImageRGB() const { return *displayColourBox; }
     inline bool displayImageDepth() const { return *displayDepthBox; }
