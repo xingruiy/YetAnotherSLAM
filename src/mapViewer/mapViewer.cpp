@@ -308,9 +308,9 @@ void MapViewer::renderView()
         for (auto T : rawKeyFrameHistory)
             pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
-        // glColor3f(0.f, 1.f, 0.f);
-        // for (auto T : keyFrameHistory)
-        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+        glColor3f(0.f, 1.f, 0.f);
+        for (auto T : optimizedKeyFramePose)
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
         pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, currentCameraPose.matrix().cast<float>(), 0.05f);
 
@@ -484,6 +484,11 @@ void MapViewer::addTrackingResult(const SE3 &T)
 void MapViewer::addRawKeyFramePose(const SE3 &T)
 {
     rawKeyFrameHistory.push_back(T.matrix().cast<float>());
+}
+
+void MapViewer::addOptimizedKFPose(const SE3 T)
+{
+    optimizedKeyFramePose.push_back(T.matrix().cast<float>());
 }
 
 void MapViewer::setCurrentCamera(const SE3 &T)

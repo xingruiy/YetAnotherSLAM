@@ -31,7 +31,6 @@ LocalMapper::LocalMapper(const Mat33d &K)
       currKeyFrame(NULL),
       lastKeyFrame(NULL)
 {
-    matcher = std::make_shared<FeatureMatcher>(PointType::ORB, DescType::ORB);
 }
 
 void LocalMapper::loop()
@@ -249,6 +248,8 @@ void LocalMapper::processNewKeyFrame()
     currKeyFrame->keyPoints = keyPoints;
     currKeyFrame->descriptors = descriptors;
     currKeyFrame->mapPoints.resize(keyPoints.size());
+
+    map->addKeyFrame(currKeyFrame);
 }
 
 void LocalMapper::createNewMapPoints()
@@ -330,7 +331,5 @@ void LocalMapper::optimizeKeyFramePose()
     currKeyFrame->setPose(currKeyFrame->RT);
 
     if (viewer)
-    {
-        map->addKeyFrame(currKeyFrame);
-    }
+        viewer->addOptimizedKFPose(currKeyFrame->RT);
 }

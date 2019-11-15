@@ -6,15 +6,6 @@
 class Localizer
 {
 public:
-    SE3 getRelativeTransform(
-        std::shared_ptr<Frame> reference,
-        std::shared_ptr<Frame> current);
-
-    SE3 getWorldTransform(
-        std::shared_ptr<Frame> frame,
-        std::vector<cv::DMatch> &matches,
-        std::vector<std::shared_ptr<MapPoint>> &pts);
-
     // generate relocalization hypotheses based on given points
     bool getRelocHypotheses(
         const std::shared_ptr<Map> map,

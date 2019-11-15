@@ -5,7 +5,6 @@
 #include "utils/numType.h"
 #include "dataStruct/keyFrame.h"
 #include "mapViewer/mapViewer.h"
-#include "localMapper/featureMatcher.h"
 
 class LocalMapper
 {
@@ -36,9 +35,6 @@ private:
     MapViewer *viewer;
     bool shouldQuit;
 
-    // std::shared_ptr<Map> map;
-    std::shared_ptr<FeatureMatcher> matcher;
-
     inline bool hasNewKeyFrame()
     {
         std::unique_lock<std::mutex> lock(mutexKeyFrameQueue);
@@ -57,12 +53,6 @@ private:
     std::shared_ptr<KeyFrame> currKeyFrame;
     std::mutex mutexKeyFrameQueue;
     std::deque<std::shared_ptr<KeyFrame>> keyFrameQueue;
-
     std::vector<std::shared_ptr<KeyFrame>> localKeyFrameSet;
     std::vector<std::shared_ptr<MapPoint>> localMapPointSet;
-
-    // void matchFeatures(std::shared_ptr<Frame> kf);
-    // void detectLoop(std::shared_ptr<Frame> kf);
-    // void createNewPoints(std::shared_ptr<Frame> kf);
-    // std::shared_ptr<Frame> getNewKeyframe();
 };

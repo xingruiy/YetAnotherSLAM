@@ -1,6 +1,5 @@
 #include "utils/mapCUDA.h"
 #include "localMapper/localizer.h"
-#include "localMapper/featureMatcher.h"
 
 #define MinimumNumMatches 3
 
@@ -175,25 +174,6 @@ void Localizer::runRansacAO(
     }
 
     numInliers = bestNumInliers;
-}
-
-SE3 Localizer::getWorldTransform(
-    std::shared_ptr<Frame> frame,
-    std::vector<cv::DMatch> &matches,
-    std::vector<std::shared_ptr<MapPoint>> &pts)
-{
-    // std::vector<Vec3d> referencePts;
-    // std::vector<Vec3d> currentPts;
-    // for (auto match : matches)
-    // {
-    //     auto &refPt = pts[match.trainIdx];
-    //     auto &currPt = frame->mapPoints[match.queryIdx];
-    //     if (refPt && !refPt->setToRemove && currPt && !currPt->setToRemove)
-    //     {
-    //         referencePts.push_back(refPt->pos);
-    //         currentPts.push_back(currPt->pos);
-    //     }
-    // }
 }
 
 template <class Derived>

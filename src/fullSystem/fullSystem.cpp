@@ -207,7 +207,9 @@ bool FullSystem::tryRelocalizeCurrentFrame()
         auto &kp = keyPoints[i];
         const auto &x = kp.pt.x;
         const auto &y = kp.pt.y;
+        // Extract depth
         auto &z = currentFrame.imDepth.ptr<float>((int)round(y))[(int)round(x)];
+        // Extract Normal
         auto &n = cpuBufferVec4FloatWxH.ptr<Vec3f>((int)round(y))[(int)round(x)];
 
         if (z > FLT_EPSILON && n(0) > FLT_EPSILON)

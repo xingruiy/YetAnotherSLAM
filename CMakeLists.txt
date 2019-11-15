@@ -28,7 +28,6 @@ PRIVATE
 
     src/localMapper/localizer.cpp
     src/localMapper/localMapper.cpp
-    src/localMapper/featureMatcher.cpp
 
     src/denseMapper/denseMap.cu
     src/denseMapper/denseMapper.cpp

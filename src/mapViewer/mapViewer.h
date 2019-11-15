@@ -66,6 +66,7 @@ class MapViewer
     std::vector<Vec3f> matchingLines;
     std::vector<Vec3f> matchedFramePoints;
     std::vector<Vec3f> rawFrameHistory;
+    std::vector<Mat44f> optimizedKeyFramePose;
     std::vector<Mat44f> rawKeyFrameHistory;
     std::vector<Vec3f> frameHistory;
     std::vector<Mat44f> keyFrameHistory;
@@ -122,6 +123,7 @@ public:
 
     void addTrackingResult(const SE3 &T);
     void addRawKeyFramePose(const SE3 &T);
+    void addOptimizedKFPose(const SE3 T);
     void setCurrentCamera(const SE3 &T);
 
     inline bool displayImageRGB() const { return *displayColourBox; }
