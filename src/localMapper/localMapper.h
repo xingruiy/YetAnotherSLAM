@@ -55,6 +55,7 @@ private:
     void updateLocalMapPoints();
     void createInitMapPoints();
     void optimizeKeyFramePose();
+    int checkMapPointOutliers();
 
     std::shared_ptr<KeyFrame> lastKeyFrame;
     std::shared_ptr<KeyFrame> currKeyFrame;

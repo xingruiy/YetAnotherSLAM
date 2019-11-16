@@ -366,10 +366,10 @@ void FullSystem::createNewKeyFrame()
     // Updtae local dense map pose
     lastTrackedPose = lastTrackedPose * rawTransformation;
 
-    if (viewer)
-    {
-        viewer->addRawKeyFramePose(lastTrackedPose);
-    }
+    // if (viewer)
+    // {
+    //     viewer->addRawKeyFramePose(lastTrackedPose);
+    // }
 
     rawTransformation = SE3();
     lastKeyFrame = currKeyFrame;

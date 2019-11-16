@@ -20,7 +20,7 @@ public:
     Eigen::Vector3d normal;
     cv::Mat descriptor;
     std::shared_ptr<KeyFrame> hostKF;
-    std::map<std::shared_ptr<KeyFrame>, Vec2d> observations;
+    std::map<std::shared_ptr<KeyFrame>, size_t> observations;
 
     bool setToRemove;
     size_t localReferenceId;
