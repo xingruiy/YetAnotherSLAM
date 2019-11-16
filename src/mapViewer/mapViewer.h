@@ -84,6 +84,7 @@ class MapViewer
     int frameWidth;
     int frameHeight;
 
+    SE3 RTLocalToGlobal;
     SE3 currentCameraPose;
 
 public:
@@ -125,6 +126,7 @@ public:
     void addRawKeyFramePose(const SE3 &T);
     void addOptimizedKFPose(const SE3 T);
     void setCurrentCamera(const SE3 &T);
+    void setRTLocalToGlobal(const SE3 &T);
 
     inline bool displayImageRGB() const { return *displayColourBox; }
     inline bool displayImageDepth() const { return *displayDepthBox; }

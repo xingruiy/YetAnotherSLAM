@@ -22,9 +22,12 @@ FullSystem::FullSystem(
     map = std::make_shared<Map>();
     denseMapper = std::make_shared<DenseMapping>(w, h, K);
 
+    loopCloser = std::make_shared<LoopCloser>();
+
     localMapper = std::make_shared<LocalMapper>(K);
     localMapper->setMap(map.get());
     localMapper->setMapViewer(&viewer);
+    localMapper->setLoopCloser(loopCloser.get());
 
     coarseTracker = std::make_shared<DenseTracker>(w, h, K, numLvl);
 
@@ -102,7 +105,15 @@ void FullSystem::processFrame(Mat imRGB, Mat imDepth)
     case SystemState::Lost:
     {
         printf("tracking loast, attempt to resuming...\n");
-        tryRelocalizeCurrentFrame();
+        if (tryRelocalizeCurrentFrame())
+        {
+            printf("Pose proposal found, trying to refine...\n");
+            if (validateRelocalization())
+            {
+                state = SystemState::OK;
+                printf("relocalisation succeeded...\n");
+            }
+        }
 
         break;
     }
@@ -143,9 +154,7 @@ bool FullSystem::trackCurrentFrame()
     rawTransformation = rawTransformation * tRes.inverse();
 
     if (viewer)
-    {
         viewer->setCurrentCamera(lastTrackedPose * rawTransformation);
-    }
 
     return true;
 }
@@ -170,7 +179,7 @@ void FullSystem::raytraceCurrentFrame()
     gpuBufferVec4FloatWxH2.download(currentFrame.nmap);
 }
 
-bool FullSystem::tryRelocalizeKeyframe(std::shared_ptr<Frame> kf)
+bool FullSystem::validateRelocalization()
 {
 }
 

@@ -60,6 +60,8 @@ void LocalMapper::loop()
             }
 
             lastKeyFrame = currKeyFrame;
+
+            loopCloser->testKeyFrame(currKeyFrame);
         }
         else
         {
@@ -286,6 +288,8 @@ void LocalMapper::createNewMapPoints()
 
 void LocalMapper::optimizeKeyFramePose()
 {
+    SE3 RTbo = currKeyFrame->RT;
+
     ceres::Problem problem;
     problem.AddParameterBlock(currKeyFrame->RT.data(), SE3::num_parameters, new LocalParameterizationSE3);
     double KBlock[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
@@ -331,5 +335,8 @@ void LocalMapper::optimizeKeyFramePose()
     currKeyFrame->setPose(currKeyFrame->RT);
 
     if (viewer)
+    {
         viewer->addOptimizedKFPose(currKeyFrame->RT);
+        viewer->setRTLocalToGlobal(currKeyFrame->RT * RTbo.inverse());
+    }
 }

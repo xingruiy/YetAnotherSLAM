@@ -3,6 +3,7 @@
 #include <mutex>
 #include "dataStruct/map.h"
 #include "utils/numType.h"
+#include "loopCloser/loopCloser.h"
 #include "dataStruct/keyFrame.h"
 #include "mapViewer/mapViewer.h"
 
@@ -21,6 +22,11 @@ public:
         this->viewer = viewer;
     }
 
+    inline void setLoopCloser(LoopCloser *closer)
+    {
+        loopCloser = closer;
+    }
+
     void addKeyFrame(std::shared_ptr<KeyFrame> KF);
     void loop();
 
@@ -32,6 +38,7 @@ public:
 private:
     Mat33d K;
     Map *map;
+    LoopCloser *loopCloser;
     MapViewer *viewer;
     bool shouldQuit;
 

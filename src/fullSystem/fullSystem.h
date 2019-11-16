@@ -9,6 +9,7 @@
 #include "mapViewer/mapViewer.h"
 #include "denseMapper/denseMapper.h"
 #include "localMapper/localMapper.h"
+#include "loopCloser/loopCloser.h"
 #include "denseTracker/denseTracker.h"
 
 enum class SystemState
@@ -60,12 +61,13 @@ public:
     void fuseCurrentFrame();
     void raytraceCurrentFrame();
     bool tryRelocalizeCurrentFrame();
-    bool tryRelocalizeKeyframe(std::shared_ptr<Frame> kf);
+    bool validateRelocalization();
 
     // System components
     std::thread loopClosureThread;
     std::thread localMappingThread;
     std::shared_ptr<Map> map;
+    std::shared_ptr<LoopCloser> loopCloser;
     std::shared_ptr<DenseMapping> denseMapper;
     std::shared_ptr<DenseTracker> coarseTracker;
     std::shared_ptr<LocalMapper> localMapper;

@@ -8,6 +8,8 @@ LoopCloser::LoopCloser()
 
 void LoopCloser::testKeyFrame(std::shared_ptr<KeyFrame> KF)
 {
+    std::unique_lock<std::mutex>(KFBufferMutex);
+    KFBuffer.push_back(KF);
 }
 
 void LoopCloser::run()

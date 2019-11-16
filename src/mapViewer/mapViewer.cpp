@@ -207,6 +207,7 @@ void MapViewer::resetViewer()
     rawKeyFrameHistory.clear();
     frameHistory.clear();
     keyFrameHistory.clear();
+    RTLocalToGlobal = SE3();
 }
 
 void MapViewer::setColourImage(Mat image)
@@ -406,6 +407,7 @@ void MapViewer::drawLocalMap()
     phongProgram.Bind();
     glBindVertexArray(vaoPhong);
     phongProgram.SetUniform("mvpMat", mainCamera->GetProjectionModelViewMatrix());
+    phongProgram.SetUniform("mMat", RTLocalToGlobal.matrix());
     glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
     glBindVertexArray(0);
     phongProgram.Unbind();
@@ -494,4 +496,9 @@ void MapViewer::addOptimizedKFPose(const SE3 T)
 void MapViewer::setCurrentCamera(const SE3 &T)
 {
     currentCameraPose = T;
+}
+
+void MapViewer::setRTLocalToGlobal(const SE3 &T)
+{
+    RTLocalToGlobal = RTLocalToGlobal * T;
 }
