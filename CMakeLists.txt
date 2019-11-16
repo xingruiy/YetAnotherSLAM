@@ -10,30 +10,32 @@ add_library(athena SHARED)
 
 target_sources(athena
 PRIVATE
-    src/dataStruct/map.cpp
-    src/dataStruct/frame.cpp
-    src/dataStruct/mapPoint.cpp
-    src/dataStruct/keyFrame.cpp
+    src/DataStruct/map.cpp
+    src/DataStruct/frame.cpp
+    src/DataStruct/mapPoint.cpp
+    src/DataStruct/keyFrame.cpp
 
     src/utils/mapCUDA.cu
 
-    src/fullSystem/fullSystem.cpp
+    src/FullSystem/fullSystem.cpp
 
-    src/mapViewer/mapViewer.cpp
+    src/MapViewer/mapViewer.cpp
 
-    src/loopCloser/loopCloser.cpp
+    src/LoopCloser/loopCloser.cpp
 
-    src/denseTracker/denseTracker.cu
-    src/denseTracker/cudaImageProc.cu
+    src/Relocalizer/Relocalizer.cpp
 
-    src/localMapper/localizer.cpp
-    src/localMapper/localMapper.cpp
+    src/DenseTracker/denseTracker.cu
+    src/DenseTracker/cudaImageProc.cu
 
-    src/denseMapper/denseMap.cu
-    src/denseMapper/denseMapper.cpp
-    src/denseMapper/depthFusion.cu
-    src/denseMapper/meshScene.cu
-    src/denseMapper/raytracing.cu
+    src/LocalMapper/localizer.cpp
+    src/LocalMapper/localMapper.cpp
+    
+    src/DenseMapper/denseMap.cu
+    src/DenseMapper/denseMapper.cpp
+    src/DenseMapper/depthFusion.cu
+    src/DenseMapper/meshScene.cu
+    src/DenseMapper/raytracing.cu
 )
 
 target_compile_features(athena

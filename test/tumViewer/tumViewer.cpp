@@ -1,6 +1,6 @@
 #include "tumLoader.h"
-#include "mapViewer/mapViewer.h"
-#include "fullSystem/fullSystem.h"
+#include "MapViewer/mapViewer.h"
+#include "FullSystem/fullSystem.h"
 
 int main(int argc, char **argv)
 {
