@@ -304,20 +304,21 @@ void MapViewer::renderView()
 
     if (*displayKFHistoryBox && modelView)
     {
-        modelView->Activate(*mainCamera);
-        glColor3f(1.f, 0.f, 0.f);
-        for (auto T : rawKeyFrameHistory)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+        // modelView->Activate(*mainCamera);
+        // glColor3f(1.f, 0.f, 0.f);
+        // for (auto T : rawKeyFrameHistory)
+        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
-        glColor3f(0.f, 1.f, 0.f);
-        for (auto T : optimizedKeyFramePose)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
+        // glColor3f(0.f, 1.f, 0.f);
+        // for (auto T : optimizedKeyFramePose)
+        //     pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05f);
 
+        glColor3f(0.2f, 0.87f, 0.92f);
         pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, currentCameraPose.matrix().cast<float>(), 0.05f);
 
-        glColor3f(1.f, 0.f, 0.f);
+        glColor3f(0.71f, 0.26f, 0.92f);
         for (auto T : relocHypotheses)
-            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.1f);
+            pangolin::glDrawFrustum<float>(Kinv.cast<float>(), frameWidth, frameHeight, T, 0.05);
         glColor4f(1.f, 1.f, 1.f, 1.f);
     }
 
@@ -474,7 +475,7 @@ void MapViewer::setRelocalizationHypotheses(std::vector<SE3> &H)
     relocHypotheses.clear();
     for (auto h : H)
     {
-        relocHypotheses.push_back(h.matrix().cast<float>());
+        relocHypotheses.push_back((h).matrix().cast<float>());
     }
 }
 
@@ -495,7 +496,7 @@ void MapViewer::addOptimizedKFPose(const SE3 T)
 
 void MapViewer::setCurrentCamera(const SE3 &T)
 {
-    currentCameraPose = T;
+    currentCameraPose = RTLocalToGlobal * T;
 }
 
 void MapViewer::setRTLocalToGlobal(const SE3 &T)

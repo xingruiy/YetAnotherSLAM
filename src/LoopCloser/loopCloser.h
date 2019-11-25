@@ -5,6 +5,7 @@
 #include "utils/numType.h"
 #include "DataStruct/keyFrame.h"
 #include "MapViewer/mapViewer.h"
+#include "DataStruct/map.h"
 
 class LoopCloser
 {
@@ -18,17 +19,29 @@ public:
         shouldQuit = true;
     }
 
+    inline void setMap(Map *map)
+    {
+        this->map = map;
+    }
+
+    inline void setMapViewer(MapViewer *viewer)
+    {
+        this->viewer = viewer;
+    }
+
 private:
-    std::mutex KFBufferMutex;
-    std::deque<std::shared_ptr<KeyFrame>> KFBuffer;
-
-    bool shouldQuit;
-
     bool hasNewKeyFrameToTest();
     void processNewKeyFrame();
     void checkLoopClosingCandidates();
     void optimizeEntireMap();
 
+    std::mutex KFBufferMutex;
+    std::deque<std::shared_ptr<KeyFrame>> KFBuffer;
+
     std::shared_ptr<KeyFrame> KFToTest;
     bool needOptimize;
+
+    Map *map;
+    MapViewer *viewer;
+    bool shouldQuit;
 };

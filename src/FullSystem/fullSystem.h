@@ -55,7 +55,7 @@ public:
     std::vector<Vec3f> getMapPointPosAll();
 
 public:
-    bool needNewKF();
+    bool needNewKeyFrame();
     void createNewKeyFrame();
     bool trackCurrentFrame();
     void fuseCurrentFrame();

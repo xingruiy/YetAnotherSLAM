@@ -24,6 +24,8 @@ FullSystem::FullSystem(
     denseMapper = std::make_shared<DenseMapping>(w, h, K);
 
     loopCloser = std::make_shared<LoopCloser>();
+    loopCloser->setMap(map.get());
+    loopCloser->setMapViewer(&viewer);
 
     localMapper = std::make_shared<LocalMapper>(K);
     localMapper->setMap(map.get());
@@ -39,14 +41,17 @@ FullSystem::FullSystem(
     gpuBufferFloatWxH.create(h, w, CV_32FC1);
 
     this->viewer = &viewer;
-    localMappingThread = std::thread(&LocalMapper::loop, localMapper.get());
+    localMappingThread = std::thread(&LocalMapper::run, localMapper.get());
+    loopClosureThread = std::thread(&LoopCloser::run, loopCloser.get());
 }
 
 FullSystem::~FullSystem()
 {
     localMapper->setShouldQuit();
+    loopCloser->setShouldQuit();
     printf("wating other threads to finish...\n");
     localMappingThread.join();
+    loopClosureThread.join();
     printf("all threads finished!\n");
 }
 
@@ -63,8 +68,14 @@ void FullSystem::setCpuBufferVec4FloatWxH(Mat buffer)
 
 void FullSystem::processFrame(Mat imRGB, Mat imDepth)
 {
+    // Copy state
+    lastState = state;
+
+    // Convert RGB image to float points
     imRGB.convertTo(cpuBufferVec3FloatWxH, CV_32FC3);
+    // Convert Floating RGB to Gray scale Images
     cv::cvtColor(cpuBufferVec3FloatWxH, cpuBufferFloatWxH, cv::COLOR_RGB2GRAY);
+    // Construct current frame
     currentFrame = Frame(imRGB, imDepth, cpuBufferFloatWxH, cpuBufferVec4FloatWxH, K);
 
     switch (state)
@@ -92,11 +103,12 @@ void FullSystem::processFrame(Mat imRGB, Mat imDepth)
             fuseCurrentFrame();
             raytraceCurrentFrame();
 
-            if (needNewKF())
+            if (needNewKeyFrame())
                 createNewKeyFrame();
         }
         else
         {
+            // denseMapper->reset();
             state = SystemState::Lost;
         }
 
@@ -121,11 +133,14 @@ void FullSystem::processFrame(Mat imRGB, Mat imDepth)
 
     case SystemState::Test:
     {
-        mappingEnabled = false;
+        localMapper->disableMapping();
         if (trackCurrentFrame())
         {
             fuseCurrentFrame();
             raytraceCurrentFrame();
+
+            if (needNewKeyFrame())
+                createNewKeyFrame();
         }
 
         // Update only when testKFId changed
@@ -139,9 +154,6 @@ void FullSystem::processFrame(Mat imRGB, Mat imDepth)
     }
     }
 
-    // Copy state
-    lastState = state;
-
     // Update statistics
     if (state == SystemState::OK)
         numFramesProcessed += 1;
@@ -151,6 +163,10 @@ bool FullSystem::trackCurrentFrame()
 {
     coarseTracker->setTrackingFrame(currentFrame);
     SE3 tRes = coarseTracker->getIncrementalTransform();
+
+    if (!coarseTracker->wasTrackingGood())
+        return false;
+
     // accumulated local transform
     rawTransformation = rawTransformation * tRes.inverse();
 
@@ -192,6 +208,8 @@ bool FullSystem::tryRelocalizeCurrentFrame()
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->detect(currentFrame.imRGB, keyPoints);
     detector->compute(currentFrame.imRGB, keyPoints, descriptor);
+    // ORB_SLAM2::ORBextractor detector(500, 1.2, 8, 20, 7);
+    // detector(currentFrame.imRGB, Mat(), keyPoints, descriptor);
 
     if (viewer)
     {
@@ -311,9 +329,9 @@ bool FullSystem::tryRelocalizeCurrentFrame()
         }
 
         // display matched points in a image;
-        cv::drawKeypoints(currentFrame.imRGB, vcMapPoints, cpuBufferVec3ByteWxH, cv::Scalar(0, 0, 255));
-        cv::drawKeypoints(cpuBufferVec3ByteWxH, ptMatched, cpuBufferVec3ByteWxH, cv::Scalar(0, 255, 0));
-        cv::drawKeypoints(cpuBufferVec3ByteWxH, ptMatchedDst, test, cv::Scalar(255, 0, 0));
+        // cv::drawKeypoints(currentFrame.imRGB, vcMapPoints, cpuBufferVec3ByteWxH, cv::Scalar(0, 0, 255));
+        // cv::drawKeypoints(cpuBufferVec3ByteWxH, ptMatched, cpuBufferVec3ByteWxH, cv::Scalar(0, 255, 0));
+        cv::drawKeypoints(currentFrame.imRGB, ptMatchedDst, test, cv::Scalar(0, 255, 0));
         for (int i = 0; i < nMapPoints - 1; ++i)
         {
             cv::line(test, matchingLines[2 * i], matchingLines[2 * i + 1], cv::Scalar(0, 0, 255));
@@ -323,14 +341,14 @@ bool FullSystem::tryRelocalizeCurrentFrame()
             viewer->setMatchedPointImage(test);
     }
 
-    // display pose proposals
+    // display pose proposal`s
     if (viewer)
         viewer->setRelocalizationHypotheses(RTProposals);
 
     return true;
 }
 
-bool FullSystem::needNewKF()
+bool FullSystem::needNewKeyFrame()
 {
     Vec3d t = rawTransformation.translation();
     if (t.norm() >= 0.3)
@@ -354,9 +372,11 @@ void FullSystem::createNewKeyFrame()
     }
 
     if (enableLocalMapping)
-    {
-        localMapper->addKeyFrame(currKeyFrame);
-    }
+        localMapper->enableMapping();
+    else
+        localMapper->disableMapping();
+
+    localMapper->addKeyFrame(currKeyFrame);
 
     // Updtae local dense map pose
     lastTrackedPose = lastTrackedPose * rawTransformation;

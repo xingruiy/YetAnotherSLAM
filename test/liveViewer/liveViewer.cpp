@@ -13,15 +13,16 @@ int main(int argc, char **argv)
     ONICamera camera(640, 480, 30);
     MapViewer viewer(1920, 920, 640, 480, K);
     FullSystem fullsystem(640, 480, K, 5, viewer);
+
     Mat depth, image;
     Mat depthFloat, depthImage;
-
-    float depthScale = 1.0 / 1000.0;
 
     GMat gpuBufferFloatWxH;
     GMat bufferVec4FloatWxH;
     GMat bufferVec4FloatWxH2;
     GMat bufferVec4ByteWxH;
+
+    const double depthScale = 1.0 / 1000.0;
 
     while (true && !pangolin::ShouldQuit())
     {
@@ -71,8 +72,6 @@ int main(int argc, char **argv)
                 viewer.getMeshBuffer(vbuffer, nbuffer, bufferSize);
                 viewer.setMeshSizeToRender(fullsystem.getMesh(vbuffer, nbuffer, bufferSize));
                 viewer.setActivePoints(fullsystem.getMapPointPosAll());
-                // viewer.setKeyFrameHistory(fullsystem.getKeyFramePoseHistory());
-                // viewer.setFrameHistory(fullsystem.getFramePoseHistory());
             }
         }
 

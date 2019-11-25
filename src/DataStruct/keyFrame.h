@@ -39,5 +39,6 @@ public:
     std::vector<Vec3d> x3DNormal;
 
     size_t localReferenceId;
+    size_t localReferenceId2;
     SE3 RT, RTinv;
 };

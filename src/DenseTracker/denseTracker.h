@@ -18,6 +18,7 @@ class DenseTracker
 
     GMat rawDepthBuffer;
     GMat rawImageBuffer;
+    bool trackingWasGood;
 
     const int numTrackingLvl;
     std::vector<int> iterationPerLvl;
@@ -79,4 +80,5 @@ public:
 
     SE3 getIncrementalTransform(SE3 initAlign = SE3(), bool switchBuffer = true);
     GMat getReferenceDepth(const int lvl = 0) const;
+    bool wasTrackingGood() const;
 };

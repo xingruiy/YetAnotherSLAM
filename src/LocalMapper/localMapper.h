@@ -28,11 +28,21 @@ public:
     }
 
     void addKeyFrame(std::shared_ptr<KeyFrame> KF);
-    void loop();
+    void run();
 
     inline void setShouldQuit()
     {
         shouldQuit = true;
+    }
+
+    void enableMapping()
+    {
+        updateLocalMap = true;
+    }
+
+    void disableMapping()
+    {
+        updateLocalMap = false;
     }
 
 private:
@@ -41,6 +51,7 @@ private:
     LoopCloser *loopCloser;
     MapViewer *viewer;
     bool shouldQuit;
+    bool updateLocalMap;
 
     inline bool hasNewKeyFrame()
     {

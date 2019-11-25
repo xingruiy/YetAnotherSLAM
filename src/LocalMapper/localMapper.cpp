@@ -29,11 +29,12 @@ LocalMapper::LocalMapper(const Mat33d &K)
     : K(K),
       shouldQuit(false),
       currKeyFrame(NULL),
-      lastKeyFrame(NULL)
+      lastKeyFrame(NULL),
+      updateLocalMap(true)
 {
 }
 
-void LocalMapper::loop()
+void LocalMapper::run()
 {
     while (!shouldQuit)
     {
@@ -47,11 +48,12 @@ void LocalMapper::loop()
 
                 updateLocalMapPoints();
 
-                matchLocalMapPoints();
+                int nMatches = matchLocalMapPoints();
 
                 optimizeKeyFramePose();
 
-                createNewMapPoints();
+                if (updateLocalMap)
+                    createNewMapPoints();
             }
             else
             {
@@ -60,7 +62,8 @@ void LocalMapper::loop()
 
             lastKeyFrame = currKeyFrame;
 
-            loopCloser->testKeyFrame(currKeyFrame);
+            if (updateLocalMap)
+                loopCloser->testKeyFrame(currKeyFrame);
         }
         else
         {
@@ -184,8 +187,9 @@ int LocalMapper::matchLocalMapPoints()
     {
         auto &mp = localMapPointSet[i];
         auto pos = RTinv * mp->pos;
-        const double x = fx * pos(0) / pos(2) + cx;
-        const double y = fy * pos(1) / pos(2) + cy;
+        const double z = pos(2);
+        const double x = fx * pos(0) / z + cx;
+        const double y = fy * pos(1) / z + cy;
         if (x >= 0 && y >= 0 && x < 640 && y < 480)
         {
             int bestDist = 256;
@@ -194,7 +198,7 @@ int LocalMapper::matchLocalMapPoints()
             int bestLevel2 = -1;
             int bestIdx = -1;
 
-            const auto indices = currKeyFrame->getKeyPointsInArea(x, y, 3);
+            const auto indices = currKeyFrame->getKeyPointsInArea(x, y, 5);
 
             for (auto idx : indices)
             {
@@ -219,6 +223,10 @@ int LocalMapper::matchLocalMapPoints()
             }
 
             if (bestLevel == bestLevel2 && bestDist > 0.8 * bestDist2)
+                continue;
+
+            auto ptZ = currKeyFrame->getDepth(x, y);
+            if (abs(z - ptZ) > 0.2)
                 continue;
 
             // Choose the best descriptor based on a median filter
@@ -270,10 +278,14 @@ int LocalMapper::matchLocalMapPoints()
                 }
 
                 mp->descriptor = descriptors[bestIdx].clone();
+                // mp->pos = (mp->pos * mp->referenceCounter + currKeyFrame->RT * (K.inverse() * Vec3d(kp.pt.x, kp.pt.y, 1.0) * ptZ)) / (mp->referenceCounter + 1);
+                // mp->referenceCounter++;
                 totalMatches++;
             }
         }
     }
+
+    return totalMatches;
 }
 
 void LocalMapper::processNewKeyFrame()
@@ -287,6 +299,9 @@ void LocalMapper::processNewKeyFrame()
     cv::Mat descriptors;
     std::vector<cv::KeyPoint> keyPoints;
 
+    // ORB_SLAM2::ORBextractor detector(500, 1.2, 8, 20, 7);
+    // detector(currKeyFrame->imRGB, Mat(), keyPoints, descriptors);
+
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->detect(currKeyFrame->imRGB, keyPoints);
     detector->compute(currKeyFrame->imRGB, keyPoints, descriptors);
@@ -295,7 +310,8 @@ void LocalMapper::processNewKeyFrame()
     currKeyFrame->descriptors = descriptors;
     currKeyFrame->mapPoints.resize(keyPoints.size());
 
-    map->addKeyFrame(currKeyFrame);
+    if (updateLocalMap)
+        map->addKeyFrame(currKeyFrame);
 }
 
 void LocalMapper::createNewMapPoints()
@@ -333,14 +349,54 @@ void LocalMapper::createNewMapPoints()
 void LocalMapper::optimizeKeyFramePose()
 {
     SE3 RTbo = currKeyFrame->RT;
+    auto robustLoss = new ceres::HuberLoss(10);
 
     ceres::Problem problem;
-    problem.AddParameterBlock(currKeyFrame->RT.data(), SE3::num_parameters, new LocalParameterizationSE3);
+    // problem.AddParameterBlock(currKeyFrame->RT.data(), SE3::num_parameters, new LocalParameterizationSE3);
     double KBlock[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
     problem.AddParameterBlock(&KBlock[0], 4);
     problem.SetParameterBlockConstant(&KBlock[0]);
 
-    for (auto KF : localKeyFrameSet)
+    // Collect Key Frames that are fixed in the optimizer
+    std::set<std::shared_ptr<KeyFrame>> lFixedKeyFrames;
+    std::set<std::shared_ptr<KeyFrame>> lLocalKeyFrames;
+    lLocalKeyFrames.insert(currKeyFrame);
+    for (const auto &mp : currKeyFrame->mapPoints)
+    {
+        if (mp && !mp->setToRemove)
+            for (const auto &obs : mp->observations)
+            {
+                auto KF = obs.first;
+                if (KF->KFId != currKeyFrame->KFId)
+                    lLocalKeyFrames.insert(obs.first);
+            }
+    }
+
+    std::set<std::shared_ptr<MapPoint>> fixedMapPointSet;
+    for (const auto &KF : lLocalKeyFrames)
+    {
+        for (const auto &mp : KF->mapPoints)
+            fixedMapPointSet.insert(mp);
+    }
+
+    for (const auto &mp : fixedMapPointSet)
+    {
+        if (mp && !mp->setToRemove)
+            for (const auto &obs : mp->observations)
+            {
+                const auto &KF = obs.first;
+                if (KF->KFId != currKeyFrame->KFId && lLocalKeyFrames.count(KF) == 0)
+                    lFixedKeyFrames.insert(KF);
+            }
+    }
+
+    for (auto KF : lLocalKeyFrames)
+    {
+        problem.AddParameterBlock(KF->RT.data(), SE3::num_parameters, new LocalParameterizationSE3);
+        // problem.SetParameterBlockConstant(KF->RT.data());
+    }
+
+    for (auto KF : lFixedKeyFrames)
     {
         problem.AddParameterBlock(KF->RT.data(), SE3::num_parameters, new LocalParameterizationSE3);
         problem.SetParameterBlockConstant(KF->RT.data());
@@ -357,9 +413,12 @@ void LocalMapper::optimizeKeyFramePose()
             auto KF = obs.first;
             auto idx = obs.second;
             auto &kp = KF->keyPoints[idx];
+            auto z = KF->getDepth(kp.pt.x, kp.pt.y);
 
             problem.AddResidualBlock(
                 ReprojectionErrorFunctor::create(kp.pt.x, kp.pt.y),
+                // ReprojectionError3DFunctor::create(Vec3d(kp.pt.x, kp.pt.y, z)),
+                // robustLoss,
                 NULL,
                 &KBlock[0],
                 obs.first->RT.data(),
@@ -368,6 +427,7 @@ void LocalMapper::optimizeKeyFramePose()
             numResidualBlocks++;
         }
 
+        // if (mp->observations.size() <= 2)
         problem.SetParameterBlockConstant(mp->pos.data());
     }
 
@@ -376,16 +436,20 @@ void LocalMapper::optimizeKeyFramePose()
 
     ceres::Solver::Options options;
     ceres::Solver::Summary summary;
-    options.linear_solver_type = ceres::DENSE_SCHUR;
+    options.linear_solver_type = ceres::SPARSE_SCHUR;
+    // options.function_tolerance = 0.001;
+    // options.minimizer_progress_to_stdout = true;
     // options.function_tolerance = 1e-9;
     Solve(options, &problem, &summary);
     std::cout << summary.BriefReport() << std::endl;
 
-    currKeyFrame->setPose(currKeyFrame->RT);
+    for (auto KF : lLocalKeyFrames)
+        KF->setPose(KF->RT);
 
     if (viewer)
     {
-        viewer->addOptimizedKFPose(currKeyFrame->RT);
+        if (updateLocalMap)
+            viewer->addOptimizedKFPose(currKeyFrame->RT);
         viewer->setRTLocalToGlobal(currKeyFrame->RT * RTbo.inverse());
     }
 }

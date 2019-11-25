@@ -24,4 +24,5 @@ public:
 
     bool setToRemove;
     size_t localReferenceId;
+    size_t referenceCounter;
 };

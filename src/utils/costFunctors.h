@@ -124,7 +124,7 @@ struct ReprojectionError3DFunctor
 
         residual[0] = projX - T(obsX);
         residual[1] = projY - T(obsY);
-        residual[2] = T(1.0) * (ptWarped(2) - obsZ);
+        residual[2] = T(1000.0) * (ptWarped(2) - obsZ);
 
         return true;
     }

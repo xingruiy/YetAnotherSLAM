@@ -23,10 +23,12 @@ void LoopCloser::run()
             checkLoopClosingCandidates();
 
             optimizeEntireMap();
+
+            usleep(3000);
         }
         else
         {
-            usleep(1000);
+            usleep(3000);
         }
     }
 }
@@ -52,6 +54,8 @@ void LoopCloser::processNewKeyFrame()
 
 void LoopCloser::checkLoopClosingCandidates()
 {
+    auto &mapPoints = map->mapPointDB;
+    auto &mapDesc = map->descriptorDB;
 }
 
 void LoopCloser::optimizeEntireMap()

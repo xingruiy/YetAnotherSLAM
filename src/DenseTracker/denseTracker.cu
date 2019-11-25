@@ -4,7 +4,7 @@
 #include "DenseTracker/statisticsFunctor.h"
 
 DenseTracker::DenseTracker(int w, int h, Mat33d &K, int numLvl)
-    : numTrackingLvl(numLvl)
+    : numTrackingLvl(numLvl), trackingWasGood(false)
 {
     bufferFloat96x29.create(96, 29, CV_32FC1);
     bufferFloat96x3.create(96, 3, CV_32FC1);
@@ -66,7 +66,7 @@ DenseTracker::DenseTracker(int w, int h, Mat33d &K, int numLvl)
 
 void DenseTracker::setReferenceInvDepth(GMat vmap)
 {
-    for (int lvl = 1; lvl < numTrackingLvl; ++lvl)
+    for (int lvl = 0; lvl < numTrackingLvl; ++lvl)
     {
         if (lvl == 0)
             convertVMapToInvDepth(vmap, referenceInvDepth[lvl]);
@@ -140,6 +140,7 @@ SE3 DenseTracker::getIncrementalTransform(SE3 initAlign, bool switchBuffer)
             //     hessian.data(),
             //     residual.data());
 
+            // TODO: bugs?
             computeSE3StepRGBD(
                 lvl,
                 estimate,
@@ -155,19 +156,17 @@ SE3 DenseTracker::getIncrementalTransform(SE3 initAlign, bool switchBuffer)
             float error = sqrt(residualSum) / (numResidual + 1);
             Vec6d update = hessian.cast<double>().ldlt().solve(residual.cast<double>());
 
-            try
+            if (std::isnan(update(0)))
             {
-                estimate = SE3::exp(update) * estimate;
-                if (error < lastError)
-                {
-                    lastSuccessEstimate = estimate;
-                    lastError = error;
-                }
-            }
-            catch (std::exception e)
-            {
-                printf("Problems occured when computing pose transformation, verbose:\n%s", e.what());
+                trackingWasGood = false;
                 return SE3();
+            }
+
+            estimate = SE3::exp(update) * estimate;
+            if (error < lastError)
+            {
+                lastSuccessEstimate = estimate;
+                lastError = error;
             }
         }
     }
@@ -180,6 +179,7 @@ SE3 DenseTracker::getIncrementalTransform(SE3 initAlign, bool switchBuffer)
             std::swap(referenceIntensity[lvl], currentIntensity[lvl]);
         }
 
+    trackingWasGood = true;
     return lastSuccessEstimate;
 }
 
@@ -442,4 +442,9 @@ void DenseTracker::computeSE3StepRGBDLinear(
 GMat DenseTracker::getReferenceDepth(const int lvl) const
 {
     return rawDepthBuffer;
+}
+
+bool DenseTracker::wasTrackingGood() const
+{
+    return trackingWasGood;
 }

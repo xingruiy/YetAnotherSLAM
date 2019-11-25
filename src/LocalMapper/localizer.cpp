@@ -191,7 +191,7 @@ std::vector<cv::DMatch> Localizer::getMatches2NN(Mat src, Mat dst, bool allowAmb
     std::vector<std::vector<cv::DMatch>> rawMatches;
     std::vector<cv::DMatch> matches;
 
-    auto matcher2 = cv::BFMatcher(cv::NORM_HAMMING);
+    auto matcher2 = cv::BFMatcher(cv::NORM_HAMMING2);
     matcher2.knnMatch(src, dst, rawMatches, 2);
 
     for (auto knn : rawMatches)
