@@ -40,6 +40,9 @@ public:
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
 
+    // MapPoints associated to keypoints
+    std::vector<MapPoint *> mvpMapPoints;
+
     // Scale
     const int mnScaleLevels;
     const float mfScaleFactor;
@@ -48,11 +51,7 @@ public:
     const std::vector<float> mvLevelSigma2;
     const std::vector<float> mvInvLevelSigma2;
 
-private:
     Sophus::SE3d mTcw;
-
-    // MapPoints associated to keypoints
-    std::vector<MapPoint *> mvpMapPoints;
 
     Map *mpMap;
 

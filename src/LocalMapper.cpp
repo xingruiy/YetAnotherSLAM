@@ -1,5 +1,33 @@
 #include "LocalMapper.h"
 
+LocalMapper::LocalMapper(Map *pMap)
+    : mpMap(pMap)
+{
+}
+
+void LocalMapper::Spin()
+{
+    while (1)
+    {
+        if (CheckNewKeyFrames())
+        {
+            ProcessNewKeyFrame();
+        }
+    }
+}
+
+void LocalMapper::InsertKeyFrame(const KeyFrame *pKF)
+{
+}
+
+bool LocalMapper::CheckNewKeyFrames()
+{
+}
+
+void LocalMapper::ProcessNewKeyFrame()
+{
+}
+
 // // Bit set count operation from
 // // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 // int descriptorDistance(const cv::Mat &a, const cv::Mat &b)

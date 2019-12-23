@@ -91,6 +91,10 @@ void Tracking::TrackImageRGBD(const cv::Mat &imGray, const cv::Mat &imDepth)
             if (NeedNewKeyFrame())
                 CreateNewKeyFrame();
         }
+        else
+        {
+            meState = TrackingState::LOST;
+        }
 
         break;
     }
@@ -156,6 +160,27 @@ void Tracking::InitializeTracking()
 
 int Tracking::CheckObservations()
 {
+    Sophus::SE3d TRefCurr;
+    TRefCurr = mCurrentFrame.mTcw.inverse() * mpReferenceKF->mTcw;
+    vector<cv::KeyPoint> vKeyPointWarped;
+
+    for (int i = 0; i < mpReferenceKF->mvKeys.size(); ++i)
+    {
+        MapPoint *pMP = mpReferenceKF->mvpMapPoints[i];
+        if (pMP == NULL)
+            continue;
+
+        Eigen::Vector3d ptTransformed = TRefCurr * pMP->mWorldPos;
+        float warpedX = Frame::fx * ptTransformed(0) / ptTransformed(2) + Frame::cx;
+        float warpedY = Frame::fy * ptTransformed(1) / ptTransformed(2) + Frame::cy;
+        float warpedZ = ptTransformed(2);
+
+        cv::KeyPoint Key = mpReferenceKF->mvKeys[i];
+        Key.pt = cv::Point2f(warpedX, warpedY);
+        vKeyPointWarped.push_back(Key);
+    }
+
+    std::cout << vKeyPointWarped.size() << std::endl;
 }
 
 void Tracking::UpdateLocalMap()

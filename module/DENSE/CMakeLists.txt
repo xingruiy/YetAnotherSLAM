@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(DENSE LANGUAGES CXX CUDA)
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+
 find_package(Eigen3 3.3 REQUIRED)
 find_package(OpenCV 3.4 REQUIRED)
 

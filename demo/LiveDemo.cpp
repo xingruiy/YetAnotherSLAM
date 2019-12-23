@@ -5,6 +5,7 @@ int main(int argc, char **argv)
 {
     if (argc <= 1)
     {
+        std::cout << "usage: ./liveDemo settings-file vocabulary-file" << std::endl;
         exit(-1);
     }
 

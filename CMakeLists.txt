@@ -39,16 +39,22 @@ PUBLIC
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
-    ${PROJECT_SOURCE_DIR}/module/DENSE/build/libDENSE.so
+    ${PROJECT_SOURCE_DIR}/module/DENSE/lib/libDENSE.so
     ${PROJECT_SOURCE_DIR}/module/DBoW2/lib/libDBoW2.so
     ${PROJECT_SOURCE_DIR}/module/ORB_SLAM2/lib/libORB_SLAM2.so
 )
 
 # Build Examples
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
-add_executable(NewLiveDemo ${PROJECT_SOURCE_DIR}/demo/LiveDemo.cpp)
-target_link_libraries(NewLiveDemo 
+add_executable(liveDemo ${PROJECT_SOURCE_DIR}/demo/LiveDemo.cpp)
+target_link_libraries(liveDemo 
 PRIVATE 
     athena 
-    ${PROJECT_SOURCE_DIR}/module/OniCamera/build/libOniCamera.a
+    ${PROJECT_SOURCE_DIR}/module/OniCamera/lib/libOniCamera.so
+)
+
+add_executable(testRun ${PROJECT_SOURCE_DIR}/demo/TestRun.cpp)
+target_link_libraries(testRun 
+PRIVATE 
+    athena 
 )

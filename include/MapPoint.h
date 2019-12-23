@@ -8,25 +8,10 @@
 class Map;
 class KeyFrame;
 
+using namespace std;
+
 class MapPoint
 {
-    // public:
-    //     MapPoint();
-
-    // public:
-    //     size_t mpId;
-    //     static size_t nextMpId;
-
-    //     Eigen::Vector3d pos;
-    //     Eigen::Vector3d normal;
-    //     cv::Mat descriptor;
-    //     std::shared_ptr<KeyFrame> hostKF;
-    //     std::map<std::shared_ptr<KeyFrame>, size_t> observations;
-
-    //     bool setToRemove;
-    //     size_t localReferenceId;
-    //     size_t referenceCounter;
-
 public:
     MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap);
 
@@ -76,4 +61,6 @@ public:
 
     // Position in absolute coordinates
     Eigen::Vector3d mWorldPos;
+
+    int nObs;
 };

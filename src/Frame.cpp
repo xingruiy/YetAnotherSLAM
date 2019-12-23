@@ -15,7 +15,9 @@ Frame::Frame(const Frame &F)
 {
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts, const Eigen::Matrix3d &K, ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
+Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
+             const Eigen::Matrix3d &K, ORB_SLAM2::ORBextractor *extractor,
+             ORB_SLAM2::ORBVocabulary *voc)
     : mpORBvocabulary(voc), mpORBextractor(extractor), mTimeStamp(ts)
 {
   if (!mbInitialized)
@@ -26,8 +28,8 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts, co
     cy = K(1, 2);
     invfx = 1.0 / fx;
     invfy = 1.0 / fy;
-    mbInitialized = true;
     mK = K;
+    mbInitialized = true;
   }
 
   // Frame ID

@@ -20,6 +20,8 @@ public:
 
     void SetCurrentImage(const cv::Mat &imRGB);
 
+    void SetCurrentDepth(const cv::Mat &imDepth);
+
 private:
     int mnImageWidth;
     int mnImageHeight;
@@ -39,6 +41,7 @@ private:
     float mPointSize;
 
     pangolin::GlTexture mImageRGB, mImageDepth;
+    pangolin::GlTexture mImgKeyPoint, mImgKeyPoint2;
 
     void DrawMapPoints();
 };

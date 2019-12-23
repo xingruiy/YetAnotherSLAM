@@ -1,0 +1,46 @@
+%YAML:1.0
+
+# Camera Parameters
+
+Camera.fx: 580.0
+Camera.fy: 580.0
+Camera.cx: 319.5
+Camera.cy: 239.5
+
+Camera.width: 640
+Camera.height: 480
+
+Camera.depth_scale: 1000.0
+
+Camera.RGB : 1
+
+# Tracking Parameters
+
+Tracking.num_pyr: 5
+Tracking.num_iter_lvl1: 10
+Tracking.num_iter_lvl2: 5
+Tracking.num_iter_lvl3: 3
+Tracking.num_iter_lvl4: 3
+Tracking.num_iter_lvl5: 3
+
+Tracking.use_rgb: 1
+Tracking.use_depth: 1
+
+# ORB 
+
+ORBextractor.nFeatures: 1000
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+
+# Global
+
+Global.use_voc: 0
+Global.use_viewer: 0
+
+# Viewer
+
+Viewer.width: 1920
+Viewer.height: 1080
+Viewer.point_size: 5

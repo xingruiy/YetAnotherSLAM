@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 2.8)
 project(OniCamera)
 
-add_library(${PROJECT_NAME})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+
+add_library(${PROJECT_NAME} SHARED "")
 
 target_sources(${PROJECT_NAME}
 PRIVATE

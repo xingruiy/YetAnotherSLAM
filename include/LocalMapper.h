@@ -69,4 +69,19 @@ private:
     std::deque<std::shared_ptr<KeyFrame>> keyFrameQueue;
     std::vector<std::shared_ptr<KeyFrame>> localKeyFrameSet;
     std::vector<std::shared_ptr<MapPoint>> localMapPointSet;
+
+    ///////////////////////////////////////
+public:
+    LocalMapper(Map *pMap);
+
+    void Spin();
+
+    void InsertKeyFrame(const KeyFrame *pKF);
+
+    bool CheckNewKeyFrames();
+
+    void ProcessNewKeyFrame();
+
+private:
+    Map *mpMap;
 };
