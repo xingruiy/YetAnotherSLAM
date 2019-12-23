@@ -34,7 +34,7 @@ PUBLIC
     ${Pangolin_INCLUDE_DIRS}  
     ${PROJECT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${PROJECT_SOURCE_DIR}/module/
+    ${PROJECT_SOURCE_DIR}/third_party/
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -43,8 +43,9 @@ PUBLIC
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
-    ${PROJECT_SOURCE_DIR}/module/DENSE/lib/libDENSE.so
-    ${PROJECT_SOURCE_DIR}/module/DBoW2/lib/libDBoW2.so
+    ${PROJECT_SOURCE_DIR}/third_party/DENSE/lib/libDENSE.so
+    ${PROJECT_SOURCE_DIR}/third_party/DBoW2/lib/libDBoW2.so
+    ${PROJECT_SOURCE_DIR}/third_party/g2o/lib/libg2o.so
 )
 
 # Build Examples
@@ -53,7 +54,7 @@ add_executable(liveDemo ${PROJECT_SOURCE_DIR}/demo/LiveDemo.cpp)
 target_link_libraries(liveDemo 
 PRIVATE 
     athena 
-    ${PROJECT_SOURCE_DIR}/module/ONI_Camera/lib/libOniCamera.so
+    ${PROJECT_SOURCE_DIR}/third_party/ONI_Camera/lib/libOniCamera.so
 )
 
 add_executable(testRun ${PROJECT_SOURCE_DIR}/demo/TestRun.cpp)

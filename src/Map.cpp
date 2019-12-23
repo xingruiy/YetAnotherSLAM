@@ -24,3 +24,10 @@ unsigned long Map::KeyFramesInMap()
     unique_lock<mutex> lock(mMutexMap);
     return mspKeyFrames.size();
 }
+
+void Map::Reset()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    mspKeyFrames.clear();
+    mspMapPoints.clear();
+}

@@ -15,5 +15,5 @@ public:
 
     void static LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap);
 
-    int static PoseOptimization(Frame *pFrame);
+    int static PoseOptimization(KeyFrame *pKF);
 };

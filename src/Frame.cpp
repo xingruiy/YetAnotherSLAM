@@ -89,7 +89,7 @@ void Frame::ComputeDepth(const cv::Mat &imDepth)
     const float &v = kp.pt.y;
     const float &u = kp.pt.x;
 
-    const float d = imDepth.at<float>(v, u);
+    const float d = imDepth.at<float>(cv::Point2f(u, v));
 
     if (d > 0)
     {

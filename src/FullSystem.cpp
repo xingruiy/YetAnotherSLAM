@@ -2,7 +2,7 @@
 #include "DENSE/include/ImageProc.h"
 
 FullSystem::FullSystem(const std::string &strSettingFile, const std::string &strVocFile)
-    : mbFinished(false)
+    : mbFinished(false), mbPaused(true)
 {
     {
         cv::FileStorage fsSetting(strSettingFile, cv::FileStorage::READ);
@@ -54,6 +54,9 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
 
 void FullSystem::TrackImageRGBD(const cv::Mat &imRGB, const cv::Mat &imDepth, const double TimeStamp)
 {
+    if (mbPaused)
+        return;
+
     if (mbRGB)
         cv::cvtColor(imRGB, mImGray, cv::COLOR_RGB2GRAY);
     else
@@ -72,4 +75,20 @@ void FullSystem::SetToFinish()
 bool FullSystem::IsFinished()
 {
     return mbFinished;
+}
+
+void FullSystem::SetToPause()
+{
+    mbPaused = true;
+}
+
+void FullSystem::SetToUnPause()
+{
+    mbPaused = false;
+}
+
+void FullSystem::Reset()
+{
+    mpTracker->Reset();
+    mpMap->Reset();
 }

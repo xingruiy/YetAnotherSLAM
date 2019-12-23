@@ -26,9 +26,12 @@ public:
 
     void TrackImageRGBD(const cv::Mat &imRGB, const cv::Mat &imDepth, const double TimeStamp);
 
+    void SetToPause();
+    void SetToUnPause();
     void SetToFinish();
-
     bool IsFinished();
+
+    void Reset();
 
 private:
     Tracking *mpTracker;
@@ -46,6 +49,7 @@ private:
     bool mbRGB;
     bool mbUseVoc;
     bool mbUseViewer;
+    bool mbPaused;
 
     bool mbFinished;
 

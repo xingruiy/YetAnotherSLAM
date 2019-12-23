@@ -19,8 +19,8 @@ Tracking::Tracking(const std::string &strSettingPath, FullSystem *pSys, Map *pMa
     double cx = fSettings["Camera.cx"];
     double cy = fSettings["Camera.cy"];
 
-    mnImageWidth = fSettings["Camera.width"];
-    mnImageHeight = fSettings["Camera.height"];
+    mImgWidth = fSettings["Camera.width"];
+    mImgHeight = fSettings["Camera.height"];
 
     mK = Eigen::Matrix3d::Identity();
     mK(0, 0) = fx;
@@ -35,7 +35,7 @@ Tracking::Tracking(const std::string &strSettingPath, FullSystem *pSys, Map *pMa
     int fMinThFAST = fSettings["ORBextractor.minThFAST"];
 
     mpORBextractor = new ORB_SLAM2::ORBextractor(nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
-    mpMapper = new DenseMapping(mnImageWidth, mnImageHeight, mK);
+    mpMapper = new DenseMapping(mImgWidth, mImgHeight, mK);
 
     int nUseRGB = fSettings["Tracking.use_rgb"];
     int nNumPyr = fSettings["Tracking.num_pyr"];
@@ -50,7 +50,7 @@ Tracking::Tracking(const std::string &strSettingPath, FullSystem *pSys, Map *pMa
         vIterations[i] = nIter;
     }
 
-    mpTracker = new DenseTracking(mnImageWidth, mnImageHeight, mK, nNumPyr, vIterations, bUseRGB, bUseDepth);
+    mpTracker = new DenseTracking(mImgWidth, mImgHeight, mK, nNumPyr, vIterations, bUseRGB, bUseDepth);
 }
 
 void Tracking::TrackImageRGBD(const cv::Mat &imGray, const cv::Mat &imDepth)
@@ -149,11 +149,11 @@ void Tracking::InitializeTracking()
 
         mpReferenceKF = pKFini;
         mCurrentFrame.mpReferenceKF = pKFini;
+        meState = TrackingState::OK;
+        printf("Map created with %lu points\n", mpMap->GetMapPointVec().size());
 
         mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
         mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);
-        meState = TrackingState::OK;
-        printf("Map created with %lu points\n", mvpLocalMapPoints.size());
     }
 }
 
@@ -173,6 +173,9 @@ int Tracking::CheckObservations()
     vector<cv::KeyPoint> vKeyPointsWarped;
     vector<MapPoint *> vpObsMapPoints;
 
+    int nMapPointObs = 0;
+    int nMapPointNotObs = 0;
+
     for (int i = 0; i < mpReferenceKF->N; ++i)
     {
         MapPoint *pMP = mpReferenceKF->mvpMapPoints[i];
@@ -188,36 +191,35 @@ int Tracking::CheckObservations()
         {
             cv::KeyPoint Key = mpReferenceKF->mvKeys[i];
             Key.pt = cv::Point2f(warpedX, warpedY);
-            vKeyPointsWarped.push_back(Key);
-            vpObsMapPoints.push_back(mpReferenceKF->mvpMapPoints[i]);
+            float z = mCurrentFrame.mImDepth.at<float>(cv::Point2f(warpedX, warpedY));
 
-            if (warpedX < minX)
-                minX = warpedX;
-            if (warpedX > maxX)
-                maxX = warpedX;
-            if (warpedY < minY)
-                minY = warpedY;
-            if (warpedY > maxY)
-                maxY = warpedY;
+            if (std::abs(warpedZ - z) < 0.1)
+            {
+                vKeyPointsWarped.push_back(Key);
+                vpObsMapPoints.push_back(mpReferenceKF->mvpMapPoints[i]);
+
+                if (warpedX < minX)
+                    minX = warpedX;
+                if (warpedX > maxX)
+                    maxX = warpedX;
+                if (warpedY < minY)
+                    minY = warpedY;
+                if (warpedY > maxY)
+                    maxY = warpedY;
+
+                nMapPointObs++;
+            }
+            else
+                nMapPointNotObs++;
         }
     }
 
     mObs = vKeyPointsWarped.size();
     mCurrentFrame.mvObsKeys = vKeyPointsWarped;
     mCurrentFrame.mvObsMapPoints = vpObsMapPoints;
-    // std::cout << "min-max: " << minX << "," << maxX << ";" << minY << "," << maxY << std::endl;
     float obsWidth = maxX - minX;
     float obsHeight = maxY - minY;
     mObsRatio = obsWidth * obsHeight / (Frame::width * Frame::height);
-    // std::cout << mObs << ": " << mObsRatio << std::endl;
-    // std::cout << mObsRatio << std::endl;
-
-    // cv::Mat outImg;
-    // cv::drawKeypoints(mCurrentFrame.mImGray, vKeyPointsWarped, outImg, cv::Scalar(0, 255, 0));
-    // cv::imshow("Keypoints", outImg);
-    // cv::waitKey(1);
-
-    // return vKeyPointWarped.size();
 }
 
 void Tracking::UpdateLocalMap()
@@ -243,9 +245,7 @@ bool Tracking::TrackLastFrame()
 
     // Update viewer if applicable
     if (mpViewer)
-    {
         mpViewer->SetCurrentCameraPose(mCurrentFrame.mTcw.matrix());
-    }
 
     return true;
 }
@@ -264,7 +264,7 @@ bool Tracking::NeedNewKeyFrame()
         return false;
 
     // criteria 1: when observed points falls bellow a threshold
-    if (mObs < 300 || mObsRatio <= 0.45)
+    if (mObs < 400 || mObsRatio <= 0.5)
         return true;
 
     return false;
@@ -311,4 +311,10 @@ void Tracking::CreateNewKeyFrame()
 void Tracking::SetViewer(Viewer *pViewer)
 {
     mpViewer = pViewer;
+}
+
+void Tracking::Reset()
+{
+    meState = TrackingState::NOTInit;
+    mLastFrame.mTcw = Sophus::SE3d();
 }

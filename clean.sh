@@ -1,5 +1,5 @@
 rm -rf build/
-rm -rf module/g2o/build
-rm -rf module/DENSE/build
-rm -rf module/DBoW2/build
-rm -rf module/ONI_Camera/build
+rm -rf third_party/g2o/build
+rm -rf third_party/DENSE/build
+rm -rf third_party/DBoW2/build
+rm -rf third_party/ONI_Camera/build

@@ -22,6 +22,8 @@ public:
 
     void SetViewer(Viewer *pViewer);
 
+    void Reset();
+
 private:
     enum class TrackingState
     {
@@ -45,8 +47,8 @@ private:
 
     // Calibration
     Eigen::Matrix3d mK;
-    int mnImageWidth;
-    int mnImageHeight;
+    int mImgWidth;
+    int mImgHeight;
     TrackingState meState;
     TrackingState meLastState;
 

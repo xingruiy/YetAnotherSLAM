@@ -17,6 +17,7 @@ using namespace std;
 class Map
 {
 public:
+    void Reset();
     void AddKeyFrame(KeyFrame *pKF);
     void AddMapPoint(MapPoint *pMP);
 

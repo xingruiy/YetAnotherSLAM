@@ -11,10 +11,10 @@ Viewer::Viewer(const string &strSettingFile, FullSystem *pSys, Map *pMap)
 
     if (fSettings.isOpened())
     {
-        mnImageWidth = fSettings["Camera.width"];
-        mnImageHeight = fSettings["Camera.height"];
-        mnWindowWidth = fSettings["Viewer.width"];
-        mnWindowHeight = fSettings["Viewer.height"];
+        mImgWidth = fSettings["Camera.width"];
+        mImgHeight = fSettings["Camera.height"];
+        mWinWidth = fSettings["Viewer.width"];
+        mWinHeight = fSettings["Viewer.height"];
 
         double fx = fSettings["Camera.fx"];
         double fy = fSettings["Camera.fy"];
@@ -76,7 +76,7 @@ Viewer::Viewer(const string &strSettingFile, FullSystem *pSys, Map *pMap)
 
 void Viewer::Spin()
 {
-    pangolin::CreateWindowAndBind("VIEWER", mnWindowWidth, mnWindowHeight);
+    pangolin::CreateWindowAndBind("VIEWER", mWinWidth, mWinHeight);
 
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
@@ -86,6 +86,8 @@ void Viewer::Spin()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     pangolin::CreatePanel("menu").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(175));
+    pangolin::Var<bool> menuPauseTracking("menu.Pause System", true, true);
+    pangolin::Var<bool> menuResetSystem("menu.Reset System", true, false);
     pangolin::Var<bool> menuFollowCamera("menu.Follow Camera", true, true);
     pangolin::Var<bool> menuDrawMapPoints("menu.Draw Map Points", true, true);
 
@@ -100,8 +102,8 @@ void Viewer::Spin()
                                 .SetHandler(new pangolin::Handler3D(s_cam));
 
     // Initialize textures
-    mImageRGB.Reinitialise(mnImageWidth, mnImageHeight, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mImageDepth.Reinitialise(mnImageWidth, mnImageHeight, GL_RGBA, true, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    mImageRGB.Reinitialise(mImgWidth, mImgHeight, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    mImageDepth.Reinitialise(mImgWidth, mImgHeight, GL_RGBA, true, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
     while (!pangolin::ShouldQuit())
     {
@@ -110,10 +112,18 @@ void Viewer::Spin()
         d_cam.Activate(s_cam);
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-        pangolin::glDrawFrustum(mKinv, mnImageWidth, mnImageHeight, mTcw, 0.1);
+        if (menuPauseTracking)
+            mpSystem->SetToPause();
+        else
+            mpSystem->SetToUnPause();
+
+        pangolin::glDrawFrustum(mKinv, mImgWidth, mImgHeight, mTcw, 0.1);
 
         if (menuDrawMapPoints)
             DrawMapPoints();
+
+        if (pangolin::Pushed(menuResetSystem))
+            mpSystem->Reset();
 
         pangolin::FinishFrame();
     }

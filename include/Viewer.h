@@ -1,11 +1,9 @@
 #pragma once
 
 #include <pangolin/pangolin.h>
-#include <pangolin/gl/glcuda.h>
-#include <memory>
+#include <mutex>
 
 #include "FullSystem.h"
-#include <mutex>
 
 class FullSystem;
 
@@ -23,27 +21,29 @@ public:
     void SetCurrentDepth(const cv::Mat &imDepth);
 
 private:
-    int mnImageWidth;
-    int mnImageHeight;
-    int mnWindowWidth;
-    int mnWindowHeight;
+    void DrawMapPoints();
 
+    // System components
     FullSystem *mpSystem;
     Map *mpMap;
 
+    // Camera calibration
     Eigen::Matrix3d mKinv;
     Eigen::Matrix4d mTcw;
 
     std::mutex mCurrentPoseMutex;
 
+    // Image allignment
     bool mbRGB;
+
+    // Image and Window size
+    int mImgWidth, mImgHeight;
+    int mWinWidth, mWinHeight;
 
     float mPointSize;
 
     pangolin::GlTexture mImageRGB, mImageDepth;
     pangolin::GlTexture mImgKeyPoint, mImgKeyPoint2;
-
-    void DrawMapPoints();
 };
 
 // class MapViewer
