@@ -1,9 +1,12 @@
 #include "MapPoint.h"
 #include <cmath>
 
+unsigned long MapPoint::nNextId = 0;
+
 MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
-    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos)
+    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), nFrameObs(0)
 {
+    mnId = nNextId++;
 }
 
 std::map<KeyFrame *, size_t> MapPoint::GetObservations()

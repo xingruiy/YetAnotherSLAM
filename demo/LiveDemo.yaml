@@ -24,7 +24,7 @@ Tracking.num_iter_lvl4: 3
 Tracking.num_iter_lvl5: 3
 
 Tracking.use_rgb: 1
-Tracking.use_depth: 1
+Tracking.use_depth: 0
 
 # ORB 
 

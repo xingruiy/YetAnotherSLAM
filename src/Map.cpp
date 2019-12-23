@@ -18,3 +18,9 @@ void Map::AddMapPoint(MapPoint *pMP)
     unique_lock<mutex> lock(mMutexMap);
     mspMapPoints.insert(pMP);
 }
+
+unsigned long Map::KeyFramesInMap()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return mspKeyFrames.size();
+}

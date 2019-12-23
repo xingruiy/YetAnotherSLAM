@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ORB_SLAM2/include/ORBextractor.h>
+#include <ORBextractor.h>
 #include <ORBVocabulary.h>
 #include <sophus/se3.hpp>
 #include <opencv2/opencv.hpp>
@@ -19,6 +19,8 @@ public:
     Frame(const Frame &F);
 
     Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts, const Eigen::Matrix3d &K, ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc);
+
+    void ExtractORB();
 
     void SetPose(const cv::Mat &Tcw);
 
@@ -51,6 +53,8 @@ public:
 
     // Calibration matrix
     Eigen::Matrix3d mK;
+    static int width;
+    static int height;
     static float fx;
     static float fy;
     static float cx;
@@ -71,6 +75,7 @@ public:
     // Key points and descriptors
     int N;
     std::vector<cv::KeyPoint> mvKeys;
+    std::vector<cv::KeyPoint> mvObsKeys;
     cv::Mat mDescriptors;
 
     // Corresponding stereo coordinate and depth for each keypoint.
@@ -80,7 +85,10 @@ public:
 
     // MapPoints associated to keypoints, NULL pointer if no association.
     std::vector<MapPoint *> mvpMapPoints;
+    std::vector<MapPoint *> mvObsMapPoints;
 
     // Pose
     Sophus::SE3d mTcw;
+
+    int mObs;
 };

@@ -17,6 +17,10 @@ PRIVATE
     src/FullSystem.cpp
     src/Viewer.cpp
     src/Tracking.cpp
+
+    src/ORBextractor.cpp
+    src/Optimizer.cpp
+    src/Converter.cpp
 )
 
 target_compile_features(${PROJECT_NAME}
@@ -41,7 +45,6 @@ PUBLIC
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/module/DENSE/lib/libDENSE.so
     ${PROJECT_SOURCE_DIR}/module/DBoW2/lib/libDBoW2.so
-    ${PROJECT_SOURCE_DIR}/module/ORB_SLAM2/lib/libORB_SLAM2.so
 )
 
 # Build Examples
@@ -50,7 +53,7 @@ add_executable(liveDemo ${PROJECT_SOURCE_DIR}/demo/LiveDemo.cpp)
 target_link_libraries(liveDemo 
 PRIVATE 
     athena 
-    ${PROJECT_SOURCE_DIR}/module/OniCamera/lib/libOniCamera.so
+    ${PROJECT_SOURCE_DIR}/module/ONI_Camera/lib/libOniCamera.so
 )
 
 add_executable(testRun ${PROJECT_SOURCE_DIR}/demo/TestRun.cpp)

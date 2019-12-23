@@ -58,9 +58,11 @@ public:
 
     std::mutex mMutexPos;
     std::mutex mMutexFeatures;
+    std::mutex mGlobalMutex;
 
     // Position in absolute coordinates
     Eigen::Vector3d mWorldPos;
 
     int nObs;
+    int nFrameObs;
 };

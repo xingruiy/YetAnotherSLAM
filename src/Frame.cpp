@@ -2,6 +2,7 @@
 
 unsigned long Frame::mnNextId = 0;
 bool Frame::mbInitialized = false;
+int Frame::width, Frame::height;
 float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
 
 Frame::Frame(const Frame &F)
@@ -28,6 +29,8 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
     cy = K(1, 2);
     invfx = 1.0 / fx;
     invfy = 1.0 / fy;
+    width = imGray.cols;
+    height = imGray.rows;
     mK = K;
     mbInitialized = true;
   }
@@ -49,16 +52,26 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
   mvInvLevelSigma2 = mpORBextractor->GetInverseScaleSigmaSquares();
 
   // ORB extraction
-  ExtractORB(imGray);
+  // ExtractORB(imGray);
 
-  N = mvKeys.size();
-  mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
+  // N = mvKeys.size();
+  // mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
 
-  ComputeDepth(imDepth);
+  // ComputeDepth(imDepth);
 }
 
 void Frame::SetPose(const cv::Mat &Tcw)
 {
+}
+
+void Frame::ExtractORB()
+{
+  ExtractORB(mImGray);
+
+  N = mvKeys.size();
+  mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
+
+  ComputeDepth(mImDepth);
 }
 
 void Frame::ExtractORB(const cv::Mat &imGray)

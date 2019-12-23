@@ -20,6 +20,7 @@ public:
     void AddKeyFrame(KeyFrame *pKF);
     void AddMapPoint(MapPoint *pMP);
 
+    unsigned long KeyFramesInMap();
     vector<MapPoint *> GetMapPointVec();
 
 private:

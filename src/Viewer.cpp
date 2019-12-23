@@ -28,7 +28,6 @@ Viewer::Viewer(const string &strSettingFile, FullSystem *pSys, Map *pMap)
         mKinv = K.inverse();
 
         mPointSize = fSettings["Viewer.point_size"];
-
         int nRGB = fSettings["Camera.RGB"];
         mbRGB = (nRGB != 0);
     }

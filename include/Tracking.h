@@ -87,4 +87,8 @@ private:
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
+
+    // Used for creating KeyFrame
+    int mObs;
+    float mObsRatio;
 };

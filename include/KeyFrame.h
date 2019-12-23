@@ -33,15 +33,16 @@ public:
     const int N;
 
     // KeyPoints
+    const std::vector<float> mvDepth;
     const std::vector<cv::KeyPoint> mvKeys;
     const cv::Mat mDescriptors;
+
+    // MapPoints associated to keypoints
+    std::vector<MapPoint *> mvpMapPoints;
 
     // BoW
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
-
-    // MapPoints associated to keypoints
-    std::vector<MapPoint *> mvpMapPoints;
 
     // Scale
     const int mnScaleLevels;

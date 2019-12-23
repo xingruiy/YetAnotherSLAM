@@ -1,5 +1,5 @@
 #include "FullSystem.h"
-#include "OniCamera/OniCamera.h"
+#include "ONI_Camera/OniCamera.h"
 
 int main(int argc, char **argv)
 {
