@@ -1,6 +1,7 @@
 #include "MapPoint.h"
 #include <cmath>
 
+std::mutex MapPoint::mGlobalMutex;
 unsigned long MapPoint::nNextId = 0;
 
 MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
@@ -74,4 +75,20 @@ void MapPoint::Replace(MapPoint *pMP)
 MapPoint *MapPoint::GetReplaced()
 {
     return mpReplaced;
+}
+
+bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
+{
+}
+
+float MapPoint::GetMinDistanceInvariance()
+{
+    unique_lock<mutex> lock(mMutexPos);
+    return 0.8f * mfMinDistance;
+}
+
+float MapPoint::GetMaxDistanceInvariance()
+{
+    unique_lock<mutex> lock(mMutexPos);
+    return 1.2f * mfMaxDistance;
 }

@@ -90,6 +90,7 @@ void Viewer::Spin()
     pangolin::Var<bool> menuResetSystem("menu.Reset System", true, false);
     pangolin::Var<bool> menuFollowCamera("menu.Follow Camera", true, true);
     pangolin::Var<bool> menuDrawMapPoints("menu.Draw Map Points", true, true);
+    pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Pause System"));
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
@@ -161,6 +162,7 @@ void Viewer::DrawMapPoints()
         Eigen::Vector3d &pos = vpMPs[i]->mWorldPos;
         glVertex3f(pos(0), pos(1), pos(2));
     }
+
     glEnd();
 }
 

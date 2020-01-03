@@ -14,6 +14,12 @@ Camera.depth_scale: 1000.0
 
 Camera.RGB : 1
 
+# IR projector baseline times fx (aprox.)
+Camera.bf: 40.0
+
+# Close/Far threshold. Baseline times.
+Camera.th_depth: 40.0
+
 # Tracking Parameters
 
 Tracking.num_pyr: 5

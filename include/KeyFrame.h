@@ -2,6 +2,7 @@
 #include "Map.h"
 #include "Frame.h"
 #include "MapPoint.h"
+#include "ORBVocabulary.h"
 
 #include <memory>
 
@@ -38,11 +39,14 @@ public:
     const cv::Mat mDescriptors;
 
     // MapPoints associated to keypoints
+    std::vector<bool> mvbOutlier;
     std::vector<MapPoint *> mvpMapPoints;
 
     // BoW
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
+
+    ORB_SLAM2::ORBVocabulary *mpORBvocabulary;
 
     // Scale
     const int mnScaleLevels;

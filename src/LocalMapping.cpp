@@ -1,30 +1,114 @@
-#include "LocalMapper.h"
+#include "LocalMapping.h"
 
-LocalMapper::LocalMapper(Map *pMap)
+LocalMapping::LocalMapping(Map *pMap)
     : mpMap(pMap)
 {
 }
 
-void LocalMapper::Spin()
+void LocalMapping::Spin()
 {
     while (1)
     {
         if (CheckNewKeyFrames())
         {
             ProcessNewKeyFrame();
+
+            // Check recent MapPoints
+            MapPointCulling();
+
+            // Triangulate new MapPoints
+            CreateNewMapPoints();
         }
     }
 }
 
-void LocalMapper::InsertKeyFrame(const KeyFrame *pKF)
+void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
 {
+    unique_lock<mutex> lock(mMutexNewKFs);
+    mlNewKeyFrames.push_back(pKF);
+    mbAbortBA = true;
 }
 
-bool LocalMapper::CheckNewKeyFrames()
+bool LocalMapping::CheckNewKeyFrames()
 {
+    unique_lock<mutex> lock(mMutexNewKFs);
+    return (!mlNewKeyFrames.empty());
 }
 
-void LocalMapper::ProcessNewKeyFrame()
+void LocalMapping::ProcessNewKeyFrame()
+{
+    {
+        unique_lock<mutex> lock(mMutexNewKFs);
+        mpCurrentKeyFrame = mlNewKeyFrames.front();
+        mlNewKeyFrames.pop_front();
+    }
+
+    // Compute Bags of Words structures
+    mpCurrentKeyFrame->ComputeBoW();
+
+    // Associate MapPoints to the new keyframe and update normal and descriptor
+    const vector<MapPoint *> vpMapPointMatches; //= mpCurrentKeyFrame->GetMapPointMatches();
+
+    for (size_t i = 0; i < vpMapPointMatches.size(); i++)
+    {
+        MapPoint *pMP = vpMapPointMatches[i];
+        if (pMP)
+        {
+            if (!pMP->isBad())
+            {
+                if (!pMP->IsInKeyFrame(mpCurrentKeyFrame))
+                {
+                    pMP->AddObservation(mpCurrentKeyFrame, i);
+                    pMP->UpdateNormalAndDepth();
+                    pMP->ComputeDistinctiveDescriptors();
+                }
+                else // this can only happen for new stereo points inserted by the Tracking
+                {
+                    mlpRecentAddedMapPoints.push_back(pMP);
+                }
+            }
+        }
+    }
+
+    // Update links in the Covisibility Graph
+    // mpCurrentKeyFrame->UpdateConnections();
+
+    // Insert Keyframe in Map
+    mpMap->AddKeyFrame(mpCurrentKeyFrame);
+}
+
+void LocalMapping::MapPointCulling()
+{
+    // Check Recent Added MapPoints
+    list<MapPoint *>::iterator lit = mlpRecentAddedMapPoints.begin();
+    const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
+    const int cnThObs = 3;
+
+    while (lit != mlpRecentAddedMapPoints.end())
+    {
+        MapPoint *pMP = *lit;
+        if (pMP->isBad())
+        {
+            lit = mlpRecentAddedMapPoints.erase(lit);
+        }
+        // else if (pMP->GetFoundRatio() < 0.25f)
+        // {
+        //     pMP->SetBadFlag();
+        //     lit = mlpRecentAddedMapPoints.erase(lit);
+        // }
+        else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 2 && pMP->Observations() <= cnThObs)
+        {
+            pMP->SetBadFlag();
+            lit = mlpRecentAddedMapPoints.erase(lit);
+        }
+        else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 3)
+            lit = mlpRecentAddedMapPoints.erase(lit);
+        else
+            lit++;
+    }
+}
+
+void LocalMapping::CreateNewMapPoints()
 {
 }
 
@@ -48,7 +132,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //     return dist;
 // }
 
-// LocalMapper::LocalMapper(const Eigen::Matrix3d &K)
+// LocalMapping::LocalMapping(const Eigen::Matrix3d &K)
 //     : K(K),
 //       shouldQuit(false),
 //       currKeyFrame(NULL),
@@ -57,7 +141,7 @@ void LocalMapper::ProcessNewKeyFrame()
 // {
 // }
 
-// void LocalMapper::run()
+// void LocalMapping::run()
 // {
 //     while (!shouldQuit)
 //     {
@@ -92,13 +176,13 @@ void LocalMapper::ProcessNewKeyFrame()
 //     }
 // }
 
-// void LocalMapper::addKeyFrame(std::shared_ptr<KeyFrame> KF)
+// void LocalMapping::addKeyFrame(std::shared_ptr<KeyFrame> KF)
 // {
 //     std::unique_lock<std::mutex> lock(mutexKeyFrameQueue);
 //     keyFrameQueue.push_back(KF);
 // }
 
-// void LocalMapper::createInitMapPoints()
+// void LocalMapping::createInitMapPoints()
 // {
 //     size_t numPointsCreated = 0;
 //     auto N = currKeyFrame->keyPoints.size();
@@ -129,7 +213,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //     printf("Map initialized with %lu map points.\n", numPointsCreated);
 // }
 
-// void LocalMapper::updateLocalKeyFrames()
+// void LocalMapping::updateLocalKeyFrames()
 // {
 //     std::map<std::shared_ptr<KeyFrame>, int> keyFrameCounter;
 //     for (auto &mp : lastKeyFrame->mapPoints)
@@ -172,7 +256,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //     }
 // }
 
-// void LocalMapper::updateLocalMapPoints()
+// void LocalMapping::updateLocalMapPoints()
 // {
 //     localMapPointSet.clear();
 //     for (const auto &KF : localKeyFrameSet)
@@ -193,7 +277,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //     }
 // }
 
-// int LocalMapper::matchLocalMapPoints()
+// int LocalMapping::matchLocalMapPoints()
 // {
 //     int totalMatches = 0;
 //     const auto &RTinv = currKeyFrame->RTinv;
@@ -308,7 +392,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //     return totalMatches;
 // }
 
-// void LocalMapper::processNewKeyFrame()
+// void LocalMapping::processNewKeyFrame()
 // {
 //     {
 //         std::unique_lock<std::mutex> lock(mutexKeyFrameQueue);
@@ -334,7 +418,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //         map->addKeyFrame(currKeyFrame);
 // }
 
-// void LocalMapper::createNewMapPoints()
+// void LocalMapping::createNewMapPoints()
 // {
 //     int numPointCreated = 0;
 
@@ -366,7 +450,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //     }
 // }
 
-// void LocalMapper::optimizeKeyFramePose()
+// void LocalMapping::optimizeKeyFramePose()
 // {
 //     Sophus::SE3d RTbo = currKeyFrame->RT;
 //     auto robustLoss = new ceres::HuberLoss(10);
@@ -474,7 +558,7 @@ void LocalMapper::ProcessNewKeyFrame()
 //     }
 // }
 
-// int LocalMapper::checkMapPointOutliers()
+// int LocalMapping::checkMapPointOutliers()
 // {
 //     auto &matchedPoints = currKeyFrame->mapPoints;
 //     auto &projections = currKeyFrame->keyPoints;

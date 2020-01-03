@@ -24,6 +24,8 @@ public:
 
     void SetPose(const cv::Mat &Tcw);
 
+    bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
+
 public:
     void ExtractORB(const cv::Mat &imGray);
 
@@ -76,6 +78,7 @@ public:
     int N;
     std::vector<cv::KeyPoint> mvKeys;
     std::vector<cv::KeyPoint> mvObsKeys;
+    std::vector<bool> mvbOutlier;
     cv::Mat mDescriptors;
 
     // Corresponding stereo coordinate and depth for each keypoint.

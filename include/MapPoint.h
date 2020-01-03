@@ -31,6 +31,13 @@ public:
 
     MapPoint *GetReplaced();
 
+    bool IsInKeyFrame(KeyFrame *pKF);
+    void UpdateNormalAndDepth();
+    void ComputeDistinctiveDescriptors();
+
+    float GetMinDistanceInvariance();
+    float GetMaxDistanceInvariance();
+
 public:
     unsigned long mnId;
     static unsigned long nNextId;
@@ -58,11 +65,18 @@ public:
 
     std::mutex mMutexPos;
     std::mutex mMutexFeatures;
-    std::mutex mGlobalMutex;
+    static std::mutex mGlobalMutex;
 
     // Position in absolute coordinates
     Eigen::Vector3d mWorldPos;
 
     int nObs;
     int nFrameObs;
+
+    // Scale invariance distances
+    float mfMinDistance;
+    float mfMaxDistance;
+
+    bool mbTrackInView;
+    bool mnTrackScaleLevel;
 };

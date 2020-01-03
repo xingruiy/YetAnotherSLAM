@@ -13,7 +13,7 @@ PRIVATE
     src/Frame.cpp
     src/MapPoint.cpp
     src/KeyFrame.cpp
-    src/LocalMapper.cpp
+    src/LocalMapping.cpp
     src/FullSystem.cpp
     src/Viewer.cpp
     src/Tracking.cpp
@@ -21,6 +21,7 @@ PRIVATE
     src/ORBextractor.cpp
     src/Optimizer.cpp
     src/Converter.cpp
+    src/ORBmatcher.cpp
 )
 
 target_compile_features(${PROJECT_NAME}

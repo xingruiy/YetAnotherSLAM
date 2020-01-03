@@ -12,7 +12,7 @@ Frame::Frame(const Frame &F)
       mvScaleFactors(F.mvScaleFactors), mvInvScaleFactors(F.mvInvScaleFactors),
       mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2),
       mvKeys(F.mvKeys), mvpMapPoints(F.mvpMapPoints), mImGray(F.mImGray),
-      mImDepth(F.mImDepth)
+      mImDepth(F.mImDepth), mvbOutlier(F.mvbOutlier)
 {
 }
 
@@ -50,14 +50,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
   mvInvScaleFactors = mpORBextractor->GetInverseScaleFactors();
   mvLevelSigma2 = mpORBextractor->GetScaleSigmaSquares();
   mvInvLevelSigma2 = mpORBextractor->GetInverseScaleSigmaSquares();
-
-  // ORB extraction
-  // ExtractORB(imGray);
-
-  // N = mvKeys.size();
-  // mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
-
-  // ComputeDepth(imDepth);
 }
 
 void Frame::SetPose(const cv::Mat &Tcw)
@@ -69,6 +61,7 @@ void Frame::ExtractORB()
   ExtractORB(mImGray);
 
   N = mvKeys.size();
+  mvbOutlier.resize(N, false);
   mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
 
   ComputeDepth(mImDepth);
@@ -96,4 +89,59 @@ void Frame::ComputeDepth(const cv::Mat &imDepth)
       mvDepth[i] = d;
     }
   }
+}
+
+bool Frame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
+{
+  pMP->mbTrackInView = false;
+
+  // 3D in camera coordinates
+  Eigen::Vector3d Pc = mTcw.inverse() * pMP->mWorldPos;
+  const float &PcX = Pc(0);
+  const float &PcY = Pc(1);
+  const float &PcZ = Pc(2);
+
+  // Check positive depth
+  if (PcZ < 0.0f)
+    return false;
+
+  // Project in image and check it is not outside
+  const float invz = 1.0f / PcZ;
+  const float u = fx * PcX * invz + cx;
+  const float v = fy * PcY * invz + cy;
+
+  if (u < 0 || u > width)
+    return false;
+  if (v < 0 || v > height)
+    return false;
+
+  // Check distance is in the scale invariance region of the MapPoint
+  const float maxDistance = pMP->GetMaxDistanceInvariance();
+  const float minDistance = pMP->GetMinDistanceInvariance();
+  const Eigen::Vector3d PO = pMP->mWorldPos - mTcw.translation();
+  const float dist = PO.norm();
+
+  if (dist < minDistance || dist > maxDistance)
+    return false;
+
+  // Check viewing angle
+  // cv::Mat Pn = pMP->GetNormal();
+
+  // const float viewCos = PO.dot(Pn) / dist;
+
+  // if (viewCos < viewingCosLimit)
+  //   return false;
+
+  // // Predict scale in the image
+  // const int nPredictedLevel = pMP->PredictScale(dist, this);
+
+  // // Data used by the tracking
+  pMP->mbTrackInView = true;
+  // pMP->mTrackProjX = u;
+  // pMP->mTrackProjXR = u - mbf * invz;
+  // pMP->mTrackProjY = v;
+  // pMP->mnTrackScaleLevel = nPredictedLevel;
+  // pMP->mTrackViewCos = viewCos;
+
+  return true;
 }

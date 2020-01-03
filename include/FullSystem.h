@@ -8,7 +8,7 @@
 #include "KeyFrame.h"
 #include "Viewer.h"
 #include "Tracking.h"
-#include "LocalMapper.h"
+#include "LocalMapping.h"
 
 #include "DENSE/include/DenseMapping.h"
 #include "DENSE/include/DenseTracking.h"
@@ -17,7 +17,7 @@
 class Viewer;
 class MapViewer;
 class Tracking;
-class LocalMapper;
+class LocalMapping;
 
 class FullSystem
 {

@@ -49,6 +49,13 @@ private:
     Eigen::Matrix3d mK;
     int mImgWidth;
     int mImgHeight;
+    float mbf;
+
+    // Threshold close/far points
+    // Points seen as close by the stereo/RGBD sensor are considered reliable
+    // and inserted from just one frame. Far points requiere a match in two keyframes.
+    float mThDepth;
+
     TrackingState meState;
     TrackingState meLastState;
 

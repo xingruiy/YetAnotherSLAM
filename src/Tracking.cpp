@@ -28,6 +28,9 @@ Tracking::Tracking(const std::string &strSettingPath, FullSystem *pSys, Map *pMa
     mK(0, 2) = cx;
     mK(1, 2) = cy;
 
+    mbf = fSettings["Camera.bf"];
+    mThDepth = mbf * (float)fSettings["ThDepth"] / fx;
+
     int nFeatures = fSettings["ORBextractor.nFeatures"];
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
     int nLevels = fSettings["ORBextractor.nLevels"];
@@ -264,7 +267,7 @@ bool Tracking::NeedNewKeyFrame()
         return false;
 
     // criteria 1: when observed points falls bellow a threshold
-    if (mObs < 400 || mObsRatio <= 0.5)
+    if (mObs < 200 || mObsRatio <= 0.4)
         return true;
 
     return false;
@@ -273,39 +276,103 @@ bool Tracking::NeedNewKeyFrame()
 void Tracking::CreateNewKeyFrame()
 {
     mCurrentFrame.ExtractORB();
-    if (mCurrentFrame.N > 500)
+
+    if (mCurrentFrame.N > 300)
     {
-        // Create KeyFrame
+        // Check map points
+        const size_t nObs = mCurrentFrame.mvObsMapPoints.size();
+        const size_t nKPs = mCurrentFrame.mvKeys.size();
+
+        // for (int i = 0; i < nObs; ++i)
+        // {
+        //     Sophus::SE3d Twc = mCurrentFrame.mTcw.inverse();
+        //     MapPoint *pMP = mCurrentFrame.mvObsMapPoints[i];
+        //     if (pMP)
+        //     {
+        //         Eigen::Vector3d ptTransformed = Twc * pMP->mWorldPos;
+        //         float x = Frame::fx * ptTransformed(0) / ptTransformed(2) + Frame::cx;
+        //         float y = Frame::fy * ptTransformed(1) / ptTransformed(2) + Frame::cy;
+        //         float z = ptTransformed(2);
+
+        //         for (int j = 0; j < nKPs; ++j)
+        //         {
+        //             cv::KeyPoint kp = mCurrentFrame.mvKeys[j];
+        //             double dist = (Eigen::Vector2d(x, y) - Eigen::Vector2d(kp.pt.x, kp.pt.y)).norm();
+        //             if (dist < 2)
+        //             {
+        //                 cv::Mat KPDesc = mCurrentFrame.mDescriptors.row(j);
+        //                 Descriptor
+        //             }
+        //         }
+        //     }
+        // }
+
+        // Create a new keyframe
         KeyFrame *pKF = new KeyFrame(mCurrentFrame, mpMap);
+        mpReferenceKF = pKF;
+        mCurrentFrame.mpReferenceKF = pKF;
 
-        // Insert KeyFrame into the map
-        mpMap->AddKeyFrame(pKF);
-
+        // We sort points by the measured depth by the RGBD sensor.
+        // We create all those MapPoints whose depth < mThDepth.
+        // If there are less than 100 close points we create the 100 closest.
+        vector<pair<float, int>> vDepthIdx;
+        vDepthIdx.reserve(mCurrentFrame.N);
         for (int i = 0; i < mCurrentFrame.N; i++)
         {
-            if (mCurrentFrame.mvpMapPoints[i])
-                continue;
-
             float z = mCurrentFrame.mvDepth[i];
             if (z > 0)
             {
-                Eigen::Vector3d x3D;
-                cv::KeyPoint kp = mCurrentFrame.mvKeys[i];
-                const float x = kp.pt.x;
-                const float y = kp.pt.y;
-                x3D(0) = (x - Frame::cx) * Frame::invfx * z;
-                x3D(1) = (y - Frame::cy) * Frame::invfy * z;
-                x3D(2) = z;
-                x3D = pKF->mTcw * x3D;
-                MapPoint *pNewMP = new MapPoint(x3D, pKF, mpMap);
-                pKF->mvpMapPoints[i] = pNewMP;
-                mpMap->AddMapPoint(pNewMP);
+                vDepthIdx.push_back(make_pair(z, i));
             }
         }
 
-        mpReferenceKF = pKF;
-        mCurrentFrame.mpReferenceKF = pKF;
+        if (!vDepthIdx.empty())
+        {
+            sort(vDepthIdx.begin(), vDepthIdx.end());
+
+            int nPoints = 0;
+            for (size_t j = 0; j < vDepthIdx.size(); j++)
+            {
+                int i = vDepthIdx[j].second;
+
+                bool bCreateNew = false;
+
+                MapPoint *pMP = mCurrentFrame.mvpMapPoints[i];
+                if (!pMP)
+                    bCreateNew = true;
+                else if (pMP->Observations() < 1)
+                {
+                    bCreateNew = true;
+                    mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
+                }
+
+                if (bCreateNew)
+                {
+                    Eigen::Vector3d x3D;
+                    cv::KeyPoint kp = mCurrentFrame.mvKeys[i];
+                    const float x = kp.pt.x;
+                    const float y = kp.pt.y;
+                    const float z = mCurrentFrame.mvDepth[i];
+                    x3D(0) = (x - Frame::cx) * Frame::invfx * z;
+                    x3D(1) = (y - Frame::cy) * Frame::invfy * z;
+                    x3D(2) = z;
+                    x3D = pKF->mTcw * x3D;
+                    MapPoint *pNewMP = new MapPoint(x3D, pKF, mpMap);
+                    pKF->mvpMapPoints[i] = pNewMP;
+                    mpMap->AddMapPoint(pNewMP);
+                }
+                else
+                {
+                    nPoints++;
+                }
+
+                if (vDepthIdx[j].first > mThDepth && nPoints > 100)
+                    break;
+            }
+        }
     }
+
+    //   mpLocalMapper->InsertKeyFrame(pKF);
 }
 
 void Tracking::SetViewer(Viewer *pViewer)
