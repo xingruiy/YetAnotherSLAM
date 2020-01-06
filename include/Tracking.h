@@ -8,9 +8,11 @@
 
 #include "Frame.h"
 #include "Viewer.h"
+#include "LocalMapping.h"
 #include "FullSystem.h"
 
 class Viewer;
+class LocalMapping;
 class FullSystem;
 
 class Tracking
@@ -21,6 +23,7 @@ public:
     void TrackImageRGBD(const cv::Mat &imGray, const cv::Mat &imDepth);
 
     void SetViewer(Viewer *pViewer);
+    void SetLocalMapper(LocalMapping *pLocalMapper);
 
     void Reset();
 
@@ -35,10 +38,9 @@ private:
     void InitializeTracking();
     bool TrackLastFrame();
     bool Relocalization();
-    bool TrackLocalMap();
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
-    int CheckObservations();
+    // int CheckObservations();
 
     // Local map management
     void UpdateLocalMap();
@@ -61,6 +63,9 @@ private:
 
     // Dense Tracker
     DenseTracking *mpTracker;
+
+    // Sparse Mapping
+    LocalMapping *mpLocalMapper;
 
     // Dense Mapping
     DenseMapping *mpMapper;
@@ -96,8 +101,4 @@ private:
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
-
-    // Used for creating KeyFrame
-    int mObs;
-    float mObsRatio;
 };

@@ -8,6 +8,9 @@
 #include "KeyFrame.h"
 #include "MapPoint.h"
 
+#define FRAME_GRID_ROWS 48
+#define FRAME_GRID_COLS 64
+
 class KeyFrame;
 class MapPoint;
 
@@ -18,7 +21,7 @@ public:
 
     Frame(const Frame &F);
 
-    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts, const Eigen::Matrix3d &K, ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc);
+    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts, const Eigen::Matrix3d &K, const float &bf, const float &thDepth, ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc);
 
     void ExtractORB();
 
@@ -30,6 +33,10 @@ public:
     void ExtractORB(const cv::Mat &imGray);
 
     void ComputeDepth(const cv::Mat &imDepth);
+
+    void AssignFeaturesToGrid();
+
+    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
 
     // Frame ID
     unsigned long mnId;
@@ -61,9 +68,16 @@ public:
     static float fy;
     static float cx;
     static float cy;
+    static float mbf;
+    static float mThDepth;
     static float invfx;
     static float invfy;
     static bool mbInitialized;
+
+    // Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
+    static float mfGridElementWidthInv;
+    static float mfGridElementHeightInv;
+    std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
 
     // Scale pyramid info.
     int mnScaleLevels;

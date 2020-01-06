@@ -1,11 +1,13 @@
 #pragma once
 
+#include "Frame.h"
 #include "KeyFrame.h"
 #include "Map.h"
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 
 class Map;
+class Frame;
 class KeyFrame;
 
 using namespace std;
@@ -13,7 +15,7 @@ using namespace std;
 class MapPoint
 {
 public:
-    MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap);
+    MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF);
 
     std::map<KeyFrame *, size_t> GetObservations();
 
@@ -27,9 +29,14 @@ public:
 
     bool isBad();
 
+    Eigen::Vector3d GetNormal();
+
     void Replace(MapPoint *pMP);
 
     MapPoint *GetReplaced();
+
+    cv::Mat GetDescriptor();
+    void IncreaseVisible(int n = 1);
 
     bool IsInKeyFrame(KeyFrame *pKF);
     void UpdateNormalAndDepth();
@@ -37,6 +44,9 @@ public:
 
     float GetMinDistanceInvariance();
     float GetMaxDistanceInvariance();
+
+    int PredictScale(const float &currentDist, Frame *pFrame);
+    int PredictScale(const float &currentDist, KeyFrame *pKF);
 
 public:
     unsigned long mnId;
@@ -51,8 +61,11 @@ public:
     // Keyframes observing the point and associated index in keyframe
     std::map<KeyFrame *, size_t> mObservations;
 
+    // Position in absolute coordinates
+    Eigen::Vector3d mWorldPos;
+
     // Mean viewing direction
-    cv::Mat mNormalVector;
+    Eigen::Vector3d mNormalVector;
 
     // Best descriptor to fast matching
     cv::Mat mDescriptor;
@@ -67,16 +80,21 @@ public:
     std::mutex mMutexFeatures;
     static std::mutex mGlobalMutex;
 
-    // Position in absolute coordinates
-    Eigen::Vector3d mWorldPos;
-
+    // Tracking counters
+    int mnVisible;
+    int mnFound;
     int nObs;
-    int nFrameObs;
 
     // Scale invariance distances
     float mfMinDistance;
     float mfMaxDistance;
 
+    // Variables used by the tracking
+    float mTrackProjX;
+    float mTrackProjY;
+    float mTrackProjXR;
     bool mbTrackInView;
-    bool mnTrackScaleLevel;
+    int mnTrackScaleLevel;
+    float mTrackViewCos;
+    long unsigned int mnTrackReferenceForFrame;
 };

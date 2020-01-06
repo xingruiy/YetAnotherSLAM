@@ -2,8 +2,10 @@
 
 unsigned long Frame::mnNextId = 0;
 bool Frame::mbInitialized = false;
+float Frame::mbf, Frame::mThDepth;
 int Frame::width, Frame::height;
 float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
+float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
 Frame::Frame(const Frame &F)
     : mpORBvocabulary(F.mpORBvocabulary), mpORBextractor(F.mpORBextractor),
@@ -17,8 +19,8 @@ Frame::Frame(const Frame &F)
 }
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
-             const Eigen::Matrix3d &K, ORB_SLAM2::ORBextractor *extractor,
-             ORB_SLAM2::ORBVocabulary *voc)
+             const Eigen::Matrix3d &K, const float &bf, const float &thDepth,
+             ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
     : mpORBvocabulary(voc), mpORBextractor(extractor), mTimeStamp(ts)
 {
   if (!mbInitialized)
@@ -27,11 +29,15 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
     fy = K(1, 1);
     cx = K(0, 2);
     cy = K(1, 2);
+    mbf = bf;
+    mThDepth = thDepth;
     invfx = 1.0 / fx;
     invfy = 1.0 / fy;
     width = imGray.cols;
     height = imGray.rows;
     mK = K;
+    mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(width);
+    mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(height);
     mbInitialized = true;
   }
 
@@ -60,6 +66,8 @@ void Frame::ExtractORB()
 {
   ExtractORB(mImGray);
 
+  AssignFeaturesToGrid();
+
   N = mvKeys.size();
   mvbOutlier.resize(N, false);
   mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
@@ -75,6 +83,7 @@ void Frame::ExtractORB(const cv::Mat &imGray)
 void Frame::ComputeDepth(const cv::Mat &imDepth)
 {
   mvDepth = std::vector<float>(N, -1);
+  mvuRight = std::vector<float>(N, -1);
 
   for (int i = 0; i < N; i++)
   {
@@ -87,8 +96,38 @@ void Frame::ComputeDepth(const cv::Mat &imDepth)
     if (d > 0)
     {
       mvDepth[i] = d;
+      mvuRight[i] = kp.pt.x - mbf / d;
     }
   }
+}
+
+void Frame::AssignFeaturesToGrid()
+{
+  int nReserve = 0.5f * N / (FRAME_GRID_COLS * FRAME_GRID_ROWS);
+  for (unsigned int i = 0; i < FRAME_GRID_COLS; i++)
+    for (unsigned int j = 0; j < FRAME_GRID_ROWS; j++)
+      mGrid[i][j].reserve(nReserve);
+
+  for (int i = 0; i < N; i++)
+  {
+    const cv::KeyPoint &kp = mvKeys[i];
+
+    int nGridPosX, nGridPosY;
+    if (PosInGrid(kp, nGridPosX, nGridPosY))
+      mGrid[nGridPosX][nGridPosY].push_back(i);
+  }
+}
+
+bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
+{
+  posX = round((kp.pt.x) * mfGridElementWidthInv);
+  posY = round((kp.pt.y) * mfGridElementHeightInv);
+
+  //Keypoint's coordinates are undistorted, which could cause to go out of the image
+  if (posX < 0 || posX >= FRAME_GRID_COLS || posY < 0 || posY >= FRAME_GRID_ROWS)
+    return false;
+
+  return true;
 }
 
 bool Frame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
@@ -125,23 +164,23 @@ bool Frame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
     return false;
 
   // Check viewing angle
-  // cv::Mat Pn = pMP->GetNormal();
+  Eigen::Vector3d Pn = pMP->GetNormal();
 
-  // const float viewCos = PO.dot(Pn) / dist;
+  const float viewCos = PO.dot(Pn) / dist;
 
-  // if (viewCos < viewingCosLimit)
-  //   return false;
+  if (viewCos < viewingCosLimit)
+    return false;
 
-  // // Predict scale in the image
-  // const int nPredictedLevel = pMP->PredictScale(dist, this);
+  // Predict scale in the image
+  const int nPredictedLevel = pMP->PredictScale(dist, this);
 
-  // // Data used by the tracking
+  // Data used by the tracking
   pMP->mbTrackInView = true;
-  // pMP->mTrackProjX = u;
-  // pMP->mTrackProjXR = u - mbf * invz;
-  // pMP->mTrackProjY = v;
-  // pMP->mnTrackScaleLevel = nPredictedLevel;
-  // pMP->mTrackViewCos = viewCos;
+  pMP->mTrackProjX = u;
+  pMP->mTrackProjXR = u - mbf * invz;
+  pMP->mTrackProjY = v;
+  pMP->mnTrackScaleLevel = nPredictedLevel;
+  pMP->mTrackViewCos = viewCos;
 
   return true;
 }

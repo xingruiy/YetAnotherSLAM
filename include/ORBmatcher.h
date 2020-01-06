@@ -16,4 +16,15 @@ public:
     // Search matches between Frame keypoints and projected MapPoints. Returns number of matches
     // Used to track the local map (Tracking)
     int SearchByProjection(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, const float th = 3);
+
+public:
+    static const int TH_LOW;
+    static const int TH_HIGH;
+    static const int HISTO_LENGTH;
+
+protected:
+    float RadiusByViewingCos(const float &viewCos);
+
+    float mfNNratio;
+    bool mbCheckOrientation;
 };

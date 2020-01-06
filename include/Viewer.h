@@ -42,8 +42,10 @@ private:
 
     float mPointSize;
 
-    pangolin::GlTexture mImageRGB, mImageDepth;
-    pangolin::GlTexture mImgKeyPoint, mImgKeyPoint2;
+    pangolin::GlTexture mImageRGB;
+    pangolin::GlTexture mImageDepth;
+    pangolin::GlTexture mImgKeyPoint;
+    pangolin::GlTexture mImgKeyPoint2;
 };
 
 // class MapViewer

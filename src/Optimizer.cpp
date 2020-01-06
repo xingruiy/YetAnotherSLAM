@@ -1,4 +1,5 @@
 #include <g2o/g2o/core/block_solver.h>
+#include <g2o/g2o/core/optimizable_graph.h>
 #include <g2o/g2o/core/optimization_algorithm_levenberg.h>
 #include <g2o/g2o/solvers/linear_solver_eigen.h>
 #include <g2o/g2o/types/types_six_dof_expmap.h>
@@ -37,7 +38,6 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
     vpEdgesStereo.reserve(N);
     vnIndexEdgeStereo.reserve(N);
 
-    const float deltaMono = sqrt(5.991);
     const float deltaStereo = sqrt(7.815);
 
     {
@@ -54,8 +54,8 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
                 //SET EDGE
                 Eigen::Matrix<double, 3, 1> obs;
                 const cv::KeyPoint &kpUn = pKF->mvKeys[i];
-                // const float &kp_ur = pKF->mvuRight[i];
-                // obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
+                const float &kp_ur = pKF->mvuRight[i];
+                obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
                 g2o::EdgeStereoSE3ProjectXYZOnlyPose *e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
 
@@ -73,7 +73,7 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
                 e->fy = Frame::fy;
                 e->cx = Frame::cx;
                 e->cy = Frame::cy;
-                // e->bf = pKF->mbf;
+                e->bf = pKF->mbf;
                 Eigen::Vector3d Xw = pMP->mWorldPos;
                 e->Xw[0] = Xw(0);
                 e->Xw[1] = Xw(1);

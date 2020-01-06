@@ -16,13 +16,14 @@ public:
     void Spin();
 
     void InsertKeyFrame(KeyFrame *pKF);
-
     bool CheckNewKeyFrames();
-
     void ProcessNewKeyFrame();
 
-    void MapPointCulling();
+    void MatchLocalPoints();
     void CreateNewMapPoints();
+    void SetShouldQuit();
+    void UpdateLocalMap();
+    void TrackLocalMap();
 
 private:
     Map *mpMap;
@@ -30,9 +31,15 @@ private:
     std::mutex mMutexNewKFs;
 
     bool mbAbortBA;
+    bool mbShouldQuit;
 
     KeyFrame *mpCurrentKeyFrame;
 
     std::list<KeyFrame *> mlNewKeyFrames;
     std::list<MapPoint *> mlpRecentAddedMapPoints;
+
+    //Local Map
+    KeyFrame *mpReferenceKF;
+    std::vector<KeyFrame *> mvpLocalKeyFrames;
+    std::vector<MapPoint *> mvpLocalMapPoints;
 };

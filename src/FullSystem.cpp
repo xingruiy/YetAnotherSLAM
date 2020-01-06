@@ -40,8 +40,13 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
     // Create map
     mpMap = new Map();
 
+    //Initialize the Local Mapping thread and launch
+    mpLocalMapper = new LocalMapping(mpMap);
+    mptLocalMapping = new thread(&LocalMapping::Spin, mpLocalMapper);
+
     // Craete main tracking thread
     mpTracker = new Tracking(strSettingFile, this, mpMap, mpORBVocabulary);
+    mpTracker->SetLocalMapper(mpLocalMapper);
 
     // Create viewing thread if applicable
     if (mbUseViewer)
@@ -50,6 +55,12 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
         mptViewer = new thread(&Viewer::Spin, mpViewer);
         mpTracker->SetViewer(mpViewer);
     }
+}
+
+FullSystem::~FullSystem()
+{
+    mpLocalMapper->SetShouldQuit();
+    mptLocalMapping->join();
 }
 
 void FullSystem::TrackImageRGBD(const cv::Mat &imRGB, const cv::Mat &imDepth, const double TimeStamp)

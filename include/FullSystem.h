@@ -22,6 +22,7 @@ class LocalMapping;
 class FullSystem
 {
 public:
+    ~FullSystem();
     FullSystem(const std::string &strSettingFile, const std::string &strVocFile);
 
     void TrackImageRGBD(const cv::Mat &imRGB, const cv::Mat &imDepth, const double TimeStamp);
@@ -40,6 +41,10 @@ private:
 
     Map *mpMap;
 
+    LocalMapping *mpLocalMapper;
+
+    ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
+
     // System threads: Local Mapping, Loop Closing, Viewer.
     // The Tracking thread "lives" in the main execution thread that creates the System object.
     std::thread *mptLocalMapping;
@@ -55,6 +60,4 @@ private:
 
     cv::Mat mImGray, mImDepth;
     double mDepthScale;
-
-    ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
 };
