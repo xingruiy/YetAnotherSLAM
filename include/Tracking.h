@@ -48,9 +48,11 @@ private:
     void UpdateLocalKeyFrames();
 
     // Calibration
+    cv::Mat mDistCoef;
     Eigen::Matrix3d mK;
     int mImgWidth;
     int mImgHeight;
+    int mMaxFrameRate;
     float mbf;
 
     // Threshold close/far points

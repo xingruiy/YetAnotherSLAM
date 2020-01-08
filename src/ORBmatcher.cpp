@@ -26,23 +26,22 @@ int ORBmatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
     for (size_t iMP = 0; iMP < nMP; iMP++)
     {
         MapPoint *pMP = vpMapPoints[iMP];
-
-        if (!pMP->mbTrackInView)
+        if (!pMP->mbTrackInView || pMP->isBad())
             continue;
-
-        if (pMP->isBad())
-            continue;
-
-        const int &nPredictedLevel = pMP->mnTrackScaleLevel;
 
         // The size of the window will depend on the viewing direction
         float r = RadiusByViewingCos(pMP->mTrackViewCos);
+        const int &nPredictedLevel = pMP->mnTrackScaleLevel;
 
         if (bFactor)
             r *= th;
 
-        const vector<size_t> vIndices =
-            pKF->GetFeaturesInArea(pMP->mTrackProjX, pMP->mTrackProjY, r * pKF->mvScaleFactors[nPredictedLevel], nPredictedLevel - 1, nPredictedLevel);
+        const auto vIndices =
+            pKF->GetFeaturesInArea(pMP->mTrackProjX,
+                                   pMP->mTrackProjY,
+                                   r * pKF->mvScaleFactors[nPredictedLevel],
+                                   nPredictedLevel - 1,
+                                   nPredictedLevel);
 
         if (vIndices.empty())
             continue;
@@ -80,12 +79,12 @@ int ORBmatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
                 bestDist2 = bestDist;
                 bestDist = dist;
                 bestLevel2 = bestLevel;
-                bestLevel = pKF->mvKeys[idx].octave;
+                bestLevel = pKF->mvKeysUn[idx].octave;
                 bestIdx = idx;
             }
             else if (dist < bestDist2)
             {
-                bestLevel2 = pKF->mvKeys[idx].octave;
+                bestLevel2 = pKF->mvKeysUn[idx].octave;
                 bestDist2 = dist;
             }
         }

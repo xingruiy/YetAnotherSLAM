@@ -9,8 +9,8 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    FullSystem sys(argv[1], argv[2]);
     ONI::Camera cam;
+    FullSystem sys(argv[1], argv[2]);
 
     cv::Mat imDepth, imRGB;
 

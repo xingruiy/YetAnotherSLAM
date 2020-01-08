@@ -54,6 +54,7 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
         mpViewer = new Viewer(strSettingFile, this, mpMap);
         mptViewer = new thread(&Viewer::Spin, mpViewer);
         mpTracker->SetViewer(mpViewer);
+        mpLocalMapper->SetViewer(mpViewer);
     }
 }
 
@@ -73,8 +74,10 @@ void FullSystem::TrackImageRGBD(const cv::Mat &imRGB, const cv::Mat &imDepth, co
     else
         cv::cvtColor(imRGB, mImGray, cv::COLOR_BGR2GRAY);
 
+    // Convert depth to floating point
     imDepth.convertTo(mImDepth, CV_32FC1, 1.0 / mDepthScale);
 
+    // Invoke the main tracking thread
     mpTracker->TrackImageRGBD(mImGray, mImDepth);
 }
 

@@ -22,6 +22,7 @@ public:
 
 private:
     void DrawMapPoints();
+    void DrawKeyFrames();
 
     // System components
     FullSystem *mpSystem;

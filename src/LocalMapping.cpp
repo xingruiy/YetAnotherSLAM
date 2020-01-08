@@ -19,15 +19,38 @@ void LocalMapping::Spin()
 
             MatchLocalPoints();
 
-            TrackLocalMap();
+            if (!CheckNewKeyFrames())
+            {
+                SearchInNeighbors();
+            }
+
+            mbAbortBA = false;
+
+            if (!CheckNewKeyFrames())
+            {
+                // Local BA
+                if (mpMap->KeyFramesInMap() > 2)
+                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
+
+                // Check redundant local Keyframes
+                KeyFrameCulling();
+            }
+
+            CreateNewMapPoints();
         }
     }
 }
 
-void LocalMapping::TrackLocalMap()
+void LocalMapping::KeyFrameCulling()
 {
-    Optimizer::PoseOptimization(mpCurrentKeyFrame);
+}
 
+void LocalMapping::SearchInNeighbors()
+{
+}
+
+void LocalMapping::CreateNewMapPoints()
+{
     // We sort points by the measured depth by the RGBD sensor.
     // We create all those MapPoints whose depth < mThDepth.
     // If there are less than 100 close points we create the 100 closest.
@@ -64,18 +87,14 @@ void LocalMapping::TrackLocalMap()
 
             if (bCreateNew)
             {
-                Eigen::Vector3d x3D;
-                cv::KeyPoint kp = mpCurrentKeyFrame->mvKeys[i];
-                const float x = kp.pt.x;
-                const float y = kp.pt.y;
-                const float z = mpCurrentKeyFrame->mvDepth[i];
-                x3D(0) = (x - Frame::cx) * Frame::invfx * z;
-                x3D(1) = (y - Frame::cy) * Frame::invfy * z;
-                x3D(2) = z;
-                x3D = mpCurrentKeyFrame->mTcw * x3D;
+                Eigen::Vector3d x3D = mpCurrentKeyFrame->UnprojectKeyPoint(i);
                 MapPoint *pNewMP = new MapPoint(x3D, mpMap, mpCurrentKeyFrame, i);
+                pNewMP->AddObservation(mpCurrentKeyFrame, i);
+                pNewMP->ComputeDistinctiveDescriptors();
+                pNewMP->UpdateNormalAndDepth();
                 mpCurrentKeyFrame->mvpMapPoints[i] = pNewMP;
                 mpMap->AddMapPoint(pNewMP);
+                nPoints++;
             }
             else
             {
@@ -92,6 +111,7 @@ void LocalMapping::UpdateLocalMap()
 {
     // Each map point vote for the keyframes in which it has been observed
     std::map<KeyFrame *, int> keyframeCounter;
+
     for (int i = 0; i < mpCurrentKeyFrame->mvpParentMPs.size(); i++)
     {
         if (mpCurrentKeyFrame->mvpParentMPs[i])
@@ -136,7 +156,6 @@ void LocalMapping::UpdateLocalMap()
 
     // Update local map points
     mvpLocalMapPoints.clear();
-
     for (vector<KeyFrame *>::const_iterator itKF = mvpLocalKeyFrames.begin(), itEndKF = mvpLocalKeyFrames.end(); itKF != itEndKF; itKF++)
     {
         KeyFrame *pKF = *itKF;
@@ -183,6 +202,11 @@ void LocalMapping::MatchLocalPoints()
         int nMatches = matcher.SearchByProjection(mpReferenceKF, mvpLocalMapPoints, th);
         std::cout << "match : " << nMatches << std::endl;
     }
+}
+
+void LocalMapping::SetViewer(Viewer *pViewer)
+{
+    mpViewer = pViewer;
 }
 
 void LocalMapping::InsertKeyFrame(KeyFrame *pKF)

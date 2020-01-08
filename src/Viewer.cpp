@@ -90,6 +90,7 @@ void Viewer::Spin()
     pangolin::Var<bool> menuResetSystem("menu.Reset System", true, false);
     pangolin::Var<bool> menuFollowCamera("menu.Follow Camera", true, true);
     pangolin::Var<bool> menuDrawMapPoints("menu.Draw Map Points", true, true);
+    pangolin::Var<bool> menuDrawKeyFrame("menu.Draw Key Frames", true, true);
     pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Pause System"));
 
     // Define Camera Render Object (for view / scene browsing)
@@ -123,6 +124,9 @@ void Viewer::Spin()
         if (menuDrawMapPoints)
             DrawMapPoints();
 
+        if (menuDrawKeyFrame)
+            DrawKeyFrames();
+
         if (pangolin::Pushed(menuResetSystem))
             mpSystem->Reset();
 
@@ -149,7 +153,7 @@ void Viewer::SetCurrentDepth(const cv::Mat &imDepth)
 
 void Viewer::DrawMapPoints()
 {
-    vector<MapPoint *> vpMPs = mpMap->GetMapPointVec();
+    vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
 
     glPointSize(mPointSize);
     glBegin(GL_POINTS);
@@ -164,6 +168,18 @@ void Viewer::DrawMapPoints()
     }
 
     glEnd();
+}
+
+void Viewer::DrawKeyFrames()
+{
+    vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
+    for (size_t i = 0, iend = vpKFs.size(); i < iend; i++)
+    {
+        if (!vpKFs[i])
+            continue;
+        KeyFrame *pKF = vpKFs[i];
+        pangolin::glDrawFrustum(mKinv, mImgWidth, mImgHeight, pKF->mTcw.matrix(), 0.1);
+    }
 }
 
 ///////////////////////////////////////////////////

@@ -19,13 +19,18 @@ public:
 
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
 
+    Eigen::Vector3d UnprojectKeyPoint(int i);
     std::vector<MapPoint *> GetMapPointMatches();
     std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, const float &r, const int minLevel, const int maxLevel) const;
 
 public:
+    bool isBad();
+    bool mbBad;
+
+    double mTimeStamp;
+
     unsigned long mnId;
     static unsigned long nNextId;
-    double mTimeStamp;
 
     // Grid (to speed up feature matching)
     const int mnGridCols;
@@ -41,8 +46,8 @@ public:
     long unsigned int mnBAFixedForKF;
 
     // Calibration parameters
-    const int width, height;
     const float mbf, mThDepth;
+    const int mnMinX, mnMinY, mnMaxX, mnMaxY;
     const float fx, fy, cx, cy, invfx, invfy;
 
     // Number of KeyPoints
@@ -52,6 +57,7 @@ public:
     const std::vector<float> mvDepth;
     const std::vector<float> mvuRight;
     const std::vector<cv::KeyPoint> mvKeys;
+    const std::vector<cv::KeyPoint> mvKeysUn;
     const cv::Mat mDescriptors;
 
     // MapPoints associated to keypoints
@@ -63,16 +69,26 @@ public:
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
 
+    // Feature extractor
     ORB_SLAM2::ORBVocabulary *mpORBvocabulary;
 
-    // Scale
+    // Scale data
+    // This is extracted from ORB extractor
+
+    // Total scale levels
     const int mnScaleLevels;
+    // scale factor of each level
     const float mfScaleFactor;
+    // log scale factor of each level
     const float mfLogScaleFactor;
+    // scale pyramid
     const std::vector<float> mvScaleFactors;
+    // scale pyramid ^2
     const std::vector<float> mvLevelSigma2;
+    // inverse scale pyramid^2
     const std::vector<float> mvInvLevelSigma2;
 
+    // Keyframe in World coord
     Sophus::SE3d mTcw;
     std::mutex mMutexPose;
     std::mutex mMutexConnections;

@@ -2,8 +2,7 @@
 
 unsigned long Frame::mnNextId = 0;
 bool Frame::mbInitialized = false;
-float Frame::mbf, Frame::mThDepth;
-int Frame::width, Frame::height;
+float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
 float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
@@ -13,31 +12,31 @@ Frame::Frame(const Frame &F)
       mfScaleFactor(F.mfScaleFactor), mfLogScaleFactor(F.mfLogScaleFactor),
       mvScaleFactors(F.mvScaleFactors), mvInvScaleFactors(F.mvInvScaleFactors),
       mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2),
-      mvKeys(F.mvKeys), mvpMapPoints(F.mvpMapPoints), mImGray(F.mImGray),
-      mImDepth(F.mImDepth), mvbOutlier(F.mvbOutlier)
+      mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn), mvpMapPoints(F.mvpMapPoints),
+      mImGray(F.mImGray), mImDepth(F.mImDepth), mvbOutlier(F.mvbOutlier),
+      mbf(F.mbf), mThDepth(F.mThDepth)
 {
 }
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
              const Eigen::Matrix3d &K, const float &bf, const float &thDepth,
-             ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
-    : mpORBvocabulary(voc), mpORBextractor(extractor), mTimeStamp(ts)
+             cv::Mat &distCoef, ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
+    : mTimeStamp(ts), mDistCoef(distCoef.clone()), mK(K), mpORBvocabulary(voc),
+      mpORBextractor(extractor), mbf(bf), mThDepth(thDepth)
 {
   if (!mbInitialized)
   {
+    ComputeImageBounds(imGray);
+
     fx = K(0, 0);
     fy = K(1, 1);
     cx = K(0, 2);
     cy = K(1, 2);
-    mbf = bf;
-    mThDepth = thDepth;
     invfx = 1.0 / fx;
     invfy = 1.0 / fy;
-    width = imGray.cols;
-    height = imGray.rows;
-    mK = K;
-    mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(width);
-    mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(height);
+    mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / (mnMaxX - mnMinX);
+    mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (mnMaxY - mnMinY);
+
     mbInitialized = true;
   }
 
@@ -51,6 +50,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
   // Scale Level Info
   mnScaleLevels = mpORBextractor->GetLevels();
   mfScaleFactor = mpORBextractor->GetScaleFactor();
+  // For predicting scales
   mfLogScaleFactor = log(mfScaleFactor);
   mvScaleFactors = mpORBextractor->GetScaleFactors();
   mvInvScaleFactors = mpORBextractor->GetInverseScaleFactors();
@@ -58,19 +58,16 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
   mvInvLevelSigma2 = mpORBextractor->GetInverseScaleSigmaSquares();
 }
 
-void Frame::SetPose(const cv::Mat &Tcw)
-{
-}
-
 void Frame::ExtractORB()
 {
   ExtractORB(mImGray);
 
-  AssignFeaturesToGrid();
-
   N = mvKeys.size();
   mvbOutlier.resize(N, false);
-  mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
+  mvpMapPoints.resize(N, NULL);
+
+  UndistortKeyPoints();
+  AssignFeaturesToGrid();
 
   ComputeDepth(mImDepth);
 }
@@ -82,21 +79,23 @@ void Frame::ExtractORB(const cv::Mat &imGray)
 
 void Frame::ComputeDepth(const cv::Mat &imDepth)
 {
-  mvDepth = std::vector<float>(N, -1);
-  mvuRight = std::vector<float>(N, -1);
+  mvuRight = vector<float>(N, -1);
+  mvDepth = vector<float>(N, -1);
 
   for (int i = 0; i < N; i++)
   {
     const cv::KeyPoint &kp = mvKeys[i];
+    const cv::KeyPoint &kpU = mvKeysUn[i];
+
     const float &v = kp.pt.y;
     const float &u = kp.pt.x;
 
-    const float d = imDepth.at<float>(cv::Point2f(u, v));
+    const float d = imDepth.at<float>(v, u);
 
     if (d > 0)
     {
       mvDepth[i] = d;
-      mvuRight[i] = kp.pt.x - mbf / d;
+      mvuRight[i] = kpU.pt.x - mbf / d;
     }
   }
 }
@@ -110,11 +109,96 @@ void Frame::AssignFeaturesToGrid()
 
   for (int i = 0; i < N; i++)
   {
-    const cv::KeyPoint &kp = mvKeys[i];
+    const cv::KeyPoint &kp = mvKeysUn[i];
 
     int nGridPosX, nGridPosY;
     if (PosInGrid(kp, nGridPosX, nGridPosY))
       mGrid[nGridPosX][nGridPosY].push_back(i);
+  }
+}
+
+void Frame::UndistortKeyPoints()
+{
+  if (N == 0)
+    return;
+
+  if (mDistCoef.at<float>(0) == 0.0)
+  {
+    mvKeysUn = mvKeys;
+    return;
+  }
+
+  // Fill matrix with points
+  cv::Mat mat(N, 2, CV_32F);
+  for (int i = 0; i < N; i++)
+  {
+    mat.at<float>(i, 0) = mvKeys[i].pt.x;
+    mat.at<float>(i, 1) = mvKeys[i].pt.y;
+  }
+
+  cv::Mat K = cv::Mat::eye(3, 3, CV_32F);
+  K.at<float>(0, 0) = fx;
+  K.at<float>(1, 1) = fy;
+  K.at<float>(0, 2) = cx;
+  K.at<float>(1, 2) = cy;
+
+  std::cout << mDistCoef << std::endl;
+  std::cout << K << std::endl;
+
+  std::cout << N << std::endl;
+
+  // Undistort points
+  mat = mat.reshape(2);
+  cv::undistortPoints(mat, mat, K, mDistCoef, cv::Mat(), K);
+  mat = mat.reshape(1);
+
+  // Fill undistorted keypoint vector
+  mvKeysUn.resize(N);
+  for (int i = 0; i < N; i++)
+  {
+    cv::KeyPoint kp = mvKeys[i];
+    kp.pt.x = mat.at<float>(i, 0);
+    kp.pt.y = mat.at<float>(i, 1);
+    mvKeysUn[i] = kp;
+  }
+}
+
+void Frame::ComputeImageBounds(const cv::Mat &img)
+{
+  if (mDistCoef.at<float>(0) != 0.0)
+  {
+    cv::Mat mat(4, 2, CV_32F);
+    mat.at<float>(0, 0) = 0.0;
+    mat.at<float>(0, 1) = 0.0;
+    mat.at<float>(1, 0) = img.cols;
+    mat.at<float>(1, 1) = 0.0;
+    mat.at<float>(2, 0) = 0.0;
+    mat.at<float>(2, 1) = img.rows;
+    mat.at<float>(3, 0) = img.cols;
+    mat.at<float>(3, 1) = img.rows;
+
+    cv::Mat K = cv::Mat::eye(3, 3, CV_32FC1);
+    K.at<float>(0, 0) = fx;
+    K.at<float>(1, 1) = fy;
+    K.at<float>(0, 2) = cx;
+    K.at<float>(1, 2) = cy;
+
+    // Undistort corners
+    mat = mat.reshape(2);
+    cv::undistortPoints(mat, mat, K, mDistCoef, cv::Mat(), K);
+    mat = mat.reshape(1);
+
+    mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
+    mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
+    mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
+    mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
+  }
+  else
+  {
+    mnMinX = 0.0f;
+    mnMaxX = img.cols;
+    mnMinY = 0.0f;
+    mnMaxY = img.rows;
   }
 }
 
@@ -149,9 +233,9 @@ bool Frame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
   const float u = fx * PcX * invz + cx;
   const float v = fy * PcY * invz + cy;
 
-  if (u < 0 || u > width)
+  if (u < mnMinX || u > mnMaxX)
     return false;
-  if (v < 0 || v > height)
+  if (v < mnMinY || v > mnMaxY)
     return false;
 
   // Check distance is in the scale invariance region of the MapPoint

@@ -14,6 +14,4 @@ public:
                                        const unsigned long nLoopKF = 0, const bool bRobust = true);
 
     void static LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap);
-
-    int static PoseOptimization(KeyFrame *pKF);
 };

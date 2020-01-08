@@ -44,6 +44,7 @@ PUBLIC
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
+    ${g2o_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/third_party/DENSE/lib/libDENSE.so
     ${PROJECT_SOURCE_DIR}/third_party/DBoW2/lib/libDBoW2.so
     ${PROJECT_SOURCE_DIR}/third_party/g2o/lib/libg2o.so

@@ -7,8 +7,16 @@ Camera.fy: 580.0
 Camera.cx: 319.5
 Camera.cy: 239.5
 
+Camera.k1: 0.069515
+Camera.k2: -0.113363
+Camera.p1: 0.007882
+Camera.p2: 0.010799
+Camera.k3: 0.000000
+
 Camera.width: 640
 Camera.height: 480
+
+Camera.fps: 30
 
 Camera.depth_scale: 1000.0
 

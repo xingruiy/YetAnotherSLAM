@@ -1,10 +1,16 @@
 #include "Map.h"
 #include <fstream>
 
-vector<MapPoint *> Map::GetMapPointVec()
+vector<MapPoint *> Map::GetAllMapPoints()
 {
     unique_lock<mutex> lock(mMutexMap);
     return vector<MapPoint *>(mspMapPoints.begin(), mspMapPoints.end());
+}
+
+vector<KeyFrame *> Map::GetAllKeyFrames()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return vector<KeyFrame *>(mspKeyFrames.begin(), mspKeyFrames.end());
 }
 
 void Map::AddKeyFrame(KeyFrame *pKF)

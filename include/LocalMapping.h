@@ -6,6 +6,7 @@
 #include "KeyFrame.h"
 #include "Viewer.h"
 
+class Viewer;
 class MapViewer;
 
 class LocalMapping
@@ -16,30 +17,41 @@ public:
     void Spin();
 
     void InsertKeyFrame(KeyFrame *pKF);
+    void SetViewer(Viewer *pViewer);
+
+    void SetShouldQuit();
+
+protected:
     bool CheckNewKeyFrames();
     void ProcessNewKeyFrame();
 
     void MatchLocalPoints();
     void CreateNewMapPoints();
-    void SetShouldQuit();
     void UpdateLocalMap();
-    void TrackLocalMap();
-
-private:
-    Map *mpMap;
-
-    std::mutex mMutexNewKFs;
-
-    bool mbAbortBA;
-    bool mbShouldQuit;
+    void KeyFrameCulling();
+    void SearchInNeighbors();
 
     KeyFrame *mpCurrentKeyFrame;
 
+    // Control variables
+    bool mbAbortBA;
+    bool mbShouldQuit;
+
+    // This is to store new keyframes which are to be processed
+    std::mutex mMutexNewKFs;
     std::list<KeyFrame *> mlNewKeyFrames;
+
+    // TODO: unknown purpose
     std::list<MapPoint *> mlpRecentAddedMapPoints;
 
-    //Local Map
+    // Local Map, highly volatile
     KeyFrame *mpReferenceKF;
     std::vector<KeyFrame *> mvpLocalKeyFrames;
     std::vector<MapPoint *> mvpLocalMapPoints;
+
+    // The global map
+    Map *mpMap;
+
+    // Map Viewer
+    Viewer *mpViewer;
 };

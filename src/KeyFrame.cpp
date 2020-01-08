@@ -4,13 +4,13 @@
 unsigned long KeyFrame::nNextId = 0;
 
 KeyFrame::KeyFrame(const Frame &F, Map *pMap)
-    : mpMap(pMap), mvKeys(F.mvKeys), mTcw(F.mTcw), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
-      mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
-      mvInvLevelSigma2(F.mvInvLevelSigma2), N(F.N), fx(F.fx), fy(F.fy), cx(F.cx), cy(F.cy), invfx(F.invfx),
-      invfy(F.invfy), mvpMapPoints(F.mvpMapPoints), mvDepth(F.mvDepth), mvbOutlier(F.mvbOutlier),
-      mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS), mfGridElementWidthInv(F.mfGridElementWidthInv),
-      mfGridElementHeightInv(F.mfGridElementHeightInv), width(F.width), height(F.height), mbf(F.mbf),
-      mThDepth(F.mThDepth), mvuRight(F.mvuRight), mDescriptors(F.mDescriptors), mpORBvocabulary(F.mpORBvocabulary)
+    : mpMap(pMap), mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn), mTcw(F.mTcw), mnScaleLevels(F.mnScaleLevels),
+      mfScaleFactor(F.mfScaleFactor), mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors),
+      mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2), N(F.N), fx(F.fx), fy(F.fy), cx(F.cx), cy(F.cy),
+      invfx(F.invfx), invfy(F.invfy), mvpMapPoints(F.mvpMapPoints), mvDepth(F.mvDepth), mvbOutlier(F.mvbOutlier),
+      mbBad(false), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS), mfGridElementWidthInv(F.mfGridElementWidthInv),
+      mfGridElementHeightInv(F.mfGridElementHeightInv), mbf(F.mbf), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
+      mnMaxY(F.mnMaxY), mThDepth(F.mThDepth), mvuRight(F.mvuRight), mDescriptors(F.mDescriptors), mpORBvocabulary(F.mpORBvocabulary)
 {
   mnId = nNextId++;
 
@@ -34,10 +34,36 @@ void KeyFrame::ComputeBoW()
   }
 }
 
+bool KeyFrame::isBad()
+{
+  unique_lock<mutex> lock(mMutexConnections);
+  return mbBad;
+}
+
 vector<MapPoint *> KeyFrame::GetMapPointMatches()
 {
   unique_lock<mutex> lock(mMutexFeatures);
   return mvpMapPoints;
+}
+
+Eigen::Vector3d KeyFrame::UnprojectKeyPoint(int i)
+{
+  const float z = mvDepth[i];
+  if (z > 0)
+  {
+    const float u = mvKeysUn[i].pt.x;
+    const float v = mvKeysUn[i].pt.y;
+    const float x = (u - cx) * z * invfx;
+    const float y = (v - cy) * z * invfy;
+    Eigen::Vector3d x3Dc(x, y, z);
+
+    unique_lock<mutex> lock(mMutexPose);
+    return mTcw * x3Dc;
+  }
+  else
+  {
+    return Eigen::Vector3d(0, 0, 0);
+  }
 }
 
 std::vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const float &r, const int minLevel, const int maxLevel) const
@@ -73,7 +99,7 @@ std::vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, 
 
       for (size_t j = 0, jend = vCell.size(); j < jend; j++)
       {
-        const cv::KeyPoint &kpUn = mvKeys[vCell[j]];
+        const cv::KeyPoint &kpUn = mvKeysUn[vCell[j]];
         if (bCheckLevels)
         {
           if (kpUn.octave < minLevel)
@@ -114,9 +140,9 @@ bool KeyFrame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
   const float u = fx * PcX * invz + cx;
   const float v = fy * PcY * invz + cy;
 
-  if (u < 0 || u > width)
+  if (u < mnMinX || u > mnMaxX)
     return false;
-  if (v < 0 || v > height)
+  if (v < mnMinY || v > mnMaxY)
     return false;
 
   // Check distance is in the scale invariance region of the MapPoint

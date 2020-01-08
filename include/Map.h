@@ -22,7 +22,8 @@ public:
     void AddMapPoint(MapPoint *pMP);
 
     unsigned long KeyFramesInMap();
-    vector<MapPoint *> GetMapPointVec();
+    std::vector<KeyFrame *> GetAllKeyFrames();
+    std::vector<MapPoint *> GetAllMapPoints();
 
 private:
     set<KeyFrame *> mspKeyFrames;
