@@ -36,12 +36,11 @@ int ORBmatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
         if (bFactor)
             r *= th;
 
-        const auto vIndices =
-            pKF->GetFeaturesInArea(pMP->mTrackProjX,
-                                   pMP->mTrackProjY,
-                                   r * pKF->mvScaleFactors[nPredictedLevel],
-                                   nPredictedLevel - 1,
-                                   nPredictedLevel);
+        const auto vIndices = pKF->GetFeaturesInArea(pMP->mTrackProjX,
+                                                     pMP->mTrackProjY,
+                                                     r * pKF->mvScaleFactors[nPredictedLevel],
+                                                     nPredictedLevel - 2,
+                                                     nPredictedLevel);
 
         if (vIndices.empty())
             continue;

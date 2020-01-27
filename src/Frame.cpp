@@ -21,9 +21,16 @@ Frame::Frame(const Frame &F)
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
              const Eigen::Matrix3d &K, const float &bf, const float &thDepth,
              cv::Mat &distCoef, ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
-    : mTimeStamp(ts), mDistCoef(distCoef.clone()), mK(K), mpORBvocabulary(voc),
-      mpORBextractor(extractor), mbf(bf), mThDepth(thDepth)
+    : mTimeStamp(ts), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
+      mpORBvocabulary(voc), mpORBextractor(extractor)
 {
+  cv::Mat cvK = cv::Mat::eye(3, 3, CV_32F);
+  cvK.at<float>(0, 0) = K(0, 0);
+  cvK.at<float>(1, 1) = K(1, 1);
+  cvK.at<float>(0, 2) = K(0, 2);
+  cvK.at<float>(1, 2) = K(1, 2);
+  cvK.copyTo(mK);
+
   if (!mbInitialized)
   {
     ComputeImageBounds(imGray);
@@ -34,6 +41,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
     cy = K(1, 2);
     invfx = 1.0 / fx;
     invfy = 1.0 / fy;
+
     mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / (mnMaxX - mnMinX);
     mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (mnMaxY - mnMinY);
 
@@ -60,15 +68,20 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
 
 void Frame::ExtractORB()
 {
+  // Extract ORB features
   ExtractORB(mImGray);
 
   N = mvKeys.size();
   mvbOutlier.resize(N, false);
   mvpMapPoints.resize(N, NULL);
 
+  // Generate undistorted key points
   UndistortKeyPoints();
+
+  // Assign all key points to the grid
   AssignFeaturesToGrid();
 
+  // Get depth from raw input
   ComputeDepth(mImDepth);
 }
 
@@ -136,20 +149,9 @@ void Frame::UndistortKeyPoints()
     mat.at<float>(i, 1) = mvKeys[i].pt.y;
   }
 
-  cv::Mat K = cv::Mat::eye(3, 3, CV_32F);
-  K.at<float>(0, 0) = fx;
-  K.at<float>(1, 1) = fy;
-  K.at<float>(0, 2) = cx;
-  K.at<float>(1, 2) = cy;
-
-  std::cout << mDistCoef << std::endl;
-  std::cout << K << std::endl;
-
-  std::cout << N << std::endl;
-
   // Undistort points
   mat = mat.reshape(2);
-  cv::undistortPoints(mat, mat, K, mDistCoef, cv::Mat(), K);
+  cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
   mat = mat.reshape(1);
 
   // Fill undistorted keypoint vector
@@ -177,15 +179,9 @@ void Frame::ComputeImageBounds(const cv::Mat &img)
     mat.at<float>(3, 0) = img.cols;
     mat.at<float>(3, 1) = img.rows;
 
-    cv::Mat K = cv::Mat::eye(3, 3, CV_32FC1);
-    K.at<float>(0, 0) = fx;
-    K.at<float>(1, 1) = fy;
-    K.at<float>(0, 2) = cx;
-    K.at<float>(1, 2) = cy;
-
     // Undistort corners
     mat = mat.reshape(2);
-    cv::undistortPoints(mat, mat, K, mDistCoef, cv::Mat(), K);
+    cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
     mat = mat.reshape(1);
 
     mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
@@ -204,8 +200,8 @@ void Frame::ComputeImageBounds(const cv::Mat &img)
 
 bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
 {
-  posX = round((kp.pt.x) * mfGridElementWidthInv);
-  posY = round((kp.pt.y) * mfGridElementHeightInv);
+  posX = round((kp.pt.x - mnMinX) * mfGridElementWidthInv);
+  posY = round((kp.pt.y - mnMinY) * mfGridElementHeightInv);
 
   //Keypoint's coordinates are undistorted, which could cause to go out of the image
   if (posX < 0 || posX >= FRAME_GRID_COLS || posY < 0 || posY >= FRAME_GRID_ROWS)

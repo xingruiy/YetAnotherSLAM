@@ -37,10 +37,14 @@ public:
     void UndistortKeyPoints();
     void AssignFeaturesToGrid();
 
+    // Pose
+    Sophus::SE3d mTcw;
+
     // Frame ID
     unsigned long mnId;
     static unsigned long mnNextId;
 
+    // A copy of the input frame
     cv::Mat mImGray, mImDepth;
 
     // Frame timestamp
@@ -60,13 +64,12 @@ public:
     KeyFrame *mpReferenceKF;
 
     // Calibration matrix
+    cv::Mat mK;
+    cv::Mat mDistCoef;
     float mbf;
     float mThDepth;
+
     static bool mbInitialized;
-
-    Eigen::Matrix3d mK;
-    cv::Mat mDistCoef;
-
     // Camera parameters
     static float fx, fy, cx, cy, invfx, invfy;
 
@@ -90,24 +93,21 @@ public:
 
     // Total number of key points
     int N;
+    // Feature descriptors
     cv::Mat mDescriptors;
 
-    // Original key points
-    std::vector<cv::KeyPoint> mvKeys;
-
-    // Undistorted key points
-    std::vector<cv::KeyPoint> mvKeysUn;
+    // Original and undistorted key points
     std::vector<bool> mvbOutlier;
+    std::vector<cv::KeyPoint> mvKeys;
+    std::vector<cv::KeyPoint> mvKeysUn;
 
-    // Corresponding stereo coordinate and depth for each keypoint.
+    // Corresponding stereo coordinate
     std::vector<float> mvuRight;
+
+    // Depth for each keypoint.
     std::vector<float> mvDepth;
 
-    // MapPoints associated to keypoints, NULL pointer if no association.
+    // MapPoints associated to keypoints
+    // NULL pointer if no association.
     std::vector<MapPoint *> mvpMapPoints;
-
-    // Pose
-    Sophus::SE3d mTcw;
-
-    int mObs;
 };

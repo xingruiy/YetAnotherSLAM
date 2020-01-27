@@ -152,7 +152,7 @@ void Tracking::InitializeTracking()
                 Eigen::Vector3d x3D = pKFini->UnprojectKeyPoint(i);
                 MapPoint *pNewMP = new MapPoint(x3D, mpMap, pKFini, i);
                 pNewMP->AddObservation(pKFini, i);
-                pKFini->mvpMapPoints[i] = pNewMP;
+                pKFini->AddMapPoint(pNewMP, i);
                 mpMap->AddMapPoint(pNewMP);
             }
         }
@@ -219,14 +219,14 @@ void Tracking::CreateNewKeyFrame()
     {
         KeyFrame *pKF = new KeyFrame(mCurrentFrame, mpMap);
         size_t nObsMPs = 0;
-        pKF->mvpParentMPs.clear();
+        pKF->mvpObservedMapPoints.clear();
 
         for (int i = 0; i < mpReferenceKF->mvpMapPoints.size(); ++i)
         {
             MapPoint *pMP = mpReferenceKF->mvpMapPoints[i];
             if (pMP && pKF->IsInFrustum(pMP, 0.5))
             {
-                pKF->mvpParentMPs.push_back(pMP);
+                pKF->mvpObservedMapPoints.push_back(pMP);
                 nObsMPs++;
             }
         }

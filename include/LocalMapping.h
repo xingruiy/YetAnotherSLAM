@@ -48,6 +48,7 @@ protected:
     KeyFrame *mpReferenceKF;
     std::vector<KeyFrame *> mvpLocalKeyFrames;
     std::vector<MapPoint *> mvpLocalMapPoints;
+    std::vector<MapPoint *> mvpRecentlyAddedMapPoints;
 
     // The global map
     Map *mpMap;

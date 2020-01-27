@@ -18,6 +18,20 @@ public:
     void ComputeBoW();
 
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
+    void AddMapPoint(MapPoint *pMP, const size_t &idx);
+
+    // Covisibility Graph
+    void UpdateConnections();
+    void UpdateBestCovisibles();
+    void AddConnection(KeyFrame *pKF, const int &weight);
+
+    // Spanning tree functions
+    void AddChild(KeyFrame *pKF);
+    void EraseChild(KeyFrame *pKF);
+    void ChangeParent(KeyFrame *pKF);
+    std::set<KeyFrame *> GetChilds();
+    KeyFrame *GetParent();
+    bool hasChild(KeyFrame *pKF);
 
     Eigen::Vector3d UnprojectKeyPoint(int i);
     std::vector<MapPoint *> GetMapPointMatches();
@@ -27,6 +41,7 @@ public:
     bool isBad();
     bool mbBad;
 
+    cv::Mat mImGray;
     double mTimeStamp;
 
     unsigned long mnId;
@@ -63,7 +78,7 @@ public:
     // MapPoints associated to keypoints
     std::vector<bool> mvbOutlier;
     std::vector<MapPoint *> mvpMapPoints;
-    std::vector<MapPoint *> mvpParentMPs;
+    std::vector<MapPoint *> mvpObservedMapPoints;
 
     // BoW
     DBoW2::BowVector mBowVec;
@@ -88,12 +103,22 @@ public:
     // inverse scale pyramid^2
     const std::vector<float> mvInvLevelSigma2;
 
+    Map *mpMap;
+
+    // Covisiblity graph
+    std::map<KeyFrame *, int> mConnectedKeyFrameWeights;
+    std::vector<KeyFrame *> mvpOrderedConnectedKeyFrames;
+    std::vector<int> mvOrderedWeights;
+
+    // Spanning Tree and Loop Edges
+    bool mbFirstConnection;
+    KeyFrame *mpParent;
+    std::set<KeyFrame *> mspChildrens;
+    std::set<KeyFrame *> mspLoopEdges;
+
     // Keyframe in World coord
     Sophus::SE3d mTcw;
     std::mutex mMutexPose;
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
-
-    Map *mpMap;
-    KeyFrame *mpParent;
 };
