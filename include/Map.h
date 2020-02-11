@@ -8,6 +8,9 @@
 #include "KeyFrame.h"
 #include "MapPoint.h"
 
+namespace SLAM
+{
+
 class Frame;
 class MapPoint;
 class KeyFrame;
@@ -20,6 +23,8 @@ public:
     void Reset();
     void AddKeyFrame(KeyFrame *pKF);
     void AddMapPoint(MapPoint *pMP);
+    void EraseKeyFrame(KeyFrame *pKF);
+    void EraseMapPoint(MapPoint *pMP);
 
     unsigned long KeyFramesInMap();
     std::vector<KeyFrame *> GetAllKeyFrames();
@@ -31,3 +36,5 @@ private:
 
     std::mutex mMutexMap;
 };
+
+} // namespace SLAM

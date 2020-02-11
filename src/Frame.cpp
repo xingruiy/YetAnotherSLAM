@@ -1,5 +1,8 @@
 #include "Frame.h"
 
+namespace SLAM
+{
+
 unsigned long Frame::mnNextId = 0;
 bool Frame::mbInitialized = false;
 float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
@@ -90,9 +93,11 @@ void Frame::ExtractORB(const cv::Mat &imGray)
   (*mpORBextractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
 }
 
-void Frame::ComputeDepth(const cv::Mat &imDepth)
+void Frame::ComputeDepth(const cv::Mat &depth_image)
 {
+  // The virtual right coordinate
   mvuRight = vector<float>(N, -1);
+  // Key point depth
   mvDepth = vector<float>(N, -1);
 
   for (int i = 0; i < N; i++)
@@ -103,7 +108,7 @@ void Frame::ComputeDepth(const cv::Mat &imDepth)
     const float &v = kp.pt.y;
     const float &u = kp.pt.x;
 
-    const float d = imDepth.at<float>(v, u);
+    const float d = depth_image.at<float>(v, u);
 
     if (d > 0)
     {
@@ -264,3 +269,5 @@ bool Frame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
 
   return true;
 }
+
+} // namespace SLAM

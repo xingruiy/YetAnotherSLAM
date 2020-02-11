@@ -1,161 +1,139 @@
 #include "Viewer.h"
-
-#define ZMIN 0.1
-#define ZMAX 1000
 #define ENTER_KEY 13
 
-Viewer::Viewer(const string &strSettingFile, FullSystem *pSys, Map *pMap)
-    : mpSystem(pSys), mpMap(pMap)
+namespace SLAM
 {
-    cv::FileStorage fSettings(strSettingFile, cv::FileStorage::READ);
 
-    if (fSettings.isOpened())
+Viewer::Viewer(const string &strSettingFile, System *pSys, Map *pMap)
+    : mpSystem(pSys), mpMap(pMap), mTcw(Eigen::Matrix4d::Identity()),
+      mbRGBImageUpdated(false), mbDepthImageUpdated(false)
+{
+    cv::FileStorage settingsFile(strSettingFile, cv::FileStorage::READ);
+
+    if (settingsFile.isOpened())
     {
-        mImgWidth = fSettings["Camera.width"];
-        mImgHeight = fSettings["Camera.height"];
-        mWinWidth = fSettings["Viewer.width"];
-        mWinHeight = fSettings["Viewer.height"];
+        mWidth = settingsFile["Viewer.width"];
+        mHeight = settingsFile["Viewer.height"];
 
-        double fx = fSettings["Camera.fx"];
-        double fy = fSettings["Camera.fy"];
-        double cx = fSettings["Camera.cx"];
-        double cy = fSettings["Camera.cy"];
-        Eigen::Matrix3d K = Eigen::Matrix3d::Identity();
-        K(0, 0) = fx;
-        K(1, 1) = fy;
-        K(0, 2) = cx;
-        K(1, 2) = cy;
-        mKinv = K.inverse();
-
-        mPointSize = fSettings["Viewer.point_size"];
-        int nRGB = fSettings["Camera.RGB"];
-        mbRGB = (nRGB != 0);
+        mCameraMatrix = Eigen::Matrix3d::Identity();
+        mCameraMatrix(0, 0) = (double)settingsFile["Camera.fx"];
+        mCameraMatrix(1, 1) = (double)settingsFile["Camera.fy"];
+        mCameraMatrix(0, 2) = (double)settingsFile["Camera.cx"];
+        mCameraMatrix(1, 2) = (double)settingsFile["Camera.cy"];
     }
-
-    mTcw = Eigen::Matrix4d::Identity();
-
-    const char vertexShader[] =
-        "#version 330\n"
-        "\n"
-        "layout(location = 0) in vec3 position;\n"
-        "layout(location = 1) in vec3 a_normal;\n"
-        "uniform mat4 mvpMat;\n"
-        "uniform mat4 mMat;\n"
-        "out vec3 shaded_colour;\n"
-        "\n"
-        "void main(void) {\n"
-        "    gl_Position = mvpMat * mMat * vec4(position, 1.0);\n"
-        "    vec3 lightpos = vec3(5, 5, 5);\n"
-        "    const float ka = 0.3;\n"
-        "    const float kd = 0.5;\n"
-        "    const float ks = 0.2;\n"
-        "    const float n = 20.0;\n"
-        "    const float ax = 1.0;\n"
-        "    const float dx = 1.0;\n"
-        "    const float sx = 1.0;\n"
-        "    const float lx = 1.0;\n"
-        "    vec3 L = normalize(lightpos - position);\n"
-        "    vec3 V = normalize(vec3(0.0) - position);\n"
-        "    vec3 R = normalize(2 * a_normal * dot(a_normal, L) - L);\n"
-        "    float i1 = ax * ka * dx;\n"
-        "    float i2 = lx * kd * dx * max(0.0, dot(a_normal, L));\n"
-        "    float i3 = lx * ks * sx * pow(max(0.0, dot(R, V)), n);\n"
-        "    float Ix = max(0.0, min(255.0, i1 + i2 + i3));\n"
-        "    shaded_colour = vec3(Ix, Ix, Ix);\n"
-        "}\n";
-
-    const char fragShader[] =
-        "#version 330\n"
-        "\n"
-        "in vec3 shaded_colour;\n"
-        "out vec4 colour_out;\n"
-        "void main(void) {\n"
-        "    colour_out = vec4(shaded_colour, 1);\n"
-        "}\n";
+    else
+    {
+        printf("Reading settings failed at line %d in file %s\n", __LINE__, __FILE__);
+        exit(-1);
+    }
 }
 
-void Viewer::Spin()
+void Viewer::Run()
 {
-    pangolin::CreateWindowAndBind("VIEWER", mWinWidth, mWinHeight);
-
-    // 3D Mouse handler requires depth testing to be enabled
+    pangolin::CreateWindowAndBind("SLAM", mWidth, mHeight);
     glEnable(GL_DEPTH_TEST);
-
-    // Issue specific OpenGl we might need
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    pangolin::CreatePanel("menu").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(175));
-    pangolin::Var<bool> menuPauseTracking("menu.Pause System", true, true);
-    pangolin::Var<bool> menuResetSystem("menu.Reset System", true, false);
-    pangolin::Var<bool> menuFollowCamera("menu.Follow Camera", true, true);
-    pangolin::Var<bool> menuDrawMapPoints("menu.Draw Map Points", true, true);
-    pangolin::Var<bool> menuDrawKeyFrame("menu.Draw Key Frames", true, true);
-    pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Pause System"));
-
-    // Define Camera Render Object (for view / scene browsing)
-    pangolin::OpenGlRenderState s_cam(
+    auto RenderState = pangolin::OpenGlRenderState(
         pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 389, 0.1, 1000),
-        pangolin::ModelViewLookAt(0, 0, -1, 0, 0, 0, 0.0, -1.0, 0.0));
+        pangolin::ModelViewLookAtRDF(0, 0, 0, 0, 0, -1, 0, 1, 0));
 
-    // Add named OpenGL viewport to window and provide 3D Handler
-    pangolin::View &d_cam = pangolin::CreateDisplay()
-                                .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f / 768.0f)
-                                .SetHandler(new pangolin::Handler3D(s_cam));
+    auto MenuDividerLeft = pangolin::Attach::Pix(200);
+    float RightSideBarDividerLeft = 0.75f;
 
-    // Initialize textures
-    mImageRGB.Reinitialise(mImgWidth, mImgHeight, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mImageDepth.Reinitialise(mImgWidth, mImgHeight, GL_RGBA, true, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    mpMapView = &pangolin::Display("Map");
+    mpMapView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft)
+        .SetHandler(new pangolin::Handler3D(RenderState));
+    mpRightBar = &pangolin::Display("RightBar");
+    mpRightBar->SetBounds(0, 1, RightSideBarDividerLeft, 1);
+
+    mpRGBView = &pangolin::Display("RGB");
+    mpRGBView->SetBounds(0, 0.33, 0, 1);
+    mpDepthView = &pangolin::Display("Depth");
+    mpDepthView->SetBounds(0.33, 0.66, 0, 1);
+
+    mpRightBar->AddDisplay(*mpRGBView);
+    mpRightBar->AddDisplay(*mpDepthView);
+
+    // Create textures
+    mTextureColour.Reinitialise(640, 480, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    mTextureDepth.Reinitialise(640, 480, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, NULL);
+
+    // Create menus
+    pangolin::CreatePanel("menu").SetBounds(0, 1, 0, MenuDividerLeft);
+    pangolin::Var<bool> varReset = pangolin::Var<bool>("menu.Reset", false, false);
+    pangolin::Var<bool> varPause = pangolin::Var<bool>("menu.Pause", true, true);
 
     while (!pangolin::ShouldQuit())
     {
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        d_cam.Activate(s_cam);
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-        if (menuPauseTracking)
-            mpSystem->SetToPause();
-        else
-            mpSystem->SetToUnPause();
-
-        pangolin::glDrawFrustum(mKinv, mImgWidth, mImgHeight, mTcw, 0.1);
-
-        if (menuDrawMapPoints)
-            DrawMapPoints();
-
-        if (menuDrawKeyFrame)
-            DrawKeyFrames();
-
-        if (pangolin::Pushed(menuResetSystem))
+        if (pangolin::Pushed(varReset))
             mpSystem->Reset();
+
+        if (varPause)
+            mpSystem->Pause();
+        else
+            mpSystem->UnPause();
+
+        DrawTextures();
+
+        mpMapView->Activate(RenderState);
+        DrawCameraFrustum();
+        DrawMapPoints();
+        DrawKeyFrames();
 
         pangolin::FinishFrame();
     }
 
-    mpSystem->SetToFinish();
+    mpSystem->Kill();
 }
 
-void Viewer::SetCurrentCameraPose(const Eigen::Matrix4d &Tcw)
+void Viewer::DrawTextures()
 {
-    std::unique_lock<std::mutex> lock(mCurrentPoseMutex);
-    this->mTcw = Tcw;
+    if (mbRGBImageUpdated && !mImgRGB.empty())
+        mTextureColour.Upload(mImgRGB.data, GL_RGB, GL_UNSIGNED_BYTE);
+    if (mbDepthImageUpdated && !mImgDepth.empty())
+        mTextureDepth.Upload(mImgDepth.data, GL_LUMINANCE, GL_FLOAT);
+    mbRGBImageUpdated = mbDepthImageUpdated = false;
+
+    mpRGBView->Activate();
+    mTextureColour.RenderToViewportFlipY();
+    mpDepthView->Activate();
+    mTextureDepth.RenderToViewportFlipY();
 }
 
-void Viewer::SetCurrentImage(const cv::Mat &imRGB)
+void Viewer::DrawCameraFrustum()
 {
-    mImageRGB.Upload(imRGB.data, GL_RGB, GL_UNSIGNED_BYTE);
+    glColor3f(1.0, 0.0, 0.0);
+    std::cout << mTcw << std::endl;
+    pangolin::glDrawFrustum<double>(mCameraMatrix.inverse(), 640, 480, mTcw, 0.1);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void Viewer::SetCurrentDepth(const cv::Mat &imDepth)
+void Viewer::SetCurrentFramePose(const Eigen::Matrix4d &Tcw)
 {
+    mTcw = Tcw;
+}
+
+void Viewer::SetCurrentRGBImage(const cv::Mat &ImgRGB)
+{
+    mImgRGB = ImgRGB;
+    mbRGBImageUpdated = true;
+}
+
+void Viewer::SetCurrentDepthImage(const cv::Mat &ImgDepth)
+{
+    mImgDepth = ImgDepth;
+    mbDepthImageUpdated = true;
 }
 
 void Viewer::DrawMapPoints()
 {
     vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
-
-    glPointSize(mPointSize);
+    glPointSize(5);
     glBegin(GL_POINTS);
     glColor3f(1.0, 0.0, 0.0);
 
@@ -168,19 +146,24 @@ void Viewer::DrawMapPoints()
     }
 
     glEnd();
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 void Viewer::DrawKeyFrames()
 {
     vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
+    glColor3f(0.0, 1.0, 0.0);
     for (size_t i = 0, iend = vpKFs.size(); i < iend; i++)
     {
         if (!vpKFs[i])
             continue;
         KeyFrame *pKF = vpKFs[i];
-        pangolin::glDrawFrustum(mKinv, mImgWidth, mImgHeight, pKF->mTcw.matrix(), 0.1);
+        pangolin::glDrawFrustum<double>(mCameraMatrix.inverse(), 640, 480, pKF->mTcw.matrix(), 0.1);
     }
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
+
+} // namespace SLAM
 
 ///////////////////////////////////////////////////
 

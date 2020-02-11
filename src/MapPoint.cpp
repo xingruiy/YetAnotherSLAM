@@ -2,6 +2,9 @@
 #include "ORBmatcher.h"
 #include <cmath>
 
+namespace SLAM
+{
+
 std::mutex MapPoint::mGlobalMutex;
 unsigned long MapPoint::nNextId = 0;
 
@@ -271,3 +274,5 @@ int MapPoint::PredictScale(const float &currentDist, Frame *pFrame)
 
     return nScale;
 }
+
+} // namespace SLAM

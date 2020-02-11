@@ -3,51 +3,53 @@
 #include <pangolin/pangolin.h>
 #include <mutex>
 
-#include "FullSystem.h"
+#include "System.h"
 
-class FullSystem;
+namespace SLAM
+{
+
+class System;
 
 class Viewer
 {
 public:
-    Viewer(const string &strSettingFile, FullSystem *pSys, Map *pMap);
+    Viewer(const string &strSettingFile, System *pSys, Map *pMap);
 
-    void Spin();
+    void Run();
+    void Reset();
 
-    void SetCurrentCameraPose(const Eigen::Matrix4d &Tcw);
-
-    void SetCurrentImage(const cv::Mat &imRGB);
-
-    void SetCurrentDepth(const cv::Mat &imDepth);
+    void SetCurrentRGBImage(const cv::Mat &ImgRGB);
+    void SetCurrentDepthImage(const cv::Mat &ImgDepth);
+    void SetCurrentFramePose(const Eigen::Matrix4d &Tcw);
 
 private:
+    void DrawTextures();
+    void DrawCameraFrustum();
     void DrawMapPoints();
     void DrawKeyFrames();
 
-    // System components
-    FullSystem *mpSystem;
     Map *mpMap;
+    System *mpSystem;
 
-    // Camera calibration
-    Eigen::Matrix3d mKinv;
+    int mWidth, mHeight;
     Eigen::Matrix4d mTcw;
+    Eigen::Matrix3d mCameraMatrix;
 
-    std::mutex mCurrentPoseMutex;
+    pangolin::GlTexture mTextureColour;
+    pangolin::GlTexture mTextureDepth;
 
-    // Image allignment
-    bool mbRGB;
+    pangolin::View *mpRightBar;
+    pangolin::View *mpRGBView;
+    pangolin::View *mpMapView;
+    pangolin::View *mpDepthView;
 
-    // Image and Window size
-    int mImgWidth, mImgHeight;
-    int mWinWidth, mWinHeight;
-
-    float mPointSize;
-
-    pangolin::GlTexture mImageRGB;
-    pangolin::GlTexture mImageDepth;
-    pangolin::GlTexture mImgKeyPoint;
-    pangolin::GlTexture mImgKeyPoint2;
+    cv::Mat mImgRGB;
+    cv::Mat mImgDepth;
+    bool mbRGBImageUpdated;
+    bool mbDepthImageUpdated;
 };
+
+} // namespace SLAM
 
 // class MapViewer
 // {

@@ -1,9 +1,11 @@
 #pragma once
 #include <vector>
 #include <opencv2/opencv.hpp>
-
 #include "MapPoint.h"
 #include "KeyFrame.h"
+
+namespace SLAM
+{
 
 class ORBmatcher
 {
@@ -28,3 +30,5 @@ protected:
     float mfNNratio;
     bool mbCheckOrientation;
 };
+
+} // namespace SLAM

@@ -13,12 +13,17 @@ fi
 echo -e "CMAKE_BUILD_TYPE is set to: ${RED}$BuildType${NC}"
 echo "building third party..."
 
-cd ./third_party/DENSE/
+cd ./tools/CameraOpenNI
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-cd ../../ONI_Camera
+cd ../../CudaUtils/
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=RELEASE
+make -j
+
+cd ../../DENSE/
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j

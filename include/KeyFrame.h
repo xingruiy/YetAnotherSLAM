@@ -3,7 +3,11 @@
 #include "Frame.h"
 #include "MapPoint.h"
 #include "ORBVocabulary.h"
-#include <memory>
+
+#include <mutex>
+
+namespace SLAM
+{
 
 class Map;
 class Frame;
@@ -16,6 +20,7 @@ public:
 
     // Bag of Words Representation
     void ComputeBoW();
+    void SetBadFlag();
 
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
     void AddMapPoint(MapPoint *pMP, const size_t &idx);
@@ -24,6 +29,8 @@ public:
     void UpdateConnections();
     void UpdateBestCovisibles();
     void AddConnection(KeyFrame *pKF, const int &weight);
+    void EraseConnection(KeyFrame *pKF);
+    int GetWeight(KeyFrame *pKF);
 
     // Spanning tree functions
     void AddChild(KeyFrame *pKF);
@@ -32,6 +39,7 @@ public:
     std::set<KeyFrame *> GetChilds();
     KeyFrame *GetParent();
     bool hasChild(KeyFrame *pKF);
+    std::vector<KeyFrame *> GetVectorCovisibleKeyFrames();
 
     Eigen::Vector3d UnprojectKeyPoint(int i);
     std::vector<MapPoint *> GetMapPointMatches();
@@ -40,6 +48,9 @@ public:
 public:
     bool isBad();
     bool mbBad;
+
+    bool mbNotErase;
+    bool mbToBeErased;
 
     cv::Mat mImGray;
     double mTimeStamp;
@@ -122,3 +133,5 @@ public:
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
 };
+
+} // namespace SLAM

@@ -1,5 +1,7 @@
 #include "Map.h"
-#include <fstream>
+
+namespace SLAM
+{
 
 vector<MapPoint *> Map::GetAllMapPoints()
 {
@@ -37,3 +39,23 @@ void Map::Reset()
     mspKeyFrames.clear();
     mspMapPoints.clear();
 }
+
+void Map::EraseMapPoint(MapPoint *pMP)
+{
+    unique_lock<mutex> lock(mMutexMap);
+    mspMapPoints.erase(pMP);
+
+    // TODO: This only erase the pointer.
+    // Delete the MapPoint
+}
+
+void Map::EraseKeyFrame(KeyFrame *pKF)
+{
+    unique_lock<mutex> lock(mMutexMap);
+    mspKeyFrames.erase(pKF);
+
+    // TODO: This only erase the pointer.
+    // Delete the KeyFrame
+}
+
+} // namespace SLAM

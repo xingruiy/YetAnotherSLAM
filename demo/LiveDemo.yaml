@@ -1,5 +1,9 @@
 %YAML:1.0
 
+System.ReverseRGB: 0
+System.DepthScale: 1000
+System.EnableViewer: 1
+
 # Camera Parameters
 
 Camera.fx: 580.0
@@ -17,10 +21,6 @@ Camera.width: 640
 Camera.height: 480
 
 Camera.fps: 30
-
-Camera.depth_scale: 1000.0
-
-Camera.RGB : 1
 
 # IR projector baseline times fx (aprox.)
 Camera.bf: 40.0

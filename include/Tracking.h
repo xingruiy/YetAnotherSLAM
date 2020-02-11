@@ -1,38 +1,38 @@
 #pragma once
-
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 
 #include "DENSE/include/DenseTracking.h"
 #include "DENSE/include/DenseMapping.h"
-
 #include "Frame.h"
 #include "Viewer.h"
-#include "LocalMapping.h"
-#include "FullSystem.h"
+#include "Mapping.h"
+#include "System.h"
+
+namespace SLAM
+{
 
 class Viewer;
-class LocalMapping;
-class FullSystem;
+class Mapping;
+class System;
 
 class Tracking
 {
 public:
-    Tracking(const std::string &strSettingsFile, FullSystem *pSys, Map *pMap, ORB_SLAM2::ORBVocabulary *pVoc);
-
-    void TrackImageRGBD(const cv::Mat &imGray, const cv::Mat &imDepth);
+    Tracking(const std::string &strSettingsFile, System *pSys, Map *pMap);
+    void TrackImage(const cv::Mat &imGray, const cv::Mat &imDepth, const double &TimeStamp);
 
     void SetViewer(Viewer *pViewer);
-    void SetLocalMapper(LocalMapping *pLocalMapper);
+    void SetLocalMapper(Mapping *pLocalMapper);
 
     void Reset();
 
 private:
     enum class TrackingState
     {
-        NOTInit,
+        NotInitialized,
         OK,
-        LOST
+        Lost
     };
 
     void InitializeTracking();
@@ -40,7 +40,6 @@ private:
     bool Relocalization();
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
-    // int CheckObservations();
 
     // Local map management
     void UpdateLocalMap();
@@ -60,14 +59,13 @@ private:
     // and inserted from just one frame. Far points requiere a match in two keyframes.
     float mThDepth;
 
-    TrackingState meState;
-    TrackingState meLastState;
+    TrackingState mTrackingState;
 
     // Dense Tracker
     DenseTracking *mpTracker;
 
     // Sparse Mapping
-    LocalMapping *mpLocalMapper;
+    Mapping *mpMapping;
 
     // Dense Mapping
     DenseMapping *mpMapper;
@@ -81,19 +79,11 @@ private:
     Frame mCurrentFrame;
     Frame mLastFrame;
 
-    // ORB
     ORB_SLAM2::ORBextractor *mpORBextractor;
-
-    // BoW
     ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
 
-    // Used for local map
-    KeyFrame *mpReferenceKF;
-    std::vector<KeyFrame *> mvpLocalKeyFrames;
-    std::vector<MapPoint *> mvpLocalMapPoints;
-
     // System
-    FullSystem *mpFullSystem;
+    System *mpFullSystem;
 
     // Map
     Map *mpMap;
@@ -101,6 +91,10 @@ private:
     // Map Viewr
     Viewer *mpViewer;
 
-    //Color order (true RGB, false BGR, ignored if grayscale)
-    bool mbRGB;
+    // Used for local map
+    KeyFrame *mpReferenceKF;
+    std::vector<KeyFrame *> mvpLocalKeyFrames;
+    std::vector<MapPoint *> mvpLocalMapPoints;
 };
+
+} // namespace SLAM

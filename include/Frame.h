@@ -11,6 +11,9 @@
 #define FRAME_GRID_ROWS 48
 #define FRAME_GRID_COLS 64
 
+namespace SLAM
+{
+
 class KeyFrame;
 class MapPoint;
 
@@ -111,3 +114,5 @@ public:
     // NULL pointer if no association.
     std::vector<MapPoint *> mvpMapPoints;
 };
+
+} // namespace SLAM

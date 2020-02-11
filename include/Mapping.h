@@ -6,20 +6,23 @@
 #include "KeyFrame.h"
 #include "Viewer.h"
 
+namespace SLAM
+{
+
 class Viewer;
 class MapViewer;
 
-class LocalMapping
+class Mapping
 {
 public:
-    LocalMapping(Map *pMap);
+    Mapping(Map *pMap);
 
-    void Spin();
+    void Run();
 
     void InsertKeyFrame(KeyFrame *pKF);
     void SetViewer(Viewer *pViewer);
 
-    void SetShouldQuit();
+    void Kill();
 
 protected:
     bool CheckNewKeyFrames();
@@ -56,3 +59,5 @@ protected:
     // Map Viewer
     Viewer *mpViewer;
 };
+
+} // namespace SLAM

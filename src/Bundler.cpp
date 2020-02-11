@@ -7,11 +7,14 @@
 #include <g2o/g2o/solvers/linear_solver_dense.h>
 #include <g2o/g2o/types/types_seven_dof_expmap.h>
 
-#include "Optimizer.h"
+#include "Bundler.h"
 #include "Converter.h"
 
 #include <mutex>
 #include <Eigen/StdVector>
+
+namespace SLAM
+{
 
 void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
 {
@@ -338,3 +341,5 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap
     //     pMP->UpdateNormalAndDepth();
     // }
 }
+
+} // namespace SLAM

@@ -1,24 +1,22 @@
-#include "FullSystem.h"
-#include "ONI_Camera/OniCamera.h"
+#include "System.h"
+#include "CameraOpenNI.h"
 
 int main(int argc, char **argv)
 {
     if (argc <= 1)
     {
-        std::cout << "usage: ./liveDemo settings-file vocabulary-file" << std::endl;
+        std::cout << "usage: ./liveDemo settingsFile" << std::endl;
         exit(-1);
     }
 
     ONI::Camera cam;
-    FullSystem sys(argv[1], argv[2]);
+    SLAM::System sys(argv[1]);
 
     cv::Mat imDepth, imRGB;
 
-    while (!sys.IsFinished())
+    while (sys.IsAlive())
     {
         if (cam.TryFetchingImages(imDepth, imRGB))
-        {
-            sys.TrackImageRGBD(imRGB, imDepth, 0);
-        }
+            sys.TrackImage(imRGB, imDepth, 0);
     }
 }

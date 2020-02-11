@@ -1,4 +1,4 @@
-#include "OniCamera.h"
+#include "CameraOpenNI.h"
 
 namespace ONI
 {
@@ -8,7 +8,7 @@ Camera::Camera() : Camera(640, 480, 30)
 }
 
 Camera::Camera(const int &w, const int &h, const int &fps)
-    : mnWidth(w), mnHeight(h), mnFrameRate(fps)
+    : mWidth(w), mHeight(h), mFrameRate(fps)
 {
     // openni context initialization
     if (OpenNI::initialize() != STATUS_OK)
@@ -39,8 +39,8 @@ Camera::Camera(const int &w, const int &h, const int &fps)
     }
 
     auto videoMode = VideoMode();
-    videoMode.setResolution(mnWidth, mnHeight);
-    videoMode.setFps(mnFrameRate);
+    videoMode.setResolution(mWidth, mHeight);
+    videoMode.setFps(mFrameRate);
     videoMode.setPixelFormat(PIXEL_FORMAT_DEPTH_1_MM);
     mDepthStream.setVideoMode(videoMode);
 
@@ -98,13 +98,13 @@ bool Camera::TryFetchingImages(Mat &imDepth, Mat &imRGB)
             {
             case 0: //depth ready
                 if (mDepthStream.readFrame(&mDepthFrameRef) == STATUS_OK)
-                    imDepth = cv::Mat(mnHeight, mnWidth, CV_16UC1, const_cast<void *>(mDepthFrameRef.getData()));
+                    imDepth = cv::Mat(mHeight, mWidth, CV_16UC1, const_cast<void *>(mDepthFrameRef.getData()));
                 break;
 
             case 1: // color ready
                 if (mColourStream.readFrame(&mColourFrameRef) == STATUS_OK)
                 {
-                    imRGB = cv::Mat(mnHeight, mnWidth, CV_8UC3, const_cast<void *>(mColourFrameRef.getData()));
+                    imRGB = cv::Mat(mHeight, mWidth, CV_8UC3, const_cast<void *>(mColourFrameRef.getData()));
                 }
                 break;
 

@@ -1,5 +1,8 @@
 #include "ORBmatcher.h"
 
+namespace SLAM
+{
+
 const int ORBmatcher::TH_HIGH = 100;
 const int ORBmatcher::TH_LOW = 50;
 const int ORBmatcher::HISTO_LENGTH = 30;
@@ -121,3 +124,5 @@ int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 
     return dist;
 }
+
+} // namespace SLAM

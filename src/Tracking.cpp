@@ -1,15 +1,17 @@
 #include "Tracking.h"
 
-Tracking::Tracking(const std::string &strSettingPath, FullSystem *pSys, Map *pMap, ORB_SLAM2::ORBVocabulary *pVoc)
-    : mpFullSystem(pSys), mpMap(pMap), mpORBVocabulary(pVoc), mbOnlyTracking(false)
+namespace SLAM
 {
-    meState = TrackingState::NOTInit;
 
+Tracking::Tracking(const std::string &strSettingPath, System *pSys, Map *pMap)
+    : mpFullSystem(pSys), mpMap(pMap), mbOnlyTracking(false),
+      mTrackingState(TrackingState::NotInitialized)
+{
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
     if (!fSettings.isOpened())
     {
-        std::cout << "Reading file failed..." << std::endl;
+        printf("Reading configuration failed at line %d in file %s\n", __LINE__, __FILE__);
         exit(-1);
     }
 
@@ -49,14 +51,13 @@ Tracking::Tracking(const std::string &strSettingPath, FullSystem *pSys, Map *pMa
     mbf = fSettings["Camera.bf"];
     mThDepth = mbf * (float)fSettings["ThDepth"] / fx;
 
-    int nFeatures = fSettings["ORBextractor.nFeatures"];
+    // Load ORB configurations
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
+    int nFeatures = fSettings["ORBextractor.nFeatures"];
     int nLevels = fSettings["ORBextractor.nLevels"];
     int fIniThFAST = fSettings["ORBextractor.iniThFAST"];
     int fMinThFAST = fSettings["ORBextractor.minThFAST"];
-
     mpORBextractor = new ORB_SLAM2::ORBextractor(nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
-    mpMapper = new DenseMapping(mImgWidth, mImgHeight, mK);
 
     int nUseRGB = fSettings["Tracking.use_rgb"];
     int nNumPyr = fSettings["Tracking.num_pyr"];
@@ -71,30 +72,28 @@ Tracking::Tracking(const std::string &strSettingPath, FullSystem *pSys, Map *pMa
         vIterations[i] = nIter;
     }
 
+    // mpMapper = new DenseMapping(mImgWidth, mImgHeight, mK);
     mpTracker = new DenseTracking(mImgWidth, mImgHeight, mK, nNumPyr, vIterations, bUseRGB, bUseDepth);
 }
 
-void Tracking::TrackImageRGBD(const cv::Mat &imGray, const cv::Mat &imDepth)
+void Tracking::TrackImage(const cv::Mat &imGray, const cv::Mat &imDepth, const double &TimeStamp)
 {
-    mCurrentFrame = Frame(imGray, imDepth, 0, mK, mbf, mThDepth, mDistCoef, mpORBextractor, mpORBVocabulary);
-    meLastState = meState;
-    bool bOK = false;
+    mCurrentFrame = Frame(imGray, imDepth, TimeStamp, mK, mbf, mThDepth, mDistCoef, mpORBextractor, mpORBVocabulary);
 
-    switch (meState)
+    bool bOK = false;
+    switch (mTrackingState)
     {
-    case TrackingState::NOTInit:
+    case TrackingState::NotInitialized:
     {
         // Try to initialize the system
         InitializeTracking();
 
-        if (meState != TrackingState::OK)
+        if (mTrackingState != TrackingState::OK)
             return;
     }
 
     case TrackingState::OK:
     {
-        // System is initialized. Track Frame.
-
         if (!mbOnlyTracking)
         {
             bOK = TrackLastFrame();
@@ -112,22 +111,18 @@ void Tracking::TrackImageRGBD(const cv::Mat &imGray, const cv::Mat &imDepth)
         }
         else
         {
-            meState = TrackingState::LOST;
+            mTrackingState = TrackingState::Lost;
         }
 
         break;
     }
 
-    case TrackingState::LOST:
+    case TrackingState::Lost:
     {
         bool bOK = Relocalization();
 
         break;
     }
-
-    default:
-        std::cout << "Control flow shouldn't be reaching here..." << std::endl;
-        return;
     }
 
     if (bOK)
@@ -162,7 +157,7 @@ void Tracking::InitializeTracking()
 
         mpReferenceKF = pKFini;
         mCurrentFrame.mpReferenceKF = pKFini;
-        meState = TrackingState::OK;
+        mTrackingState = TrackingState::OK;
         mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
         mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);
     }
@@ -177,9 +172,9 @@ bool Tracking::TrackLastFrame()
 
     mCurrentFrame.mTcw = mLastFrame.mTcw * Tpc.inverse();
 
-    // Update viewer if applicable
+    // Update the viewer
     if (mpViewer)
-        mpViewer->SetCurrentCameraPose(mCurrentFrame.mTcw.matrix());
+        mpViewer->SetCurrentFramePose(mCurrentFrame.mTcw.matrix());
 
     return true;
 }
@@ -231,7 +226,7 @@ void Tracking::CreateNewKeyFrame()
             }
         }
 
-        mpLocalMapper->InsertKeyFrame(pKF);
+        mpMapping->InsertKeyFrame(pKF);
         mpReferenceKF = pKF;
         mCurrentFrame.mpReferenceKF = pKF;
     }
@@ -242,13 +237,15 @@ void Tracking::SetViewer(Viewer *pViewer)
     mpViewer = pViewer;
 }
 
-void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
+void Tracking::SetLocalMapper(Mapping *pLocalMapper)
 {
-    mpLocalMapper = pLocalMapper;
+    mpMapping = pLocalMapper;
 }
 
 void Tracking::Reset()
 {
-    meState = TrackingState::NOTInit;
+    mTrackingState = TrackingState::NotInitialized;
     mLastFrame.mTcw = Sophus::SE3d();
 }
+
+} // namespace SLAM

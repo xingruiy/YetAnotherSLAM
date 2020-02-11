@@ -3,6 +3,9 @@
 #include "MapPoint.h"
 #include "KeyFrame.h"
 
+namespace SLAM
+{
+
 class Optimizer
 {
 public:
@@ -15,3 +18,5 @@ public:
 
     void static LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap);
 };
+
+} // namespace SLAM

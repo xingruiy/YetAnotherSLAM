@@ -12,17 +12,15 @@ class Camera
 {
 
 public:
+    ~Camera();
     Camera();
     Camera(const int &w, const int &h, const int &fps);
-
-    ~Camera();
-
     bool TryFetchingImages(Mat &imDepth, Mat &imRGB);
 
 private:
-    int mnWidth;
-    int mnHeight;
-    int mnFrameRate;
+    int mWidth;
+    int mHeight;
+    int mFrameRate;
 
     Device mDevice;
     VideoStream mDepthStream;

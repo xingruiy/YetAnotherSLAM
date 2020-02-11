@@ -1,38 +1,32 @@
 #pragma once
-
-#include "Frame.h"
-#include "KeyFrame.h"
-#include "Map.h"
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
+
+#include "Map.h"
+#include "Frame.h"
+#include "KeyFrame.h"
+
+namespace SLAM
+{
 
 class Map;
 class Frame;
 class KeyFrame;
 
-using namespace std;
-
 class MapPoint
 {
 public:
     MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF);
-
     std::map<KeyFrame *, size_t> GetObservations();
-
     int Observations();
 
     void AddObservation(KeyFrame *pKF, size_t idx);
-
     void EraseObservation(KeyFrame *pKF);
-
     void SetBadFlag();
-
     bool isBad();
 
     Eigen::Vector3d GetNormal();
-
     void Replace(MapPoint *pMP);
-
     MapPoint *GetReplaced();
 
     cv::Mat GetDescriptor();
@@ -101,3 +95,5 @@ public:
     float mTrackViewCos;
     long unsigned int mnTrackReferenceForFrame;
 };
+
+} // namespace SLAM
