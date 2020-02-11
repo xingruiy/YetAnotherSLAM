@@ -1,17 +1,17 @@
-#include "ORBmatcher.h"
+#include "Matcher.h"
 
 namespace SLAM
 {
 
-const int ORBmatcher::TH_HIGH = 100;
-const int ORBmatcher::TH_LOW = 50;
-const int ORBmatcher::HISTO_LENGTH = 30;
+const int Matcher::TH_HIGH = 100;
+const int Matcher::TH_LOW = 50;
+const int Matcher::HISTO_LENGTH = 30;
 
-ORBmatcher::ORBmatcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbCheckOrientation(checkOri)
+Matcher::Matcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbCheckOrientation(checkOri)
 {
 }
 
-float ORBmatcher::RadiusByViewingCos(const float &viewCos)
+float Matcher::RadiusByViewingCos(const float &viewCos)
 {
     if (viewCos > 0.998)
         return 2.5;
@@ -19,7 +19,7 @@ float ORBmatcher::RadiusByViewingCos(const float &viewCos)
         return 4.0;
 }
 
-int ORBmatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
+int Matcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
 {
     int nmatches = 0;
 
@@ -107,7 +107,7 @@ int ORBmatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
 
 // Bit set count operation from
 // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
+int Matcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 {
     const int *pa = a.ptr<int32_t>();
     const int *pb = b.ptr<int32_t>();

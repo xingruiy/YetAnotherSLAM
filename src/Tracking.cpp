@@ -86,7 +86,7 @@ void Tracking::TrackImage(const cv::Mat &imGray, const cv::Mat &imDepth, const d
     case TrackingState::NotInitialized:
     {
         // Try to initialize the system
-        InitializeTracking();
+        Initialization();
 
         if (mTrackingState != TrackingState::OK)
             return;
@@ -129,7 +129,7 @@ void Tracking::TrackImage(const cv::Mat &imGray, const cv::Mat &imDepth, const d
         mLastFrame = Frame(mCurrentFrame);
 }
 
-void Tracking::InitializeTracking()
+void Tracking::Initialization()
 {
     mCurrentFrame.ExtractORB();
 
@@ -141,7 +141,6 @@ void Tracking::InitializeTracking()
         for (int i = 0; i < mCurrentFrame.N; i++)
         {
             float z = mCurrentFrame.mvDepth[i];
-
             if (z > 0)
             {
                 Eigen::Vector3d x3D = pKFini->UnprojectKeyPoint(i);
@@ -157,6 +156,7 @@ void Tracking::InitializeTracking()
 
         mpReferenceKF = pKFini;
         mCurrentFrame.mpReferenceKF = pKFini;
+
         mTrackingState = TrackingState::OK;
         mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
         mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);

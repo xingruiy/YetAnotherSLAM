@@ -28,13 +28,6 @@ private:
     void DrawMapPoints();
     void DrawKeyFrames();
 
-    Map *mpMap;
-    System *mpSystem;
-
-    int mWidth, mHeight;
-    Eigen::Matrix4d mTcw;
-    Eigen::Matrix3d mCameraMatrix;
-
     pangolin::GlTexture mTextureColour;
     pangolin::GlTexture mTextureDepth;
 
@@ -43,10 +36,18 @@ private:
     pangolin::View *mpMapView;
     pangolin::View *mpDepthView;
 
-    cv::Mat mImgRGB;
-    cv::Mat mImgDepth;
     bool mbRGBImageUpdated;
     bool mbDepthImageUpdated;
+
+    Map *mpMap;
+    System *mpSystem;
+
+    int mWidth, mHeight;
+    Eigen::Matrix4d mTcw;
+    Eigen::Matrix3d mCameraMatrix;
+
+    cv::Mat mImgRGB;
+    cv::Mat mImgDepth;
 };
 
 } // namespace SLAM

@@ -10,9 +10,6 @@
 #include "Tracking.h"
 #include "Mapping.h"
 
-#include "DENSE/include/DenseMapping.h"
-#include "DENSE/include/DenseTracking.h"
-
 namespace SLAM
 {
 

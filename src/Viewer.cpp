@@ -108,7 +108,6 @@ void Viewer::DrawTextures()
 void Viewer::DrawCameraFrustum()
 {
     glColor3f(1.0, 0.0, 0.0);
-    std::cout << mTcw << std::endl;
     pangolin::glDrawFrustum<double>(mCameraMatrix.inverse(), 640, 480, mTcw, 0.1);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }

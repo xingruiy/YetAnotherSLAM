@@ -2,12 +2,12 @@
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 
-#include "DENSE/include/DenseTracking.h"
-#include "DENSE/include/DenseMapping.h"
 #include "Frame.h"
 #include "Viewer.h"
 #include "Mapping.h"
 #include "System.h"
+#include "DenseMapping.h"
+#include "DenseTracking.h"
 
 namespace SLAM
 {
@@ -35,7 +35,7 @@ private:
         Lost
     };
 
-    void InitializeTracking();
+    void Initialization();
     bool TrackLastFrame();
     bool Relocalization();
     bool NeedNewKeyFrame();

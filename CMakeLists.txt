@@ -17,11 +17,8 @@ PRIVATE
     src/System.cpp
     src/Viewer.cpp
     src/Tracking.cpp
-
-    src/ORBextractor.cpp
     src/Bundler.cpp
-    src/Converter.cpp
-    src/ORBmatcher.cpp
+    src/Matcher.cpp
 )
 
 target_compile_features(${PROJECT_NAME}
@@ -38,6 +35,8 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}/tools/
     ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/include
     ${PROJECT_SOURCE_DIR}/tools/DENSE/include
+    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/
+    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/include
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -48,8 +47,9 @@ PUBLIC
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/tools/DENSE/lib/libDENSE.so
-    ${PROJECT_SOURCE_DIR}/tools/DBoW2/lib/libDBoW2.so
-    ${PROJECT_SOURCE_DIR}/tools/g2o/lib/libg2o.so
+    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
+    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/g2o/lib/libg2o.so
+    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
 )
 
 # Build Examples

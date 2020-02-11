@@ -1,5 +1,5 @@
 #include "Mapping.h"
-#include "ORBmatcher.h"
+#include "Matcher.h"
 #include "Bundler.h"
 
 namespace SLAM
@@ -177,7 +177,7 @@ void Mapping::UpdateLocalMap()
 {
     // Each map point vote for the keyframes
     // in which it has been observed
-    map<KeyFrame *, int> keyframeCounter;
+    std::map<KeyFrame *, int> keyframeCounter;
     for (int i = 0; i < mpCurrentKeyFrame->mvpObservedMapPoints.size(); i++)
     {
         MapPoint *pMP = mpCurrentKeyFrame->mvpObservedMapPoints[i];
@@ -265,7 +265,7 @@ void Mapping::MatchLocalPoints()
 
     if (nToMatch > 0)
     {
-        ORBmatcher matcher(0.8);
+        Matcher matcher(0.8);
         // Project points to the current keyframe
         // And search for potential corresponding points
         nToMatch = matcher.SearchByProjection(mpCurrentKeyFrame, mvpLocalMapPoints, 3);
