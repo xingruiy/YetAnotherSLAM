@@ -22,26 +22,25 @@ Frame::Frame(const Frame &F)
 }
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
-             const Eigen::Matrix3d &K, const float &bf, const float &thDepth,
-             cv::Mat &distCoef, ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
-    : mTimeStamp(ts), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
-      mpORBvocabulary(voc), mpORBextractor(extractor)
+             ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
+    : mTimeStamp(ts), mDistCoef(g_distCoeff.clone()), mbf(g_bf),
+      mThDepth(g_thDepth), mpORBvocabulary(voc), mpORBextractor(extractor)
 {
   cv::Mat cvK = cv::Mat::eye(3, 3, CV_32F);
-  cvK.at<float>(0, 0) = K(0, 0);
-  cvK.at<float>(1, 1) = K(1, 1);
-  cvK.at<float>(0, 2) = K(0, 2);
-  cvK.at<float>(1, 2) = K(1, 2);
+  cvK.at<float>(0, 0) = g_fx[0];
+  cvK.at<float>(1, 1) = g_fy[0];
+  cvK.at<float>(0, 2) = g_cx[0];
+  cvK.at<float>(1, 2) = g_cy[0];
   cvK.copyTo(mK);
 
   if (!mbInitialized)
   {
     ComputeImageBounds(imGray);
 
-    fx = K(0, 0);
-    fy = K(1, 1);
-    cx = K(0, 2);
-    cy = K(1, 2);
+    fx = g_fx[0];
+    fy = g_fy[0];
+    cx = g_cx[0];
+    cy = g_cy[0];
     invfx = 1.0 / fx;
     invfy = 1.0 / fy;
 

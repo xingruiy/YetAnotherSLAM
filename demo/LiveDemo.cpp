@@ -14,9 +14,9 @@ int main(int argc, char **argv)
 
     cv::Mat imDepth, imRGB;
 
-    while (sys.IsAlive())
+    while (!SLAM::g_bSystemKilled)
     {
         if (cam.TryFetchingImages(imDepth, imRGB))
-            sys.TrackImage(imRGB, imDepth, 0);
+            sys.trackImage(imRGB, imDepth, 0);
     }
 }

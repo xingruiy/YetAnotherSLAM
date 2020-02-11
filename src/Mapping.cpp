@@ -5,63 +5,54 @@
 namespace SLAM
 {
 
-Mapping::Mapping(Map *pMap)
-    : mpMap(pMap), mbShouldQuit(false), mpReferenceKF(NULL)
+Mapping::Mapping(Map *pMap, Viewer *pViewer) : mpMap(pMap), viewer(pViewer)
 {
 }
 
 void Mapping::Run()
 {
-    while (!mbShouldQuit)
+    printf("Mapping Thread Started.\n");
+
+    while (!g_bSystemKilled)
     {
-        if (CheckNewKeyFrames())
-        {
-            ProcessNewKeyFrame();
-
-            UpdateLocalMap();
-
-            MatchLocalPoints();
-
-            if (!CheckNewKeyFrames())
-            {
-                SearchInNeighbors();
-            }
-
-            mbAbortBA = false;
-
-            if (!CheckNewKeyFrames())
-            {
-                // Local BA
-                if (mpMap->KeyFramesInMap() > 2)
-                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
-
-                // Check redundant local Keyframes
-                KeyFrameCulling();
-            }
-
-            CreateNewMapPoints();
-        }
+        doTasks();
     }
+
+    printf("Mapping Thread Killed.\n");
 }
 
-void Mapping::Kill()
+void Mapping::doTasks()
 {
-    mbShouldQuit = true;
+    if (CheckNewKeyFrames())
+    {
+        ProcessNewKeyFrame();
+        UpdateLocalMap();
+        MatchLocalPoints();
+
+        if (!CheckNewKeyFrames())
+            SearchInNeighbors();
+
+        if (!CheckNewKeyFrames())
+        {
+            if (mpMap->KeyFramesInMap() > 2)
+                Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
+
+            KeyFrameCulling();
+        }
+
+        CreateNewMapPoints();
+    }
 }
 
 void Mapping::KeyFrameCulling()
 {
-    // Check redundant keyframes (only local keyframes)
-    // A keyframe is considered redundant if the 90% of the MapPoints it sees, are seen
-    // in at least other 3 keyframes (in the same or finer scale)
-    // We only consider close stereo points
-    vector<KeyFrame *> vpLocalKeyFrames = mpCurrentKeyFrame->GetVectorCovisibleKeyFrames();
-
-    for (vector<KeyFrame *>::iterator vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
+    auto vpLocalKeyFrames = mpCurrentKeyFrame->GetVectorCovisibleKeyFrames();
+    for (auto vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
     {
         KeyFrame *pKF = *vit;
         if (pKF->mnId == 0)
             continue;
+
         const vector<MapPoint *> vpMapPoints = pKF->GetMapPointMatches();
 
         int nObs = 3;
@@ -277,11 +268,6 @@ void Mapping::MatchLocalPoints()
     // std::cout << "No. of KFs: " << mvpLocalKeyFrames.size()
     //           << " ;No. of MPs: " << mvpLocalMapPoints.size()
     //           << " ;No. of Matches: " << nToMatch << std::endl;
-}
-
-void Mapping::SetViewer(Viewer *pViewer)
-{
-    mpViewer = pViewer;
 }
 
 void Mapping::InsertKeyFrame(KeyFrame *pKF)

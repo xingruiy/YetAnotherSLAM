@@ -3,82 +3,17 @@
 namespace SLAM
 {
 
-Tracking::Tracking(const std::string &strSettingPath, System *pSys, Map *pMap)
-    : mpFullSystem(pSys), mpMap(pMap), mbOnlyTracking(false),
-      mTrackingState(TrackingState::NotInitialized)
+Tracking::Tracking(System *pSys, Map *pMap, Viewer *pViewer, Mapping *pMapping)
+    : mpFullSystem(pSys), mpMap(pMap), mbOnlyTracking(false), viewer(pViewer),
+      mapping(pMapping), mTrackingState(TrackingState::NotInitialized)
 {
-    cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
-
-    if (!fSettings.isOpened())
-    {
-        printf("Reading configuration failed at line %d in file %s\n", __LINE__, __FILE__);
-        exit(-1);
-    }
-
-    double fx = fSettings["Camera.fx"];
-    double fy = fSettings["Camera.fy"];
-    double cx = fSettings["Camera.cx"];
-    double cy = fSettings["Camera.cy"];
-
-    mImgWidth = fSettings["Camera.width"];
-    mImgHeight = fSettings["Camera.height"];
-
-    mK = Eigen::Matrix3d::Identity();
-    mK(0, 0) = fx;
-    mK(1, 1) = fy;
-    mK(0, 2) = cx;
-    mK(1, 2) = cy;
-
-    cv::Mat DistCoef(4, 1, CV_32F);
-    DistCoef.at<float>(0) = fSettings["Camera.k1"];
-    DistCoef.at<float>(1) = fSettings["Camera.k2"];
-    DistCoef.at<float>(2) = fSettings["Camera.p1"];
-    DistCoef.at<float>(3) = fSettings["Camera.p2"];
-    const float k3 = fSettings["Camera.k3"];
-    if (k3 != 0)
-    {
-        DistCoef.resize(5);
-        DistCoef.at<float>(4) = k3;
-    }
-
-    DistCoef.copyTo(mDistCoef);
-
-    float fps = fSettings["Camera.fps"];
-    if (fps == 0)
-        fps = 30;
-    mMaxFrameRate = fps;
-
-    mbf = fSettings["Camera.bf"];
-    mThDepth = mbf * (float)fSettings["ThDepth"] / fx;
-
-    // Load ORB configurations
-    float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
-    int nFeatures = fSettings["ORBextractor.nFeatures"];
-    int nLevels = fSettings["ORBextractor.nLevels"];
-    int fIniThFAST = fSettings["ORBextractor.iniThFAST"];
-    int fMinThFAST = fSettings["ORBextractor.minThFAST"];
-    mpORBextractor = new ORB_SLAM2::ORBextractor(nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
-
-    int nUseRGB = fSettings["Tracking.use_rgb"];
-    int nNumPyr = fSettings["Tracking.num_pyr"];
-    int nUseDepth = fSettings["Tracking.use_depth"];
-    bool bUseRGB = (nUseRGB != 0);
-    bool bUseDepth = (nUseDepth != 0);
-    std::vector<int> vIterations(nNumPyr);
-    for (int i = 0; i < nNumPyr; ++i)
-    {
-        std::string str = "Tracking.num_iter_lvl" + std::to_string(i + 1);
-        int nIter = fSettings[str.c_str()];
-        vIterations[i] = nIter;
-    }
-
-    // mpMapper = new DenseMapping(mImgWidth, mImgHeight, mK);
-    mpTracker = new DenseTracking(mImgWidth, mImgHeight, mK, nNumPyr, vIterations, bUseRGB, bUseDepth);
+    mpORBextractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
+    tracker = new DenseTracking(g_width[0], g_height[0], g_calib[0].cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
 }
 
-void Tracking::TrackImage(const cv::Mat &imGray, const cv::Mat &imDepth, const double &TimeStamp)
+void Tracking::trackImage(const cv::Mat &imGray, const cv::Mat &imDepth, double TimeStamp)
 {
-    mCurrentFrame = Frame(imGray, imDepth, TimeStamp, mK, mbf, mThDepth, mDistCoef, mpORBextractor, mpORBVocabulary);
+    mCurrentFrame = Frame(imGray, imDepth, TimeStamp, mpORBextractor, mpORBVocabulary);
 
     bool bOK = false;
     switch (mTrackingState)
@@ -158,23 +93,23 @@ void Tracking::Initialization()
         mCurrentFrame.mpReferenceKF = pKFini;
 
         mTrackingState = TrackingState::OK;
-        mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
-        mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);
+        tracker->SetReferenceImage(mCurrentFrame.mImGray);
+        tracker->SetReferenceDepth(mCurrentFrame.mImDepth);
     }
 }
 
 bool Tracking::TrackLastFrame()
 {
-    mpTracker->SetTrackingImage(mCurrentFrame.mImGray);
-    mpTracker->SetTrackingDepth(mCurrentFrame.mImDepth);
+    tracker->SetTrackingImage(mCurrentFrame.mImGray);
+    tracker->SetTrackingDepth(mCurrentFrame.mImDepth);
 
-    Sophus::SE3d Tpc = mpTracker->GetTransform();
+    Sophus::SE3d Tpc = tracker->GetTransform();
 
     mCurrentFrame.mTcw = mLastFrame.mTcw * Tpc.inverse();
 
     // Update the viewer
-    if (mpViewer)
-        mpViewer->SetCurrentFramePose(mCurrentFrame.mTcw.matrix());
+    if (viewer)
+        viewer->setLivePose(mCurrentFrame.mTcw.matrix());
 
     return true;
 }
@@ -226,23 +161,13 @@ void Tracking::CreateNewKeyFrame()
             }
         }
 
-        mpMapping->InsertKeyFrame(pKF);
+        mapping->InsertKeyFrame(pKF);
         mpReferenceKF = pKF;
         mCurrentFrame.mpReferenceKF = pKF;
     }
 }
 
-void Tracking::SetViewer(Viewer *pViewer)
-{
-    mpViewer = pViewer;
-}
-
-void Tracking::SetLocalMapper(Mapping *pLocalMapper)
-{
-    mpMapping = pLocalMapper;
-}
-
-void Tracking::Reset()
+void Tracking::reset()
 {
     mTrackingState = TrackingState::NotInitialized;
     mLastFrame.mTcw = Sophus::SE3d();

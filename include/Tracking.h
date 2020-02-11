@@ -19,13 +19,9 @@ class System;
 class Tracking
 {
 public:
-    Tracking(const std::string &strSettingsFile, System *pSys, Map *pMap);
-    void TrackImage(const cv::Mat &imGray, const cv::Mat &imDepth, const double &TimeStamp);
-
-    void SetViewer(Viewer *pViewer);
-    void SetLocalMapper(Mapping *pLocalMapper);
-
-    void Reset();
+    Tracking(System *pSys, Map *pMap, Viewer *pViewer, Mapping *pMapping);
+    void trackImage(const cv::Mat &imGray, const cv::Mat &imDepth, double TimeStamp);
+    void reset();
 
 private:
     enum class TrackingState
@@ -46,34 +42,19 @@ private:
     void UpdateLocalPoints();
     void UpdateLocalKeyFrames();
 
-    // Calibration
-    cv::Mat mDistCoef;
-    Eigen::Matrix3d mK;
-    int mImgWidth;
-    int mImgHeight;
-    int mMaxFrameRate;
-    float mbf;
-
-    // Threshold close/far points
-    // Points seen as close by the stereo/RGBD sensor are considered reliable
-    // and inserted from just one frame. Far points requiere a match in two keyframes.
-    float mThDepth;
-
     TrackingState mTrackingState;
 
     // Dense Tracker
-    DenseTracking *mpTracker;
+    DenseTracking *tracker;
 
     // Sparse Mapping
-    Mapping *mpMapping;
+    Mapping *mapping;
 
     // Dense Mapping
     DenseMapping *mpMapper;
 
     // Disable mapping
     bool mbOnlyTracking;
-
-    double mDepthScaleFactor;
 
     // Frames
     Frame mCurrentFrame;
@@ -89,7 +70,7 @@ private:
     Map *mpMap;
 
     // Map Viewr
-    Viewer *mpViewer;
+    Viewer *viewer;
 
     // Used for local map
     KeyFrame *mpReferenceKF;

@@ -9,6 +9,7 @@
 #include "KeyFrame.h"
 #include "Tracking.h"
 #include "Mapping.h"
+#include "GlobalDef.h"
 
 namespace SLAM
 {
@@ -23,29 +24,23 @@ class System
 public:
     ~System();
     System(const std::string &strSettingFile);
-    void TrackImage(const cv::Mat &ImgRGB, const cv::Mat &ImgDepth, const double TimeStamp);
-
-    bool IsAlive() const;
-    void Kill();
-    void Reset();
-    void Pause();
-    void UnPause();
+    void trackImage(const cv::Mat &img, const cv::Mat &depth, const double timeStamp);
+    void kill();
+    void reset();
 
 private:
-    Tracking *mpTracker;
+    void readSettings(const std::string &strSettingFile);
+
+    std::thread *mappingThread;
+    std::thread *viewerThread;
+
     Map *mpMap;
-    Viewer *mpViewer;
-    Mapping *mpMapping;
+    Tracking *tracker;
+    Viewer *viewer;
+    Mapping *mapping;
 
-    std::thread *mpThreadMapping;
-    std::thread *mpThreadViewer;
-
-    bool mbIsAlive;
-    bool mbReverseRGB;
-    bool mbIsRunning;
-
-    double mDepthScale;
-    cv::Mat mImGray, mImDepth;
+    cv::Mat grayScale;
+    cv::Mat depthFloat;
 };
 
 } // namespace SLAM

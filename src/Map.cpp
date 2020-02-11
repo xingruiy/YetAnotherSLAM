@@ -33,7 +33,7 @@ unsigned long Map::KeyFramesInMap()
     return mspKeyFrames.size();
 }
 
-void Map::Reset()
+void Map::reset()
 {
     unique_lock<mutex> lock(mMutexMap);
     mspKeyFrames.clear();

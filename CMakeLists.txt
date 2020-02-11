@@ -19,6 +19,7 @@ PRIVATE
     src/Tracking.cpp
     src/Bundler.cpp
     src/Matcher.cpp
+    src/GlobalDef.cpp
 )
 
 target_compile_features(${PROJECT_NAME}
@@ -47,9 +48,9 @@ PUBLIC
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/tools/DENSE/lib/libDENSE.so
+    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/g2o/lib/libg2o.so
-    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
 )
 
 # Build Examples

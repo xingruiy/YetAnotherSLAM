@@ -7,9 +7,7 @@
 #include <Eigen/Core>
 #include "KeyFrame.h"
 #include "MapPoint.h"
-
-#define FRAME_GRID_ROWS 48
-#define FRAME_GRID_COLS 64
+#include "GlobalDef.h"
 
 namespace SLAM
 {
@@ -24,9 +22,8 @@ public:
 
     Frame(const Frame &F);
 
-    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts, const Eigen::Matrix3d &K,
-          const float &bf, const float &thDepth, cv::Mat &distCoef, ORB_SLAM2::ORBextractor *extractor,
-          ORB_SLAM2::ORBVocabulary *voc);
+    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
+          ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc);
 
     void ExtractORB();
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);

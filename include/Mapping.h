@@ -15,16 +15,13 @@ class MapViewer;
 class Mapping
 {
 public:
-    Mapping(Map *pMap);
+    Mapping(Map *pMap, Viewer *pViewer);
+    void InsertKeyFrame(KeyFrame *pKF);
 
     void Run();
 
-    void InsertKeyFrame(KeyFrame *pKF);
-    void SetViewer(Viewer *pViewer);
-
-    void Kill();
-
 protected:
+    void doTasks();
     bool CheckNewKeyFrames();
     void ProcessNewKeyFrame();
 
@@ -57,7 +54,7 @@ protected:
     Map *mpMap;
 
     // Map Viewer
-    Viewer *mpViewer;
+    Viewer *viewer;
 };
 
 } // namespace SLAM

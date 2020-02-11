@@ -1,10 +1,9 @@
 #pragma once
+#include <mutex>
 #include "Map.h"
 #include "Frame.h"
 #include "MapPoint.h"
 #include "ORBVocabulary.h"
-
-#include <mutex>
 
 namespace SLAM
 {

@@ -4,6 +4,7 @@
 #include <mutex>
 
 #include "System.h"
+#include "GlobalDef.h"
 
 namespace SLAM
 {
@@ -13,41 +14,41 @@ class System;
 class Viewer
 {
 public:
-    Viewer(const string &strSettingFile, System *pSys, Map *pMap);
+    Viewer(System *pSys, Map *pMap);
 
     void Run();
-    void Reset();
+    void reset();
 
-    void SetCurrentRGBImage(const cv::Mat &ImgRGB);
-    void SetCurrentDepthImage(const cv::Mat &ImgDepth);
-    void SetCurrentFramePose(const Eigen::Matrix4d &Tcw);
+    void setLiveImage(const cv::Mat &ImgRGB);
+    void setLiveDepth(const cv::Mat &ImgDepth);
+    void setLivePose(const Eigen::Matrix4d &Tcw);
 
 private:
-    void DrawTextures();
-    void DrawCameraFrustum();
-    void DrawMapPoints();
-    void DrawKeyFrames();
+    void renderImagesToScreen();
+    void renderLiveCameraFrustum();
+    void draw3DMapPoints();
+    void drawKeyFrameHistory();
+
+    bool needUpdateImage;
+    bool needUpdateDepth;
 
     pangolin::GlTexture mTextureColour;
     pangolin::GlTexture mTextureDepth;
 
-    pangolin::View *mpRightBar;
-    pangolin::View *mpRGBView;
-    pangolin::View *mpMapView;
-    pangolin::View *mpDepthView;
+    pangolin::View *rightSideBar;
+    pangolin::View *imageViewer;
+    pangolin::View *mapViewer;
+    pangolin::View *depthViewer;
 
-    bool mbRGBImageUpdated;
-    bool mbDepthImageUpdated;
+    cv::Mat cvImage8UC3;  // Colour image
+    cv::Mat cvImage32FC1; // Depth image
 
     Map *mpMap;
-    System *mpSystem;
+    System *slamSystem;
 
     int mWidth, mHeight;
     Eigen::Matrix4d mTcw;
-    Eigen::Matrix3d mCameraMatrix;
-
-    cv::Mat mImgRGB;
-    cv::Mat mImgDepth;
+    Eigen::Matrix3d mCalib;
 };
 
 } // namespace SLAM
