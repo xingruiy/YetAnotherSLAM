@@ -31,30 +31,26 @@ protected:
     void KeyFrameCulling();
     void SearchInNeighbors();
 
-    KeyFrame *mpCurrentKeyFrame;
-
-    // Control variables
-    bool mbAbortBA;
-    bool mbShouldQuit;
-
-    // This is to store new keyframes which are to be processed
-    std::mutex mMutexNewKFs;
-    std::list<KeyFrame *> mlNewKeyFrames;
-
-    // TODO: unknown purpose
-    std::list<MapPoint *> mlpRecentAddedMapPoints;
-
-    // Local Map, highly volatile
-    KeyFrame *mpReferenceKF;
-    std::vector<KeyFrame *> mvpLocalKeyFrames;
-    std::vector<MapPoint *> mvpLocalMapPoints;
-    std::vector<MapPoint *> mvpRecentlyAddedMapPoints;
-
     // The global map
     Map *mpMap;
 
     // Map Viewer
     Viewer *viewer;
+
+    // This is to store new keyframes which are to be processed
+    std::mutex mMutexNewKFs;
+    std::list<KeyFrame *> mlNewKeyFrames;
+    KeyFrame *mpCurrentKeyFrame;
+
+    // Local Map, highly volatile
+    KeyFrame *mpReferenceKF;
+    std::vector<KeyFrame *> mvpLocalKeyFrames;
+    std::vector<MapPoint *> mvpLocalMapPoints;
+
+private:
+    std::vector<FrameShell *> frames;
+    std::vector<KeyFrame *> keyframes;
+    std::vector<MapPoint *> mapStruct;
 };
 
 } // namespace SLAM

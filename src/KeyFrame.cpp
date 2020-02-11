@@ -11,20 +11,19 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap)
       mfScaleFactor(F.mfScaleFactor), mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors),
       mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2), N(F.N), fx(F.fx), fy(F.fy), cx(F.cx), cy(F.cy),
       invfx(F.invfx), invfy(F.invfy), mvpMapPoints(F.mvpMapPoints), mvDepth(F.mvDepth), mvbOutlier(F.mvbOutlier),
-      mbBad(false), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS), mfGridElementWidthInv(F.mfGridElementWidthInv),
-      mfGridElementHeightInv(F.mfGridElementHeightInv), mbf(F.mbf), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
+      mbBad(false), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS), mbf(F.mbf), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
       mnMaxY(F.mnMaxY), mThDepth(F.mThDepth), mvuRight(F.mvuRight), mDescriptors(F.mDescriptors), mpORBvocabulary(F.mpORBvocabulary),
       mbFirstConnection(true)
 {
   mnId = nNextId++;
 
   // Copy feature point grid
-  mGrid.resize(mnGridCols);
+  orbGrid.resize(mnGridCols);
   for (int i = 0; i < mnGridCols; i++)
   {
-    mGrid[i].resize(mnGridRows);
+    orbGrid[i].resize(mnGridRows);
     for (int j = 0; j < mnGridRows; j++)
-      mGrid[i][j] = F.mGrid[i][j];
+      orbGrid[i][j] = F.orbGrid[i][j];
   }
 }
 
@@ -66,19 +65,19 @@ std::vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, 
   std::vector<size_t> vIndices;
   vIndices.reserve(N);
 
-  const int nMinCellX = max(0, (int)floor((x - mnMinX - r) * mfGridElementWidthInv));
+  const int nMinCellX = max(0, (int)floor((x - mnMinX - r) * g_gridElementWidthInv));
   if (nMinCellX >= FRAME_GRID_COLS)
     return vIndices;
 
-  const int nMaxCellX = min((int)FRAME_GRID_COLS - 1, (int)ceil((x - mnMinX + r) * mfGridElementWidthInv));
+  const int nMaxCellX = min((int)FRAME_GRID_COLS - 1, (int)ceil((x - mnMinX + r) * g_gridElementWidthInv));
   if (nMaxCellX < 0)
     return vIndices;
 
-  const int nMinCellY = max(0, (int)floor((y - mnMinY - r) * mfGridElementHeightInv));
+  const int nMinCellY = max(0, (int)floor((y - mnMinY - r) * g_gridElementHeightInv));
   if (nMinCellY >= FRAME_GRID_ROWS)
     return vIndices;
 
-  const int nMaxCellY = min((int)FRAME_GRID_ROWS - 1, (int)ceil((y - mnMinY + r) * mfGridElementHeightInv));
+  const int nMaxCellY = min((int)FRAME_GRID_ROWS - 1, (int)ceil((y - mnMinY + r) * g_gridElementHeightInv));
   if (nMaxCellY < 0)
     return vIndices;
 
@@ -88,7 +87,7 @@ std::vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, 
   {
     for (int iy = nMinCellY; iy <= nMaxCellY; iy++)
     {
-      const vector<size_t> vCell = mGrid[ix][iy];
+      const vector<size_t> vCell = orbGrid[ix][iy];
       if (vCell.empty())
         continue;
 

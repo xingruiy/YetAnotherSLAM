@@ -24,7 +24,7 @@ class System
 public:
     ~System();
     System(const std::string &strSettingFile);
-    void trackImage(const cv::Mat &img, const cv::Mat &depth, const double timeStamp);
+    void trackImage(cv::Mat img, cv::Mat depth, const double timeStamp);
     void kill();
     void reset();
 

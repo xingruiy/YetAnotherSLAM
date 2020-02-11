@@ -60,11 +60,8 @@ public:
     // Grid (to speed up feature matching)
     const int mnGridCols;
     const int mnGridRows;
-    const float mfGridElementWidthInv;
-    const float mfGridElementHeightInv;
-
     // Grid over the image to speed up feature matching
-    std::vector<std::vector<std::vector<size_t>>> mGrid;
+    std::vector<std::vector<std::vector<size_t>>> orbGrid;
 
     // Variables used by the local mapping
     long unsigned int mnBALocalForKF;

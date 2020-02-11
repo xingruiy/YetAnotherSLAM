@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
 #include <mutex>
+#include <ORBextractor.h>
 
 namespace SLAM
 {
@@ -42,7 +43,11 @@ extern Eigen::Matrix3f g_calib[NUM_PYR];
 extern Eigen::Matrix3f g_calibInv[NUM_PYR];
 extern cv::Mat g_distCoeff;
 extern std::mutex g_calibMutex;
+extern float g_minX, g_minY, g_maxX, g_maxY;
+extern float g_gridElementWidthInv;
+extern float g_gridElementHeightInv;
 
 void setGlobalCalibration(const int width, const int height, const Eigen::Matrix3d &K);
+void computeImageBounds();
 
 } // namespace SLAM

@@ -19,11 +19,14 @@ class System;
 class Tracking
 {
 public:
-    Tracking(System *pSys, Map *pMap, Viewer *pViewer, Mapping *pMapping);
-    void trackImage(const cv::Mat &imGray, const cv::Mat &imDepth, double TimeStamp);
+    Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping);
+    void trackImage(cv::Mat img, cv::Mat depth, const double timeStamp);
     void reset();
 
 private:
+    void makeKeyFrame(Frame &F);
+    void needNewKeyFrame();
+
     enum class TrackingState
     {
         NotInitialized,

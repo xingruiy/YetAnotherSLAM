@@ -78,9 +78,7 @@ public:
 
     // Keypoints are assigned to cells in a grid
     // to reduce matching complexity when projecting MapPoints.
-    vector<size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
-    static float mfGridElementWidthInv;
-    static float mfGridElementHeightInv;
+    std::vector<size_t> orbGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
 
     // Scale pyramid info.
     int mnScaleLevels;
@@ -93,22 +91,13 @@ public:
 
     // Total number of key points
     int N;
-    // Feature descriptors
     cv::Mat mDescriptors;
-
     // Original and undistorted key points
     std::vector<bool> mvbOutlier;
     std::vector<cv::KeyPoint> mvKeys;
     std::vector<cv::KeyPoint> mvKeysUn;
-
-    // Corresponding stereo coordinate
     std::vector<float> mvuRight;
-
-    // Depth for each keypoint.
     std::vector<float> mvDepth;
-
-    // MapPoints associated to keypoints
-    // NULL pointer if no association.
     std::vector<MapPoint *> mvpMapPoints;
 };
 

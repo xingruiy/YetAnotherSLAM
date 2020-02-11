@@ -7,7 +7,6 @@ unsigned long Frame::mnNextId = 0;
 bool Frame::mbInitialized = false;
 float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
 float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
-float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
 Frame::Frame(const Frame &F)
     : mpORBvocabulary(F.mpORBvocabulary), mpORBextractor(F.mpORBextractor),
@@ -43,9 +42,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
     cy = g_cy[0];
     invfx = 1.0 / fx;
     invfy = 1.0 / fy;
-
-    mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / (mnMaxX - mnMinX);
-    mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (mnMaxY - mnMinY);
 
     mbInitialized = true;
   }
@@ -122,7 +118,7 @@ void Frame::AssignFeaturesToGrid()
   int nReserve = 0.5f * N / (FRAME_GRID_COLS * FRAME_GRID_ROWS);
   for (unsigned int i = 0; i < FRAME_GRID_COLS; i++)
     for (unsigned int j = 0; j < FRAME_GRID_ROWS; j++)
-      mGrid[i][j].reserve(nReserve);
+      orbGrid[i][j].reserve(nReserve);
 
   for (int i = 0; i < N; i++)
   {
@@ -130,7 +126,7 @@ void Frame::AssignFeaturesToGrid()
 
     int nGridPosX, nGridPosY;
     if (PosInGrid(kp, nGridPosX, nGridPosY))
-      mGrid[nGridPosX][nGridPosY].push_back(i);
+      orbGrid[nGridPosX][nGridPosY].push_back(i);
   }
 }
 
@@ -204,8 +200,8 @@ void Frame::ComputeImageBounds(const cv::Mat &img)
 
 bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
 {
-  posX = round((kp.pt.x - mnMinX) * mfGridElementWidthInv);
-  posY = round((kp.pt.y - mnMinY) * mfGridElementHeightInv);
+  posX = round((kp.pt.x - mnMinX) * g_gridElementWidthInv);
+  posY = round((kp.pt.y - mnMinY) * g_gridElementHeightInv);
 
   //Keypoint's coordinates are undistorted, which could cause to go out of the image
   if (posX < 0 || posX >= FRAME_GRID_COLS || posY < 0 || posY >= FRAME_GRID_ROWS)

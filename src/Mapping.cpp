@@ -34,9 +34,6 @@ void Mapping::doTasks()
 
         if (!CheckNewKeyFrames())
         {
-            if (mpMap->KeyFramesInMap() > 2)
-                Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
-
             KeyFrameCulling();
         }
 
@@ -274,7 +271,6 @@ void Mapping::InsertKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexNewKFs);
     mlNewKeyFrames.push_back(pKF);
-    mbAbortBA = true;
 }
 
 bool Mapping::CheckNewKeyFrames()
@@ -291,13 +287,6 @@ void Mapping::ProcessNewKeyFrame()
         mpCurrentKeyFrame = mlNewKeyFrames.front();
         mlNewKeyFrames.pop_front();
     }
-
-    if (mpCurrentKeyFrame->mnId == 0)
-        mvpRecentlyAddedMapPoints = mpCurrentKeyFrame->GetMapPointMatches();
-
-    // Compute Bags of Words structures
-    // mpCurrentKeyFrame->ComputeBoW();
-
     // Insert Keyframe in Map
     mpMap->AddKeyFrame(mpCurrentKeyFrame);
 }

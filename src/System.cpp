@@ -23,7 +23,7 @@ System::System(const std::string &strSettingFile) : viewer(nullptr)
     std::cout << "Main Thread Started." << std::endl;
 }
 
-void System::trackImage(const cv::Mat &img, const cv::Mat &depth, const double timeStamp)
+void System::trackImage(cv::Mat img, cv::Mat depth, const double timeStamp)
 {
     if (!g_bReverseRGB)
         cv::cvtColor(img, grayScale, cv::COLOR_RGB2GRAY);
@@ -121,6 +121,8 @@ void System::readSettings(const std::string &strSettingFile)
         g_distCoeff.resize(5);
         g_distCoeff.at<float>(4) = k3;
     }
+
+    computeImageBounds();
 
     std::cout << "===================================================\n"
               << "The system is created with the following parameters:\n"

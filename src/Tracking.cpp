@@ -3,17 +3,17 @@
 namespace SLAM
 {
 
-Tracking::Tracking(System *pSys, Map *pMap, Viewer *pViewer, Mapping *pMapping)
-    : mpFullSystem(pSys), mpMap(pMap), mbOnlyTracking(false), viewer(pViewer),
-      mapping(pMapping), mTrackingState(TrackingState::NotInitialized)
+Tracking::Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping)
+    : mpFullSystem(system), mpMap(map), viewer(viewer), mapping(mapping),
+      mbOnlyTracking(false), mTrackingState(TrackingState::NotInitialized)
 {
     mpORBextractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
     tracker = new DenseTracking(g_width[0], g_height[0], g_calib[0].cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
 }
 
-void Tracking::trackImage(const cv::Mat &imGray, const cv::Mat &imDepth, double TimeStamp)
+void Tracking::trackImage(cv::Mat img, cv::Mat depth, const double timeStamp)
 {
-    mCurrentFrame = Frame(imGray, imDepth, TimeStamp, mpORBextractor, mpORBVocabulary);
+    mCurrentFrame = Frame(img, depth, timeStamp, mpORBextractor, mpORBVocabulary);
 
     bool bOK = false;
     switch (mTrackingState)
