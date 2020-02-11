@@ -1,8 +1,9 @@
 #pragma once
 #include <memory>
 #include <mutex>
+#include <ORBextractor.h>
 #include "Map.h"
-
+#include "GlobalDef.h"
 #include "KeyFrame.h"
 #include "Viewer.h"
 
@@ -15,27 +16,39 @@ class MapViewer;
 class Mapping
 {
 public:
-    Mapping(Map *pMap, Viewer *pViewer);
-    void InsertKeyFrame(KeyFrame *pKF);
-
+    Mapping(Map *map);
+    void addKeyFrameCandidate(Frame *F);
+    void reset();
     void Run();
 
-protected:
-    void doTasks();
-    bool CheckNewKeyFrames();
-    void ProcessNewKeyFrame();
-
-    void MatchLocalPoints();
-    void CreateNewMapPoints();
-    void UpdateLocalMap();
+private:
+    void MakeNewKeyFrame();
+    bool HasFrameToProcess();
+    void LookforPointMatches();
     void KeyFrameCulling();
     void SearchInNeighbors();
+
+    ORB_SLAM2::ORBextractor *ORBExtractor;
+    std::vector<KeyFrame *> localKeyFrames;
+    std::vector<MapPoint *> localMapPoints;
+
+public:
+    void InsertKeyFrame(KeyFrame *pKF);
+
+protected:
+    // void doTasks();
+
+    // void MatchLocalPoints();
+    // void CreateNewMapPoints();
+    // void UpdateLocalMap();
 
     // The global map
     Map *mpMap;
 
-    // Map Viewer
-    Viewer *viewer;
+    std::mutex frameMutex;
+    std::list<Frame *> newFrameQueue;
+    Frame *currentFrame;
+    KeyFrame *currentKeyFrame;
 
     // This is to store new keyframes which are to be processed
     std::mutex mMutexNewKFs;
@@ -48,7 +61,6 @@ protected:
     std::vector<MapPoint *> mvpLocalMapPoints;
 
 private:
-    std::vector<FrameShell *> frames;
     std::vector<KeyFrame *> keyframes;
     std::vector<MapPoint *> mapStruct;
 };

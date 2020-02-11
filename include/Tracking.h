@@ -24,9 +24,6 @@ public:
     void reset();
 
 private:
-    void makeKeyFrame(Frame &F);
-    void needNewKeyFrame();
-
     enum class TrackingState
     {
         NotInitialized,
@@ -34,11 +31,15 @@ private:
         Lost
     };
 
-    void Initialization();
-    bool TrackLastFrame();
-    bool Relocalization();
-    bool NeedNewKeyFrame();
-    void CreateNewKeyFrame();
+    Frame *currentFrame;
+    Frame *lastFrame;
+    Sophus::SE3d T_ref2World;
+
+    void initialisation();
+    bool trackLastFrame();
+    bool relocalisation();
+    bool needNewKeyFrame();
+    void addKeyFrameCandidate();
 
     // Local map management
     void UpdateLocalMap();
@@ -63,8 +64,8 @@ private:
     Frame mCurrentFrame;
     Frame mLastFrame;
 
-    ORB_SLAM2::ORBextractor *mpORBextractor;
-    ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
+    // ORB_SLAM2::ORBextractor *mpORBextractor;
+    // ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
 
     // System
     System *mpFullSystem;

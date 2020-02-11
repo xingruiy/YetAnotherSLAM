@@ -5,44 +5,34 @@ namespace SLAM
 
 Tracking::Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping)
     : mpFullSystem(system), mpMap(map), viewer(viewer), mapping(mapping),
-      mbOnlyTracking(false), mTrackingState(TrackingState::NotInitialized)
+      mbOnlyTracking(false), mTrackingState(TrackingState::NotInitialized),
+      currentFrame(nullptr), lastFrame(nullptr)
 {
-    mpORBextractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
+    // mpORBextractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
     tracker = new DenseTracking(g_width[0], g_height[0], g_calib[0].cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
 }
 
-void Tracking::trackImage(cv::Mat img, cv::Mat depth, const double timeStamp)
+void Tracking::trackImage(cv::Mat image, cv::Mat depth, const double timeStamp)
 {
-    mCurrentFrame = Frame(img, depth, timeStamp, mpORBextractor, mpORBVocabulary);
+    currentFrame = new Frame(image, depth, timeStamp);
 
     bool bOK = false;
     switch (mTrackingState)
     {
     case TrackingState::NotInitialized:
     {
-        // Try to initialize the system
-        Initialization();
-
-        if (mTrackingState != TrackingState::OK)
-            return;
+        initialisation();
+        break;
     }
 
     case TrackingState::OK:
     {
-        if (!mbOnlyTracking)
-        {
-            bOK = TrackLastFrame();
-        }
-        else
-        {
-        }
-
-        mCurrentFrame.mpReferenceKF = mpReferenceKF;
+        bool bOK = trackLastFrame();
 
         if (bOK)
         {
-            if (NeedNewKeyFrame())
-                CreateNewKeyFrame();
+            if (needNewKeyFrame())
+                addKeyFrameCandidate();
         }
         else
         {
@@ -54,71 +44,55 @@ void Tracking::trackImage(cv::Mat img, cv::Mat depth, const double timeStamp)
 
     case TrackingState::Lost:
     {
-        bool bOK = Relocalization();
+        bool bOK = relocalisation();
 
-        break;
-    }
-    }
-
-    if (bOK)
-        mLastFrame = Frame(mCurrentFrame);
-}
-
-void Tracking::Initialization()
-{
-    mCurrentFrame.ExtractORB();
-
-    if (mCurrentFrame.N > 500)
-    {
-        // Create the initial keyframe
-        KeyFrame *pKFini = new KeyFrame(mCurrentFrame, mpMap);
-
-        for (int i = 0; i < mCurrentFrame.N; i++)
+        if (bOK)
         {
-            float z = mCurrentFrame.mvDepth[i];
-            if (z > 0)
-            {
-                Eigen::Vector3d x3D = pKFini->UnprojectKeyPoint(i);
-                MapPoint *pNewMP = new MapPoint(x3D, mpMap, pKFini, i);
-                pNewMP->AddObservation(pKFini, i);
-                pKFini->AddMapPoint(pNewMP, i);
-                mpMap->AddMapPoint(pNewMP);
-            }
+            mTrackingState = TrackingState::OK;
+            break;
         }
-
-        // Insert KeyFrame into the map
-        mpMap->AddKeyFrame(pKFini);
-
-        mpReferenceKF = pKFini;
-        mCurrentFrame.mpReferenceKF = pKFini;
-
-        mTrackingState = TrackingState::OK;
-        tracker->SetReferenceImage(mCurrentFrame.mImGray);
-        tracker->SetReferenceDepth(mCurrentFrame.mImDepth);
+        else
+            return;
     }
+    }
+
+    lastFrame = currentFrame;
 }
 
-bool Tracking::TrackLastFrame()
+void Tracking::initialisation()
 {
-    tracker->SetTrackingImage(mCurrentFrame.mImGray);
-    tracker->SetTrackingDepth(mCurrentFrame.mImDepth);
+    tracker->SetReferenceImage(currentFrame->mImGray);
+    tracker->SetReferenceDepth(currentFrame->mImDepth);
+
+    currentFrame->mTcw = Sophus::SE3d(Eigen::Matrix4d::Identity());
+    T_ref2World = currentFrame->mTcw;
+    mapping->addKeyFrameCandidate(currentFrame);
+
+    mTrackingState = TrackingState::OK;
+}
+
+bool Tracking::trackLastFrame()
+{
+    tracker->SetTrackingImage(currentFrame->mImGray);
+    tracker->SetTrackingDepth(currentFrame->mImDepth);
 
     Sophus::SE3d Tpc = tracker->GetTransform();
 
-    mCurrentFrame.mTcw = mLastFrame.mTcw * Tpc.inverse();
+    currentFrame->mTcw = lastFrame->mTcw * Tpc.inverse();
 
     // Update the viewer
     if (viewer)
-        viewer->setLivePose(mCurrentFrame.mTcw.matrix());
+        viewer->setLivePose(currentFrame->mTcw.matrix());
 
     return true;
 }
 
-bool Tracking::Relocalization()
+bool Tracking::relocalisation()
 {
+    return false;
 }
 
-bool Tracking::NeedNewKeyFrame()
+bool Tracking::needNewKeyFrame()
 {
     if (mbOnlyTracking)
         return false;
@@ -126,7 +100,7 @@ bool Tracking::NeedNewKeyFrame()
     if (!mpReferenceKF)
         return false;
 
-    Sophus::SE3d DT = mpReferenceKF->mTcw.inverse() * mCurrentFrame.mTcw;
+    Sophus::SE3d DT = T_ref2World.inverse() * currentFrame->mTcw;
 
     if (DT.log().topRows<3>().norm() > 0.3)
         return true;
@@ -141,36 +115,41 @@ bool Tracking::NeedNewKeyFrame()
     return false;
 }
 
-void Tracking::CreateNewKeyFrame()
+void Tracking::addKeyFrameCandidate()
 {
-    mCurrentFrame.ExtractORB();
+    // mCurrentFrame.ExtractORB();
 
-    if (mCurrentFrame.N > 500)
-    {
-        KeyFrame *pKF = new KeyFrame(mCurrentFrame, mpMap);
-        size_t nObsMPs = 0;
-        pKF->mvpObservedMapPoints.clear();
+    // if (mCurrentFrame.N > 500)
+    // {
+    //     KeyFrame *pKF = new KeyFrame(mCurrentFrame, mpMap);
+    //     size_t nObsMPs = 0;
+    //     pKF->mvpObservedMapPoints.clear();
 
-        for (int i = 0; i < mpReferenceKF->mvpMapPoints.size(); ++i)
-        {
-            MapPoint *pMP = mpReferenceKF->mvpMapPoints[i];
-            if (pMP && pKF->IsInFrustum(pMP, 0.5))
-            {
-                pKF->mvpObservedMapPoints.push_back(pMP);
-                nObsMPs++;
-            }
-        }
+    //     for (int i = 0; i < mpReferenceKF->mvpMapPoints.size(); ++i)
+    //     {
+    //         MapPoint *pMP = mpReferenceKF->mvpMapPoints[i];
+    //         if (pMP && pKF->IsInFrustum(pMP, 0.5))
+    //         {
+    //             pKF->mvpObservedMapPoints.push_back(pMP);
+    //             nObsMPs++;
+    //         }
+    //     }
 
-        mapping->InsertKeyFrame(pKF);
-        mpReferenceKF = pKF;
-        mCurrentFrame.mpReferenceKF = pKF;
-    }
+    //     mapping->InsertKeyFrame(pKF);
+    //     mpReferenceKF = pKF;
+    //     mCurrentFrame.mpReferenceKF = pKF;
+    // }
+    // mapping->InsertKeyFrame(pKF);
+    // mapping->addKeyFrameCandidate(currentFrame);
+    T_ref2World = currentFrame->mTcw;
+    mapping->addKeyFrameCandidate(currentFrame);
 }
 
 void Tracking::reset()
 {
     mTrackingState = TrackingState::NotInitialized;
-    mLastFrame.mTcw = Sophus::SE3d();
+    lastFrame = NULL;
+    currentFrame = NULL;
 }
 
 } // namespace SLAM

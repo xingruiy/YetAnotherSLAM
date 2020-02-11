@@ -41,6 +41,7 @@ extern float g_invcx[NUM_PYR];
 extern float g_invcy[NUM_PYR];
 extern Eigen::Matrix3f g_calib[NUM_PYR];
 extern Eigen::Matrix3f g_calibInv[NUM_PYR];
+extern cv::Mat g_cvCalib;
 extern cv::Mat g_distCoeff;
 extern std::mutex g_calibMutex;
 extern float g_minX, g_minY, g_maxX, g_maxY;

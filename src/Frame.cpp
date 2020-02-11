@@ -4,265 +4,274 @@ namespace SLAM
 {
 
 unsigned long Frame::mnNextId = 0;
-bool Frame::mbInitialized = false;
-float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
-float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
+// bool Frame::mbInitialized = false;
+// float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
+// float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
 
-Frame::Frame(const Frame &F)
-    : mpORBvocabulary(F.mpORBvocabulary), mpORBextractor(F.mpORBextractor),
-      mTimeStamp(F.mTimeStamp), mTcw(F.mTcw), mnScaleLevels(F.mnScaleLevels),
-      mfScaleFactor(F.mfScaleFactor), mfLogScaleFactor(F.mfLogScaleFactor),
-      mvScaleFactors(F.mvScaleFactors), mvInvScaleFactors(F.mvInvScaleFactors),
-      mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2),
-      mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn), mvpMapPoints(F.mvpMapPoints),
-      mImGray(F.mImGray), mImDepth(F.mImDepth), mvbOutlier(F.mvbOutlier),
-      mbf(F.mbf), mThDepth(F.mThDepth)
+// Frame::Frame(const Frame &F)
+//     : mpORBvocabulary(F.mpORBvocabulary), mpORBextractor(F.mpORBextractor),
+//       mTimeStamp(F.mTimeStamp), mTcw(F.mTcw), mnScaleLevels(F.mnScaleLevels),
+//       mfScaleFactor(F.mfScaleFactor), mfLogScaleFactor(F.mfLogScaleFactor),
+//       mvScaleFactors(F.mvScaleFactors), mvInvScaleFactors(F.mvInvScaleFactors),
+//       mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2),
+//       mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn), mvpMapPoints(F.mvpMapPoints),
+//       mImGray(F.mImGray), mImDepth(F.mImDepth), mvbOutlier(F.mvbOutlier),
+//       mbf(F.mbf), mThDepth(F.mThDepth)
+// {
+// }
+
+Frame::Frame(cv::Mat image, cv::Mat depth, double timeStamp)
+    : mTimeStamp(timeStamp)
 {
-}
+  mImGray = image.clone();
+  mImDepth = depth.clone();
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
-             ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
-    : mTimeStamp(ts), mDistCoef(g_distCoeff.clone()), mbf(g_bf),
-      mThDepth(g_thDepth), mpORBvocabulary(voc), mpORBextractor(extractor)
-{
-  cv::Mat cvK = cv::Mat::eye(3, 3, CV_32F);
-  cvK.at<float>(0, 0) = g_fx[0];
-  cvK.at<float>(1, 1) = g_fy[0];
-  cvK.at<float>(0, 2) = g_cx[0];
-  cvK.at<float>(1, 2) = g_cy[0];
-  cvK.copyTo(mK);
-
-  if (!mbInitialized)
-  {
-    ComputeImageBounds(imGray);
-
-    fx = g_fx[0];
-    fy = g_fy[0];
-    cx = g_cx[0];
-    cy = g_cy[0];
-    invfx = 1.0 / fx;
-    invfy = 1.0 / fy;
-
-    mbInitialized = true;
-  }
-
-  // Frame ID
   mnId = mnNextId++;
-
-  // Copy images
-  mImGray = imGray.clone();
-  mImDepth = imDepth.clone();
-
-  // Scale Level Info
-  mnScaleLevels = mpORBextractor->GetLevels();
-  mfScaleFactor = mpORBextractor->GetScaleFactor();
-  // For predicting scales
-  mfLogScaleFactor = log(mfScaleFactor);
-  mvScaleFactors = mpORBextractor->GetScaleFactors();
-  mvInvScaleFactors = mpORBextractor->GetInverseScaleFactors();
-  mvLevelSigma2 = mpORBextractor->GetScaleSigmaSquares();
-  mvInvLevelSigma2 = mpORBextractor->GetInverseScaleSigmaSquares();
 }
 
-void Frame::ExtractORB()
-{
-  // Extract ORB features
-  ExtractORB(mImGray);
+// Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &ts,
+//              ORB_SLAM2::ORBextractor *extractor, ORB_SLAM2::ORBVocabulary *voc)
+//     : mTimeStamp(ts), mDistCoef(g_distCoeff.clone()), mbf(g_bf),
+//       mThDepth(g_thDepth), mpORBvocabulary(voc), mpORBextractor(extractor)
+// {
+//   cv::Mat cvK = cv::Mat::eye(3, 3, CV_32F);
+//   cvK.at<float>(0, 0) = g_fx[0];
+//   cvK.at<float>(1, 1) = g_fy[0];
+//   cvK.at<float>(0, 2) = g_cx[0];
+//   cvK.at<float>(1, 2) = g_cy[0];
+//   cvK.copyTo(mK);
 
-  N = mvKeys.size();
-  mvbOutlier.resize(N, false);
-  mvpMapPoints.resize(N, NULL);
+//   if (!mbInitialized)
+//   {
+//     ComputeImageBounds(imGray);
 
-  // Generate undistorted key points
-  UndistortKeyPoints();
+//     fx = g_fx[0];
+//     fy = g_fy[0];
+//     cx = g_cx[0];
+//     cy = g_cy[0];
+//     invfx = 1.0 / fx;
+//     invfy = 1.0 / fy;
 
-  // Assign all key points to the grid
-  AssignFeaturesToGrid();
+//     mbInitialized = true;
+//   }
 
-  // Get depth from raw input
-  ComputeDepth(mImDepth);
-}
+//   // Frame ID
+//   mnId = mnNextId++;
 
-void Frame::ExtractORB(const cv::Mat &imGray)
-{
-  (*mpORBextractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
-}
+//   // Copy images
+//   mImGray = imGray.clone();
+//   mImDepth = imDepth.clone();
 
-void Frame::ComputeDepth(const cv::Mat &depth_image)
-{
-  // The virtual right coordinate
-  mvuRight = vector<float>(N, -1);
-  // Key point depth
-  mvDepth = vector<float>(N, -1);
+//   // Scale Level Info
+//   mnScaleLevels = mpORBextractor->GetLevels();
+//   mfScaleFactor = mpORBextractor->GetScaleFactor();
+//   // For predicting scales
+//   mfLogScaleFactor = log(mfScaleFactor);
+//   mvScaleFactors = mpORBextractor->GetScaleFactors();
+//   mvInvScaleFactors = mpORBextractor->GetInverseScaleFactors();
+//   mvLevelSigma2 = mpORBextractor->GetScaleSigmaSquares();
+//   mvInvLevelSigma2 = mpORBextractor->GetInverseScaleSigmaSquares();
+// }
 
-  for (int i = 0; i < N; i++)
-  {
-    const cv::KeyPoint &kp = mvKeys[i];
-    const cv::KeyPoint &kpU = mvKeysUn[i];
+// void Frame::ExtractORB()
+// {
+//   // Extract ORB features
+//   ExtractORB(mImGray);
 
-    const float &v = kp.pt.y;
-    const float &u = kp.pt.x;
+//   N = mvKeys.size();
+//   mvbOutlier.resize(N, false);
+//   mvpMapPoints.resize(N, NULL);
 
-    const float d = depth_image.at<float>(v, u);
+//   // Generate undistorted key points
+//   UndistortKeyPoints();
 
-    if (d > 0)
-    {
-      mvDepth[i] = d;
-      mvuRight[i] = kpU.pt.x - mbf / d;
-    }
-  }
-}
+//   // Assign all key points to the grid
+//   AssignFeaturesToGrid();
 
-void Frame::AssignFeaturesToGrid()
-{
-  int nReserve = 0.5f * N / (FRAME_GRID_COLS * FRAME_GRID_ROWS);
-  for (unsigned int i = 0; i < FRAME_GRID_COLS; i++)
-    for (unsigned int j = 0; j < FRAME_GRID_ROWS; j++)
-      orbGrid[i][j].reserve(nReserve);
+//   // Get depth from raw input
+//   ComputeDepth(mImDepth);
+// }
 
-  for (int i = 0; i < N; i++)
-  {
-    const cv::KeyPoint &kp = mvKeysUn[i];
+// void Frame::ExtractORB(const cv::Mat &imGray)
+// {
+//   (*mpORBextractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
+// }
 
-    int nGridPosX, nGridPosY;
-    if (PosInGrid(kp, nGridPosX, nGridPosY))
-      orbGrid[nGridPosX][nGridPosY].push_back(i);
-  }
-}
+// void Frame::ComputeDepth(const cv::Mat &depth_image)
+// {
+//   // The virtual right coordinate
+//   mvuRight = vector<float>(N, -1);
+//   // Key point depth
+//   mvDepth = vector<float>(N, -1);
 
-void Frame::UndistortKeyPoints()
-{
-  if (N == 0)
-    return;
+//   for (int i = 0; i < N; i++)
+//   {
+//     const cv::KeyPoint &kp = mvKeys[i];
+//     const cv::KeyPoint &kpU = mvKeysUn[i];
 
-  if (mDistCoef.at<float>(0) == 0.0)
-  {
-    mvKeysUn = mvKeys;
-    return;
-  }
+//     const float &v = kp.pt.y;
+//     const float &u = kp.pt.x;
 
-  // Fill matrix with points
-  cv::Mat mat(N, 2, CV_32F);
-  for (int i = 0; i < N; i++)
-  {
-    mat.at<float>(i, 0) = mvKeys[i].pt.x;
-    mat.at<float>(i, 1) = mvKeys[i].pt.y;
-  }
+//     const float d = depth_image.at<float>(v, u);
 
-  // Undistort points
-  mat = mat.reshape(2);
-  cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
-  mat = mat.reshape(1);
+//     if (d > 0)
+//     {
+//       mvDepth[i] = d;
+//       mvuRight[i] = kpU.pt.x - mbf / d;
+//     }
+//   }
+// }
 
-  // Fill undistorted keypoint vector
-  mvKeysUn.resize(N);
-  for (int i = 0; i < N; i++)
-  {
-    cv::KeyPoint kp = mvKeys[i];
-    kp.pt.x = mat.at<float>(i, 0);
-    kp.pt.y = mat.at<float>(i, 1);
-    mvKeysUn[i] = kp;
-  }
-}
+// void Frame::AssignFeaturesToGrid()
+// {
+//   int nReserve = 0.5f * N / (FRAME_GRID_COLS * FRAME_GRID_ROWS);
+//   for (unsigned int i = 0; i < FRAME_GRID_COLS; i++)
+//     for (unsigned int j = 0; j < FRAME_GRID_ROWS; j++)
+//       orbGrid[i][j].reserve(nReserve);
 
-void Frame::ComputeImageBounds(const cv::Mat &img)
-{
-  if (mDistCoef.at<float>(0) != 0.0)
-  {
-    cv::Mat mat(4, 2, CV_32F);
-    mat.at<float>(0, 0) = 0.0;
-    mat.at<float>(0, 1) = 0.0;
-    mat.at<float>(1, 0) = img.cols;
-    mat.at<float>(1, 1) = 0.0;
-    mat.at<float>(2, 0) = 0.0;
-    mat.at<float>(2, 1) = img.rows;
-    mat.at<float>(3, 0) = img.cols;
-    mat.at<float>(3, 1) = img.rows;
+//   for (int i = 0; i < N; i++)
+//   {
+//     const cv::KeyPoint &kp = mvKeysUn[i];
 
-    // Undistort corners
-    mat = mat.reshape(2);
-    cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
-    mat = mat.reshape(1);
+//     int nGridPosX, nGridPosY;
+//     if (PosInGrid(kp, nGridPosX, nGridPosY))
+//       orbGrid[nGridPosX][nGridPosY].push_back(i);
+//   }
+// }
 
-    mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
-    mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
-    mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
-    mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
-  }
-  else
-  {
-    mnMinX = 0.0f;
-    mnMaxX = img.cols;
-    mnMinY = 0.0f;
-    mnMaxY = img.rows;
-  }
-}
+// void Frame::UndistortKeyPoints()
+// {
+//   if (N == 0)
+//     return;
 
-bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
-{
-  posX = round((kp.pt.x - mnMinX) * g_gridElementWidthInv);
-  posY = round((kp.pt.y - mnMinY) * g_gridElementHeightInv);
+//   if (mDistCoef.at<float>(0) == 0.0)
+//   {
+//     mvKeysUn = mvKeys;
+//     return;
+//   }
 
-  //Keypoint's coordinates are undistorted, which could cause to go out of the image
-  if (posX < 0 || posX >= FRAME_GRID_COLS || posY < 0 || posY >= FRAME_GRID_ROWS)
-    return false;
+//   // Fill matrix with points
+//   cv::Mat mat(N, 2, CV_32F);
+//   for (int i = 0; i < N; i++)
+//   {
+//     mat.at<float>(i, 0) = mvKeys[i].pt.x;
+//     mat.at<float>(i, 1) = mvKeys[i].pt.y;
+//   }
 
-  return true;
-}
+//   // Undistort points
+//   mat = mat.reshape(2);
+//   cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
+//   mat = mat.reshape(1);
 
-bool Frame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
-{
-  pMP->mbTrackInView = false;
+//   // Fill undistorted keypoint vector
+//   mvKeysUn.resize(N);
+//   for (int i = 0; i < N; i++)
+//   {
+//     cv::KeyPoint kp = mvKeys[i];
+//     kp.pt.x = mat.at<float>(i, 0);
+//     kp.pt.y = mat.at<float>(i, 1);
+//     mvKeysUn[i] = kp;
+//   }
+// }
 
-  // 3D in camera coordinates
-  Eigen::Vector3d Pc = mTcw.inverse() * pMP->mWorldPos;
-  const float &PcX = Pc(0);
-  const float &PcY = Pc(1);
-  const float &PcZ = Pc(2);
+// void Frame::ComputeImageBounds(const cv::Mat &img)
+// {
+//   if (mDistCoef.at<float>(0) != 0.0)
+//   {
+//     cv::Mat mat(4, 2, CV_32F);
+//     mat.at<float>(0, 0) = 0.0;
+//     mat.at<float>(0, 1) = 0.0;
+//     mat.at<float>(1, 0) = img.cols;
+//     mat.at<float>(1, 1) = 0.0;
+//     mat.at<float>(2, 0) = 0.0;
+//     mat.at<float>(2, 1) = img.rows;
+//     mat.at<float>(3, 0) = img.cols;
+//     mat.at<float>(3, 1) = img.rows;
 
-  // Check positive depth
-  if (PcZ < 0.0f)
-    return false;
+//     // Undistort corners
+//     mat = mat.reshape(2);
+//     cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
+//     mat = mat.reshape(1);
 
-  // Project in image and check it is not outside
-  const float invz = 1.0f / PcZ;
-  const float u = fx * PcX * invz + cx;
-  const float v = fy * PcY * invz + cy;
+//     mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
+//     mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
+//     mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
+//     mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
+//   }
+//   else
+//   {
+//     mnMinX = 0.0f;
+//     mnMaxX = img.cols;
+//     mnMinY = 0.0f;
+//     mnMaxY = img.rows;
+//   }
+// }
 
-  if (u < mnMinX || u > mnMaxX)
-    return false;
-  if (v < mnMinY || v > mnMaxY)
-    return false;
+// bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
+// {
+//   posX = round((kp.pt.x - mnMinX) * g_gridElementWidthInv);
+//   posY = round((kp.pt.y - mnMinY) * g_gridElementHeightInv);
 
-  // Check distance is in the scale invariance region of the MapPoint
-  const float maxDistance = pMP->GetMaxDistanceInvariance();
-  const float minDistance = pMP->GetMinDistanceInvariance();
-  const Eigen::Vector3d PO = pMP->mWorldPos - mTcw.translation();
-  const float dist = PO.norm();
+//   //Keypoint's coordinates are undistorted, which could cause to go out of the image
+//   if (posX < 0 || posX >= FRAME_GRID_COLS || posY < 0 || posY >= FRAME_GRID_ROWS)
+//     return false;
 
-  if (dist < minDistance || dist > maxDistance)
-    return false;
+//   return true;
+// }
 
-  // Check viewing angle
-  Eigen::Vector3d Pn = pMP->GetNormal();
+// bool Frame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
+// {
+//   pMP->mbTrackInView = false;
 
-  const float viewCos = PO.dot(Pn) / dist;
+//   // 3D in camera coordinates
+//   Eigen::Vector3d Pc = mTcw.inverse() * pMP->mWorldPos;
+//   const float &PcX = Pc(0);
+//   const float &PcY = Pc(1);
+//   const float &PcZ = Pc(2);
 
-  if (viewCos < viewingCosLimit)
-    return false;
+//   // Check positive depth
+//   if (PcZ < 0.0f)
+//     return false;
 
-  // Predict scale in the image
-  const int nPredictedLevel = pMP->PredictScale(dist, this);
+//   // Project in image and check it is not outside
+//   const float invz = 1.0f / PcZ;
+//   const float u = fx * PcX * invz + cx;
+//   const float v = fy * PcY * invz + cy;
 
-  // Data used by the tracking
-  pMP->mbTrackInView = true;
-  pMP->mTrackProjX = u;
-  pMP->mTrackProjXR = u - mbf * invz;
-  pMP->mTrackProjY = v;
-  pMP->mnTrackScaleLevel = nPredictedLevel;
-  pMP->mTrackViewCos = viewCos;
+//   if (u < mnMinX || u > mnMaxX)
+//     return false;
+//   if (v < mnMinY || v > mnMaxY)
+//     return false;
 
-  return true;
-}
+//   // Check distance is in the scale invariance region of the MapPoint
+//   const float maxDistance = pMP->GetMaxDistanceInvariance();
+//   const float minDistance = pMP->GetMinDistanceInvariance();
+//   const Eigen::Vector3d PO = pMP->mWorldPos - mTcw.translation();
+//   const float dist = PO.norm();
+
+//   if (dist < minDistance || dist > maxDistance)
+//     return false;
+
+//   // Check viewing angle
+//   Eigen::Vector3d Pn = pMP->GetNormal();
+
+//   const float viewCos = PO.dot(Pn) / dist;
+
+//   if (viewCos < viewingCosLimit)
+//     return false;
+
+//   // Predict scale in the image
+//   const int nPredictedLevel = pMP->PredictScale(dist, this);
+
+//   // Data used by the tracking
+//   pMP->mbTrackInView = true;
+//   pMP->mTrackProjX = u;
+//   pMP->mTrackProjXR = u - mbf * invz;
+//   pMP->mTrackProjY = v;
+//   pMP->mnTrackScaleLevel = nPredictedLevel;
+//   pMP->mTrackViewCos = viewCos;
+
+//   return true;
+// }
 
 } // namespace SLAM

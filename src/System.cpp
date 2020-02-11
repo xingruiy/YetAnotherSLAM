@@ -16,7 +16,7 @@ System::System(const std::string &strSettingFile) : viewer(nullptr)
         viewerThread = new thread(&Viewer::Run, viewer);
     }
 
-    mapping = new Mapping(mpMap, viewer);
+    mapping = new Mapping(mpMap);
     mappingThread = new thread(&Mapping::Run, mapping);
 
     tracker = new Tracking(this, mpMap, viewer, mapping);

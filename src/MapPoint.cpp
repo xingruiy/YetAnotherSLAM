@@ -260,19 +260,19 @@ int MapPoint::PredictScale(const float &currentDist, KeyFrame *pKF)
 
 int MapPoint::PredictScale(const float &currentDist, Frame *pFrame)
 {
-    float ratio;
-    {
-        unique_lock<mutex> lock(mMutexPos);
-        ratio = mfMaxDistance / currentDist;
-    }
+    // float ratio;
+    // {
+    //     unique_lock<mutex> lock(mMutexPos);
+    //     ratio = mfMaxDistance / currentDist;
+    // }
 
-    int nScale = ceil(log(ratio) / pFrame->mfLogScaleFactor);
-    if (nScale < 0)
-        nScale = 0;
-    else if (nScale >= pFrame->mnScaleLevels)
-        nScale = pFrame->mnScaleLevels - 1;
+    // int nScale = ceil(log(ratio) / pFrame->mfLogScaleFactor);
+    // if (nScale < 0)
+    //     nScale = 0;
+    // else if (nScale >= pFrame->mnScaleLevels)
+    //     nScale = pFrame->mnScaleLevels - 1;
 
-    return nScale;
+    // return nScale;
 }
 
 } // namespace SLAM

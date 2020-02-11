@@ -1,9 +1,10 @@
 #pragma once
 #include <mutex>
+#include <ORBextractor.h>
 #include "Map.h"
 #include "Frame.h"
 #include "MapPoint.h"
-#include "ORBVocabulary.h"
+// #include "ORBVocabulary.h"
 
 namespace SLAM
 {
@@ -15,7 +16,16 @@ class MapPoint;
 class KeyFrame
 {
 public:
-    KeyFrame(const Frame &F, Map *pMap);
+    KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor);
+
+private:
+    void UndistortKeys();
+    void AssignFeaturesToGrid();
+    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
+    void ComputeDepth(const cv::Mat depth);
+
+public:
+    KeyFrame(Frame &F, Map *pMap);
 
     // Bag of Words Representation
     void ComputeBoW();
@@ -27,7 +37,7 @@ public:
     // Covisibility Graph
     void UpdateConnections();
     void UpdateBestCovisibles();
-    void AddConnection(KeyFrame *pKF, const int &weight);
+    void AddConnection(KeyFrame *pKF, int &weight);
     void EraseConnection(KeyFrame *pKF);
     int GetWeight(KeyFrame *pKF);
 
@@ -42,7 +52,7 @@ public:
 
     Eigen::Vector3d UnprojectKeyPoint(int i);
     std::vector<MapPoint *> GetMapPointMatches();
-    std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, const float &r, const int minLevel, const int maxLevel) const;
+    std::vector<size_t> GetFeaturesInArea(float &x, float &y, float &r, int minLevel, int maxLevel);
 
 public:
     bool isBad();
@@ -58,29 +68,29 @@ public:
     static unsigned long nNextId;
 
     // Grid (to speed up feature matching)
-    const int mnGridCols;
-    const int mnGridRows;
+    int mnGridCols;
+    int mnGridRows;
     // Grid over the image to speed up feature matching
-    std::vector<std::vector<std::vector<size_t>>> orbGrid;
+    std::vector<std::vector<std::vector<size_t>>> mGrid;
 
     // Variables used by the local mapping
     long unsigned int mnBALocalForKF;
     long unsigned int mnBAFixedForKF;
 
     // Calibration parameters
-    const float mbf, mThDepth;
-    const int mnMinX, mnMinY, mnMaxX, mnMaxY;
-    const float fx, fy, cx, cy, invfx, invfy;
+    float mbf, mThDepth;
+    int mnMinX, mnMinY, mnMaxX, mnMaxY;
+    float fx, fy, cx, cy, invfx, invfy;
 
     // Number of KeyPoints
-    const int N;
+    int N;
 
     // KeyPoints
-    const std::vector<float> mvDepth;
-    const std::vector<float> mvuRight;
-    const std::vector<cv::KeyPoint> mvKeys;
-    const std::vector<cv::KeyPoint> mvKeysUn;
-    const cv::Mat mDescriptors;
+    std::vector<float> mvDepth;
+    std::vector<float> mvuRight;
+    std::vector<cv::KeyPoint> mvKeys;
+    std::vector<cv::KeyPoint> mvKeysUn;
+    cv::Mat mDescriptors;
 
     // MapPoints associated to keypoints
     std::vector<bool> mvbOutlier;
@@ -88,27 +98,27 @@ public:
     std::vector<MapPoint *> mvpObservedMapPoints;
 
     // BoW
-    DBoW2::BowVector mBowVec;
-    DBoW2::FeatureVector mFeatVec;
+    // DBoW2::BowVector mBowVec;
+    // DBoW2::FeatureVector mFeatVec;
 
     // Feature extractor
-    ORB_SLAM2::ORBVocabulary *mpORBvocabulary;
+    // ORB_SLAM2::ORBVocabulary *mpORBvocabulary;
 
     // Scale data
     // This is extracted from ORB extractor
 
     // Total scale levels
-    const int mnScaleLevels;
+    int mnScaleLevels;
     // scale factor of each level
-    const float mfScaleFactor;
+    float mfScaleFactor;
     // log scale factor of each level
-    const float mfLogScaleFactor;
+    float mfLogScaleFactor;
     // scale pyramid
-    const std::vector<float> mvScaleFactors;
+    std::vector<float> mvScaleFactors;
     // scale pyramid ^2
-    const std::vector<float> mvLevelSigma2;
+    std::vector<float> mvLevelSigma2;
     // inverse scale pyramid^2
-    const std::vector<float> mvInvLevelSigma2;
+    std::vector<float> mvInvLevelSigma2;
 
     Map *mpMap;
 
@@ -128,6 +138,8 @@ public:
     std::mutex mMutexPose;
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
+
+    ORB_SLAM2::ORBextractor *mpExtractor;
 };
 
 } // namespace SLAM
