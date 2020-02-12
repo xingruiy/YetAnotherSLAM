@@ -6,12 +6,11 @@
 #include <Thirdparty/g2o/g2o/core/robust_kernel_impl.h>
 #include <Thirdparty/g2o/g2o/solvers/linear_solver_dense.h>
 #include <Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h>
+#include <mutex>
+#include <Eigen/StdVector>
 
 #include "Bundler.h"
 #include "Converter.h"
-
-#include <mutex>
-#include <Eigen/StdVector>
 
 namespace SLAM
 {
@@ -24,64 +23,65 @@ void Bundler::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
     lLocalKeyFrames.push_back(pKF);
     pKF->mnBALocalForKF = pKF->mnId;
 
-    // const vector<KeyFrame *> vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
-    // for (int i = 0, iend = vNeighKFs.size(); i < iend; i++)
-    // {
-    //     KeyFrame *pKFi = vNeighKFs[i];
-    //     pKFi->mnBALocalForKF = pKF->mnId;
-    //     if (!pKFi->isBad())
-    //         lLocalKeyFrames.push_back(pKFi);
-    // }
+    const auto vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
+    for (int i = 0, iend = vNeighKFs.size(); i < iend; i++)
+    {
+        KeyFrame *pKFi = vNeighKFs[i];
+        pKFi->mnBALocalForKF = pKF->mnId;
+        if (!pKFi->isBad())
+            lLocalKeyFrames.push_back(pKFi);
+    }
 
-    // // Local MapPoints seen in Local KeyFrames
-    // list<MapPoint *> lLocalMapPoints;
-    // for (list<KeyFrame *>::iterator lit = lLocalKeyFrames.begin(), lend = lLocalKeyFrames.end(); lit != lend; lit++)
-    // {
-    //     vector<MapPoint *> vpMPs = (*lit)->GetMapPointMatches();
-    //     for (vector<MapPoint *>::iterator vit = vpMPs.begin(), vend = vpMPs.end(); vit != vend; vit++)
-    //     {
-    //         MapPoint *pMP = *vit;
-    //         if (pMP)
-    //             if (!pMP->isBad())
-    //                 if (pMP->mnBALocalForKF != pKF->mnId)
-    //                 {
-    //                     lLocalMapPoints.push_back(pMP);
-    //                     pMP->mnBALocalForKF = pKF->mnId;
-    //                 }
-    //     }
-    // }
+    // Local MapPoints seen in Local KeyFrames
+    std::list<MapPoint *> lLocalMapPoints;
+    for (auto lit = lLocalKeyFrames.begin(), lend = lLocalKeyFrames.end(); lit != lend; lit++)
+    {
+        std::vector<MapPoint *> vpMPs = (*lit)->GetMapPointMatches();
+        for (auto vit = vpMPs.begin(), vend = vpMPs.end(); vit != vend; vit++)
+        {
+            MapPoint *pMP = *vit;
+            if (pMP)
+                if (!pMP->isBad())
+                    if (pMP->mnBALocalForKF != pKF->mnId)
+                    {
+                        lLocalMapPoints.push_back(pMP);
+                        pMP->mnBALocalForKF = pKF->mnId;
+                    }
+        }
+    }
 
-    // // Fixed Keyframes. Keyframes that see Local MapPoints but that are not Local Keyframes
-    // list<KeyFrame *> lFixedCameras;
-    // for (list<MapPoint *>::iterator lit = lLocalMapPoints.begin(), lend = lLocalMapPoints.end(); lit != lend; lit++)
-    // {
-    //     map<KeyFrame *, size_t> observations = (*lit)->GetObservations();
-    //     for (map<KeyFrame *, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
-    //     {
-    //         KeyFrame *pKFi = mit->first;
+    // Fixed Keyframes.
+    // Keyframes that see Local MapPoints but that are not Local Keyframes
+    std::list<KeyFrame *> lFixedCameras;
+    for (auto lit = lLocalMapPoints.begin(), lend = lLocalMapPoints.end(); lit != lend; lit++)
+    {
+        auto observations = (*lit)->GetObservations();
+        for (auto mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+        {
+            KeyFrame *pKFi = mit->first;
 
-    //         if (pKFi->mnBALocalForKF != pKF->mnId && pKFi->mnBAFixedForKF != pKF->mnId)
-    //         {
-    //             pKFi->mnBAFixedForKF = pKF->mnId;
-    //             if (!pKFi->isBad())
-    //                 lFixedCameras.push_back(pKFi);
-    //         }
-    //     }
-    // }
+            if (pKFi->mnBALocalForKF != pKF->mnId && pKFi->mnBAFixedForKF != pKF->mnId)
+            {
+                pKFi->mnBAFixedForKF = pKF->mnId;
+                if (!pKFi->isBad())
+                    lFixedCameras.push_back(pKFi);
+            }
+        }
+    }
 
-    // // Setup optimizer
-    // g2o::SparseOptimizer optimizer;
-    // g2o::BlockSolver_6_3::LinearSolverType *linearSolver;
+    // Setup optimizer
+    g2o::SparseOptimizer optimizer;
+    g2o::BlockSolver_6_3::LinearSolverType *linearSolver;
 
-    // linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolver_6_3::PoseMatrixType>();
+    linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolver_6_3::PoseMatrixType>();
 
-    // g2o::BlockSolver_6_3 *solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
+    g2o::BlockSolver_6_3 *solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
 
-    // g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-    // optimizer.setAlgorithm(solver);
+    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+    optimizer.setAlgorithm(solver);
 
-    // if (pbStopFlag)
-    //     optimizer.setForceStopFlag(pbStopFlag);
+    if (pbStopFlag)
+        optimizer.setForceStopFlag(pbStopFlag);
 
     // unsigned long maxKFid = 0;
 

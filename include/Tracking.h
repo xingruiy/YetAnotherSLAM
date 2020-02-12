@@ -6,6 +6,7 @@
 #include "Viewer.h"
 #include "Mapping.h"
 #include "System.h"
+#include "GlobalDef.h"
 #include "DenseMapping.h"
 #include "DenseTracking.h"
 
@@ -20,7 +21,7 @@ class Tracking
 {
 public:
     Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping);
-    void trackImage(cv::Mat img, cv::Mat depth, const double timeStamp);
+    void trackImage(cv::Mat ImGray, cv::Mat Depth, const double TimeStamp);
     void reset();
 
 private:
@@ -31,8 +32,8 @@ private:
         Lost
     };
 
-    Frame *currentFrame;
-    Frame *lastFrame;
+    Frame NextFrame;
+    Frame lastFrame;
     Sophus::SE3d T_ref2World;
 
     void initialisation();

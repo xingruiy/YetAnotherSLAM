@@ -16,6 +16,7 @@ class KeyFrame;
 class MapPoint
 {
 public:
+    MapPoint(const Eigen::Vector3d &Pos, KeyFrame *pRefKF, Map *pMap);
     MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF);
     std::map<KeyFrame *, size_t> GetObservations();
     int Observations();
@@ -25,6 +26,7 @@ public:
     void SetBadFlag();
     bool isBad();
 
+    Eigen::Vector3d GetWorldPos();
     Eigen::Vector3d GetNormal();
     void Replace(MapPoint *pMP);
     MapPoint *GetReplaced();
@@ -86,6 +88,11 @@ public:
     float mfMinDistance;
     float mfMaxDistance;
 
+    // Temporary varialbes
+    unsigned long mnBALocalForKF;
+    unsigned long mnFuseCandidateForKF;
+    unsigned long mnTrackReferenceForFrame;
+
     // Variables used by the tracking
     float mTrackProjX;
     float mTrackProjY;
@@ -93,7 +100,6 @@ public:
     bool mbTrackInView;
     int mnTrackScaleLevel;
     float mTrackViewCos;
-    long unsigned int mnTrackReferenceForFrame;
 };
 
 } // namespace SLAM

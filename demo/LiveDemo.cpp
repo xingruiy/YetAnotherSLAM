@@ -3,14 +3,14 @@
 
 int main(int argc, char **argv)
 {
-    if (argc <= 1)
+    if (argc <= 2)
     {
-        std::cout << "usage: ./liveDemo settingsFile" << std::endl;
+        std::cout << "usage: ./liveDemo settingsFile ORBVocFile" << std::endl;
         exit(-1);
     }
 
     ONI::Camera cam;
-    SLAM::System sys(argv[1]);
+    SLAM::System sys(argv[1], argv[2]);
 
     cv::Mat imDepth, imRGB;
 

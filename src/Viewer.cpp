@@ -1,5 +1,4 @@
 #include "Viewer.h"
-#define ENTER_KEY 13
 
 namespace SLAM
 {

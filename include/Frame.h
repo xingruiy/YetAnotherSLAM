@@ -14,16 +14,16 @@ class KeyFrame;
 struct Frame
 {
     ~Frame();
+    Frame() = default;
+    Frame(const Frame &F);
     Frame(cv::Mat image, cv::Mat depth, double timeStamp);
 
     // Frame ID
-    unsigned long mnId;
-    static unsigned long mnNextId;
+    // unsigned long mnId;
+    // static unsigned long mnNextId;
 
     // Pose
     Sophus::SE3d mTcw;
-    Sophus::SE3d T_frame2World;
-    Sophus::SE3d T_frame2last;
     Sophus::SE3d T_frame2Ref;
 
     // A copy of the input frame

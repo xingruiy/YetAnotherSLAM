@@ -1,10 +1,12 @@
 #pragma once
 #include <mutex>
 #include <ORBextractor.h>
+#include <ORBVocabulary.h>
+#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
+#include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
 #include "Map.h"
 #include "Frame.h"
 #include "MapPoint.h"
-// #include "ORBVocabulary.h"
 
 namespace SLAM
 {
@@ -19,14 +21,20 @@ public:
     KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor);
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
     void AddMapPoint(MapPoint *pMP, const size_t &idx);
-    Eigen::Vector3d UnprojectKeyPoint(int i);
-    std::vector<MapPoint *> GetMapPointMatches();
-    std::vector<size_t> GetFeaturesInArea(float &x, float &y, float r, int minlvl, int maxlvl);
 
+    cv::Mat GetRotation() const;
+    cv::Mat GetTranslation() const;
+
+    Eigen::Vector3d UnprojectKeyPoint(int i);
+    MapPoint *GetMapPoint(const size_t &idx);
+    std::set<MapPoint *> GetMapPoints();
+    std::vector<MapPoint *> GetMapPointMatches();
+    std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, float r, int minlvl = -1, int maxlvl = -1);
+    bool IsInImage(const float &x, const float &y) const;
     bool isBad();
 
     // Bag of Words Representation
-    void ComputeBoW();
+    void ComputeBoW(ORB_SLAM2::ORBVocabulary *voc);
     // Destroy frame
     void SetBadFlag();
 
@@ -36,7 +44,10 @@ public:
     void UpdateBestCovisibles();
     void AddConnection(KeyFrame *pKF, int &weight);
     void EraseConnection(KeyFrame *pKF);
+    std::set<KeyFrame *> GetConnectedKeyFrames();
     std::vector<KeyFrame *> GetVectorCovisibleKeyFrames();
+    std::vector<KeyFrame *> GetBestCovisibilityKeyFrames(const int &N);
+    std::vector<KeyFrame *> GetCovisiblesByWeight(const int &w);
 
     // Spanning tree functions
     KeyFrame *GetParent();
@@ -47,34 +58,24 @@ public:
     bool hasChild(KeyFrame *pKF);
 
 public:
-    bool mbBad;
+    Map *mpMap;
 
+    bool mbBad;
     bool mbNotErase;
     bool mbToBeErased;
 
-    // cv::Mat mImGray;
     double mTimeStamp;
-
-    Map *mpMap;
-
-    unsigned long mnId;
-    static unsigned long nNextId;
 
     // Grid over the image to speed up feature matching
     std::vector<std::vector<std::vector<size_t>>> mGrid;
 
-    // Variables used by the local mapping
-    long unsigned int mnBALocalForKF;
-    long unsigned int mnBAFixedForKF;
-
     // Calibration parameters
-    float mbf, mThDepth;
+    float mb, mbf, mThDepth;
     float fx, fy, cx, cy, invfx, invfy;
+    cv::Mat mK;
 
-    // Number of KeyPoints
-    int N;
-
-    // KeyPoints
+    // KeyPoints configurations
+    int N; // Number of KeyPoints
     std::vector<float> mvDepth;
     std::vector<float> mvuRight;
     std::vector<cv::KeyPoint> mvKeys;
@@ -85,6 +86,7 @@ public:
     std::vector<bool> mvbOutlier;
     std::vector<MapPoint *> mvpMapPoints;
 
+    // ORB scale pyramid info
     int mnScaleLevels;                   // Total scale levels
     float mfScaleFactor;                 // scale factor of each level
     float mfLogScaleFactor;              // log scale factor of each level
@@ -108,10 +110,25 @@ public:
     std::mutex poseMutex;
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
+    KeyFrame *mReferenceKeyFrame;
 
-    ORB_SLAM2::ORBextractor *mpExtractor;
+    static bool weightComp(int a, int b)
+    {
+        return a > b;
+    }
 
-private:
+    // Variables used by the local mapping
+    unsigned long mnBALocalForKF;
+    unsigned long mnBAFixedForKF;
+    unsigned long mnFuseTargetForKF;
+
+    unsigned long mnId;
+    static unsigned long nNextId;
+
+    // Bag of Words Vector structures.
+    DBoW2::BowVector mBowVec;
+    DBoW2::FeatureVector mFeatVec;
+
     void UndistortKeys();
     void AssignFeaturesToGrid();
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);

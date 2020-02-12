@@ -8,9 +8,20 @@ namespace SLAM
 std::mutex MapPoint::mGlobalMutex;
 unsigned long MapPoint::nNextId = 0;
 
+MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
+    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1),
+      mnTrackReferenceForFrame(-1), mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0),
+      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId)
+{
+    mNormalVector = Eigen::Vector3d::Zero();
+
+    mnId = nNextId++;
+}
+
 MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF)
     : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1),
-      mnTrackReferenceForFrame(0)
+      mnTrackReferenceForFrame(-1), mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0),
+      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId)
 {
     mnId = nNextId++;
 
@@ -108,6 +119,12 @@ Eigen::Vector3d MapPoint::GetNormal()
 {
     std::unique_lock<std::mutex> lock2(mMutexPos);
     return mNormalVector;
+}
+
+Eigen::Vector3d MapPoint::GetWorldPos()
+{
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    return mWorldPos;
 }
 
 MapPoint *MapPoint::GetReplaced()

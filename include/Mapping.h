@@ -13,8 +13,8 @@ namespace SLAM
 class Mapping
 {
 public:
-    Mapping(Map *map);
-    void addKeyFrameCandidate(Frame *F);
+    Mapping(const std::string &strVocFile, Map *map);
+    void AddKeyFrameCandidate(const Frame &F);
     void reset();
     void Run();
 
@@ -26,19 +26,25 @@ private:
     void SearchInNeighbors();
     void CreateNewMapPoints();
     void UpdateConnections();
+    cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
+    cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 
     // keyframe candidate
     std::mutex frameMutex;
-    std::list<Frame *> newFrameQueue;
-    Frame *currentFrame;
-    KeyFrame *currentKeyFrame;
+    Frame NextFrame;
+    std::list<Frame> mlFrameQueue;
+    KeyFrame *NextKeyFrame;
+    KeyFrame *lastKeyFrame;
     KeyFrame *referenceKeyframe;
 
     ORB_SLAM2::ORBextractor *ORBExtractor;
+    ORB_SLAM2::ORBVocabulary *ORBvocabulary;
+
     std::vector<KeyFrame *> localKeyFrames;
     std::vector<MapPoint *> localMapPoints;
 
     Map *mpMap;
+    std::list<MapPoint *> mlpRecentAddedMapPoints;
 };
 
 } // namespace SLAM

@@ -3,7 +3,8 @@
 namespace SLAM
 {
 
-System::System(const std::string &strSettingFile) : viewer(nullptr)
+System::System(const std::string &strSettingFile, const std::string &strVocFile)
+    : viewer(nullptr)
 {
     readSettings(strSettingFile);
 
@@ -15,7 +16,7 @@ System::System(const std::string &strSettingFile) : viewer(nullptr)
         viewerThread = new std::thread(&Viewer::Run, viewer);
     }
 
-    mapping = new Mapping(mpMap);
+    mapping = new Mapping(strVocFile, mpMap);
     mappingThread = new std::thread(&Mapping::Run, mapping);
     tracker = new Tracking(this, mpMap, viewer, mapping);
 

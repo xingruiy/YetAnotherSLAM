@@ -1,5 +1,6 @@
 #include "KeyFrame.h"
-// #include "Converter.h"
+#include "Converter.h"
+#include "GlobalDef.h"
 
 namespace SLAM
 {
@@ -11,19 +12,22 @@ KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
 {
   mnId = nNextId++;
 
+  mGrid.resize(FRAME_GRID_COLS);
+  for (int i = 0; i < FRAME_GRID_COLS; i++)
+    mGrid[i].resize(FRAME_GRID_ROWS);
+
   (*pExtractor)(F->mImGray, cv::Mat(), mvKeys, mDescriptors);
   N = mvKeys.size();
   mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
 
   UndistortKeys();
-
+  AssignFeaturesToGrid();
   ComputeDepth(F->mImDepth);
 
   // Scale Level Info
   mnScaleLevels = pExtractor->GetLevels();
   mfScaleFactor = pExtractor->GetScaleFactor();
-  // For predicting scales
-  mfLogScaleFactor = log(mfScaleFactor);
+  mfLogScaleFactor = log(mfScaleFactor); // For predicting scales
   mvScaleFactors = pExtractor->GetScaleFactors();
   mvLevelSigma2 = pExtractor->GetScaleSigmaSquares();
   mvInvLevelSigma2 = pExtractor->GetInverseScaleSigmaSquares();
@@ -35,7 +39,14 @@ KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
   invfx = g_invfx[0];
   invfy = g_invfy[0];
   mbf = g_bf;
+  mb = mbf / fx;
   mThDepth = g_thDepth;
+
+  mK = cv::Mat::eye(3, 3, CV_32F);
+  mK.at<float>(0, 0) = fx;
+  mK.at<float>(1, 1) = fy;
+  mK.at<float>(0, 2) = cx;
+  mK.at<float>(1, 2) = cy;
 }
 
 void KeyFrame::UndistortKeys()
@@ -70,6 +81,15 @@ void KeyFrame::UndistortKeys()
     kp.pt.x = mat.at<float>(i, 0);
     kp.pt.y = mat.at<float>(i, 1);
     mvKeysUn[i] = kp;
+  }
+}
+
+void KeyFrame::ComputeBoW(ORB_SLAM2::ORBVocabulary *voc)
+{
+  if (mBowVec.empty())
+  {
+    std::vector<cv::Mat> vCurrentDesc = ORB_SLAM2::Converter::toDescriptorVector(mDescriptors);
+    voc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
   }
 }
 
@@ -134,20 +154,40 @@ std::vector<MapPoint *> KeyFrame::GetMapPointMatches()
   return mvpMapPoints;
 }
 
+MapPoint *KeyFrame::GetMapPoint(const size_t &idx)
+{
+  std::unique_lock<std::mutex> lock(mMutexFeatures);
+  return mvpMapPoints[idx];
+}
+
+std::set<MapPoint *> KeyFrame::GetMapPoints()
+{
+  std::unique_lock<std::mutex> lock(mMutexFeatures);
+  std::set<MapPoint *> s;
+  for (size_t i = 0, iend = mvpMapPoints.size(); i < iend; i++)
+  {
+    if (!mvpMapPoints[i])
+      continue;
+    MapPoint *pMP = mvpMapPoints[i];
+    if (!pMP->isBad())
+      s.insert(pMP);
+  }
+  return s;
+}
+
 Eigen::Vector3d KeyFrame::UnprojectKeyPoint(int i)
 {
-  float z = mvDepth[i];
-
+  const float z = mvDepth[i];
   if (z > 0)
   {
-    float u = mvKeysUn[i].pt.x;
-    float v = mvKeysUn[i].pt.y;
-    float x = (u - cx) * z * invfx;
-    float y = (v - cy) * z * invfy;
-    Eigen::Vector3d pt3D(x, y, z);
+    const float u = mvKeysUn[i].pt.x;
+    const float v = mvKeysUn[i].pt.y;
+    const float x = (u - cx) * z * invfx;
+    const float y = (v - cy) * z * invfy;
+    Eigen::Vector3d x3Dc(x, y, z);
 
     std::unique_lock<std::mutex> lock(poseMutex);
-    return mTcw * pt3D;
+    return mTcw * x3Dc;
   }
   else
   {
@@ -155,7 +195,7 @@ Eigen::Vector3d KeyFrame::UnprojectKeyPoint(int i)
   }
 }
 
-std::vector<size_t> KeyFrame::GetFeaturesInArea(float &x, float &y, float r, int minLevel, int maxLevel)
+std::vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, float r, int minLevel, int maxLevel)
 {
   std::vector<size_t> vIndices;
   vIndices.reserve(N);
@@ -209,6 +249,11 @@ std::vector<size_t> KeyFrame::GetFeaturesInArea(float &x, float &y, float r, int
   }
 
   return vIndices;
+}
+
+bool KeyFrame::IsInImage(const float &x, const float &y) const
+{
+  return (x >= g_minX && x < g_maxX && y >= g_minY && y < g_maxY);
 }
 
 bool KeyFrame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
@@ -402,6 +447,32 @@ std::vector<KeyFrame *> KeyFrame::GetVectorCovisibleKeyFrames()
   return mvpOrderedConnectedKeyFrames;
 }
 
+std::vector<KeyFrame *> KeyFrame::GetBestCovisibilityKeyFrames(const int &N)
+{
+  std::unique_lock<std::mutex> lock(mMutexConnections);
+  if ((int)mvpOrderedConnectedKeyFrames.size() < N)
+    return mvpOrderedConnectedKeyFrames;
+  else
+    return std::vector<KeyFrame *>(mvpOrderedConnectedKeyFrames.begin(), mvpOrderedConnectedKeyFrames.begin() + N);
+}
+
+std::vector<KeyFrame *> KeyFrame::GetCovisiblesByWeight(const int &w)
+{
+  std::unique_lock<std::mutex> lock(mMutexConnections);
+
+  if (mvpOrderedConnectedKeyFrames.empty())
+    return std::vector<KeyFrame *>();
+
+  auto it = upper_bound(mvOrderedWeights.begin(), mvOrderedWeights.end(), w, KeyFrame::weightComp);
+  if (it == mvOrderedWeights.end())
+    return std::vector<KeyFrame *>();
+  else
+  {
+    int n = it - mvOrderedWeights.begin();
+    return std::vector<KeyFrame *>(mvpOrderedConnectedKeyFrames.begin(), mvpOrderedConnectedKeyFrames.begin() + n);
+  }
+}
+
 int KeyFrame::GetWeight(KeyFrame *pKF)
 {
   std::unique_lock<std::mutex> lock(mMutexConnections);
@@ -531,6 +602,28 @@ void KeyFrame::EraseConnection(KeyFrame *pKF)
 
   if (bUpdate)
     UpdateBestCovisibles();
+}
+
+cv::Mat KeyFrame::GetRotation() const
+{
+  cv::Mat cvMat(3, 3, CV_32F);
+  Eigen::Matrix3d R = mTcw.rotationMatrix();
+
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++)
+      cvMat.at<float>(i, j) = R(i, j);
+
+  return cvMat.clone();
+}
+
+cv::Mat KeyFrame::GetTranslation() const
+{
+  cv::Mat cvMat(3, 1, CV_32F);
+  Eigen::Vector3d Ow = mTcw.translation();
+  for (int i = 0; i < 3; i++)
+    cvMat.at<float>(i) = Ow(i);
+
+  return cvMat;
 }
 
 } // namespace SLAM

@@ -23,7 +23,7 @@ class System
 {
 public:
     ~System();
-    System(const std::string &strSettingFile);
+    System(const std::string &strSettingFile, const std::string &strVocFile);
     void trackImage(cv::Mat img, cv::Mat depth, const double timeStamp);
     void kill();
     void reset();
