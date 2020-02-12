@@ -24,10 +24,9 @@ private:
     void LookforPointMatches();
     void KeyFrameCulling();
     void SearchInNeighbors();
+    void TriangulatePoints();
     void CreateNewMapPoints();
     void UpdateConnections();
-    cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
-    cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 
     // keyframe candidate
     std::mutex frameMutex;
@@ -45,6 +44,9 @@ private:
 
     Map *mpMap;
     std::list<MapPoint *> mlpRecentAddedMapPoints;
+
+    cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
+    cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 };
 
 } // namespace SLAM

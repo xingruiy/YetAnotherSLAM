@@ -41,6 +41,8 @@ void Mapping::Run()
                 KeyFrameCulling();
             }
 
+            TriangulatePoints();
+
             CreateNewMapPoints();
 
             UpdateConnections();
@@ -145,6 +147,8 @@ void Mapping::LookforPointMatches()
 
     // Update covisibility based on the correspondences
     NextKeyFrame->UpdateConnections();
+
+    std::cout << "matched map points: " << nToMatch;
 }
 
 void Mapping::KeyFrameCulling()
@@ -284,7 +288,7 @@ void Mapping::SearchInNeighbors()
     NextKeyFrame->UpdateConnections();
 }
 
-void Mapping::CreateNewMapPoints()
+void Mapping::TriangulatePoints()
 {
     // Retrieve neighbor keyframes in covisibility graph
     const auto vpNeighKFs = NextKeyFrame->GetBestCovisibilityKeyFrames(10);
@@ -334,11 +338,11 @@ void Mapping::CreateNewMapPoints()
         std::vector<std::pair<size_t, size_t>> vMatchedIndices;
         matcher.SearchForTriangulation(NextKeyFrame, pKF2, F12, vMatchedIndices, false);
 
-        cv::Mat Rwc2 = pKF2->GetRotation();
-        cv::Mat Rcw2 = Rwc2.t();
-        cv::Mat twc2 = -Rcw2 * Ow2;
+        cv::Mat Rcw2 = pKF2->GetRotation();
+        cv::Mat Rwc2 = Rcw2.t();
+        cv::Mat twc2 = -Rwc2 * Ow2;
         cv::Mat Twc2(3, 4, CV_32F);
-        Rcw2.copyTo(Twc2.colRange(0, 3));
+        Rwc2.copyTo(Twc2.colRange(0, 3));
         twc2.copyTo(Twc2.col(3));
 
         const float &fx2 = pKF2->fx;
@@ -417,11 +421,11 @@ void Mapping::CreateNewMapPoints()
             cv::Mat x3Dt = x3D.t();
 
             //Check triangulation in front of cameras
-            float z1 = Rcw1.row(2).dot(x3Dt) + twc1.at<float>(2);
+            float z1 = Rwc1.row(2).dot(x3Dt) + twc1.at<float>(2);
             if (z1 <= 0)
                 continue;
 
-            float z2 = Rcw2.row(2).dot(x3Dt) + twc2.at<float>(2);
+            float z2 = Rwc2.row(2).dot(x3Dt) + twc2.at<float>(2);
             if (z2 <= 0)
                 continue;
 
@@ -515,6 +519,68 @@ void Mapping::CreateNewMapPoints()
             nnew++;
         }
     }
+
+    std::cout << "triangulated points: " << nnew << std::endl;
+}
+
+void Mapping::CreateNewMapPoints()
+{
+    // We sort points by the measured depth by the stereo/RGBD sensor.
+    // We create all those MapPoints whose depth < mThDepth.
+    // If there are less than 100 close points we create the 100 closest.
+    std::vector<std::pair<float, int>> vDepthIdx;
+    vDepthIdx.reserve(NextKeyFrame->N);
+    for (int i = 0; i < NextKeyFrame->N; i++)
+    {
+        float z = NextKeyFrame->mvDepth[i];
+        if (z > 0)
+        {
+            vDepthIdx.push_back(std::make_pair(z, i));
+        }
+    }
+
+    int nPoints = 0;
+
+    if (!vDepthIdx.empty())
+    {
+        std::sort(vDepthIdx.begin(), vDepthIdx.end());
+        for (size_t j = 0; j < vDepthIdx.size(); j++)
+        {
+            int i = vDepthIdx[j].second;
+
+            bool bCreateNew = false;
+            MapPoint *pMP = NextKeyFrame->mvpMapPoints[i];
+            if (!pMP)
+                bCreateNew = true;
+            else if (pMP->Observations() < 1)
+            {
+                bCreateNew = true;
+                NextKeyFrame->mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
+            }
+
+            if (bCreateNew)
+            {
+                auto x3D = NextKeyFrame->UnprojectKeyPoint(i);
+                MapPoint *pNewMP = new MapPoint(x3D, NextKeyFrame, mpMap);
+                pNewMP->AddObservation(NextKeyFrame, i);
+                NextKeyFrame->AddMapPoint(pNewMP, i);
+                pNewMP->ComputeDistinctiveDescriptors();
+                pNewMP->UpdateNormalAndDepth();
+                mpMap->AddMapPoint(pNewMP);
+                NextKeyFrame->AddMapPoint(pNewMP, i);
+                nPoints++;
+            }
+            else
+            {
+                nPoints++;
+            }
+
+            if (vDepthIdx[j].first > g_thDepth && nPoints > 100)
+                break;
+        }
+    }
+
+    std::cout << "points created in the keyframe: " << nPoints << std::endl;
 }
 
 void Mapping::UpdateConnections()
