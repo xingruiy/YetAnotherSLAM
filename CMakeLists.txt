@@ -35,7 +35,7 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/tools/
     ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/include
-    ${PROJECT_SOURCE_DIR}/tools/DENSE/include
+    ${PROJECT_SOURCE_DIR}/tools/CudaUtilities/include
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/include
 )
@@ -47,8 +47,8 @@ PUBLIC
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
-    ${PROJECT_SOURCE_DIR}/tools/DENSE/lib/libDENSE.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
+    ${PROJECT_SOURCE_DIR}/tools/CudaUtilities/lib/libCudaUtilities.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/g2o/lib/libg2o.so
 )

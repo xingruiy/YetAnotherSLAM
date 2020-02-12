@@ -16,7 +16,7 @@
 namespace SLAM
 {
 
-void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
+void Bundler::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
 {
     // Local KeyFrames: First Breath Search from Current Keyframe
     std::list<KeyFrame *> lLocalKeyFrames;
@@ -308,7 +308,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap
     // }
 
     // // Get Map Mutex
-    // unique_lock<mutex> lock(pMap->mMutexMapUpdate);
+    // std::unique_lock<std::mutex> lock(pMap->mMutexMapUpdate);
 
     // if (!vToErase.empty())
     // {

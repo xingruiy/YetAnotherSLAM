@@ -1,5 +1,4 @@
 #include "System.h"
-#include "DENSE/include/ImageProc.h"
 
 namespace SLAM
 {
@@ -13,13 +12,13 @@ System::System(const std::string &strSettingFile) : viewer(nullptr)
     if (g_bEnableViewer)
     {
         viewer = new Viewer(this, mpMap);
-        viewerThread = new thread(&Viewer::Run, viewer);
+        viewerThread = new std::thread(&Viewer::Run, viewer);
     }
 
     mapping = new Mapping(mpMap);
-    mappingThread = new thread(&Mapping::Run, mapping);
-
+    mappingThread = new std::thread(&Mapping::Run, mapping);
     tracker = new Tracking(this, mpMap, viewer, mapping);
+
     std::cout << "Main Thread Started." << std::endl;
 }
 
@@ -60,6 +59,7 @@ void System::kill()
 System::~System()
 {
     std::cout << "System Waits for Other Threads." << std::endl;
+
     mappingThread->join();
     viewerThread->join();
 
@@ -95,7 +95,6 @@ void System::readSettings(const std::string &strSettingFile)
     g_ORBMinThFAST = settingsFile["ORB_SLAM2.minThFAST"];
 
     // read calibration parameters
-    g_bf = settingsFile["Calibration.bf"];
     int width = settingsFile["Calibration.width"];
     int height = settingsFile["Calibration.height"];
     float fx = settingsFile["Calibration.fx"];
@@ -107,7 +106,8 @@ void System::readSettings(const std::string &strSettingFile)
     setGlobalCalibration(width, height, calib);
 
     // Update tracking parameters
-    g_thDepth = g_bf * (float)settingsFile["Tracking.ThDepth"] / g_fx[0];
+    g_bf = settingsFile["Calibration.bf"];
+    g_thDepth = g_bf * (float)settingsFile["Tracking.ThDepth"] / fx;
 
     // read distortion coefficients
     g_distCoeff = cv::Mat(4, 1, CV_32F);

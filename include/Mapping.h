@@ -10,9 +10,6 @@
 namespace SLAM
 {
 
-class Viewer;
-class MapViewer;
-
 class Mapping
 {
 public:
@@ -27,42 +24,21 @@ private:
     void LookforPointMatches();
     void KeyFrameCulling();
     void SearchInNeighbors();
+    void CreateNewMapPoints();
+    void UpdateConnections();
+
+    // keyframe candidate
+    std::mutex frameMutex;
+    std::list<Frame *> newFrameQueue;
+    Frame *currentFrame;
+    KeyFrame *currentKeyFrame;
+    KeyFrame *referenceKeyframe;
 
     ORB_SLAM2::ORBextractor *ORBExtractor;
     std::vector<KeyFrame *> localKeyFrames;
     std::vector<MapPoint *> localMapPoints;
 
-public:
-    void InsertKeyFrame(KeyFrame *pKF);
-
-protected:
-    // void doTasks();
-
-    // void MatchLocalPoints();
-    // void CreateNewMapPoints();
-    // void UpdateLocalMap();
-
-    // The global map
     Map *mpMap;
-
-    std::mutex frameMutex;
-    std::list<Frame *> newFrameQueue;
-    Frame *currentFrame;
-    KeyFrame *currentKeyFrame;
-
-    // This is to store new keyframes which are to be processed
-    std::mutex mMutexNewKFs;
-    std::list<KeyFrame *> mlNewKeyFrames;
-    KeyFrame *mpCurrentKeyFrame;
-
-    // Local Map, highly volatile
-    KeyFrame *mpReferenceKF;
-    std::vector<KeyFrame *> mvpLocalKeyFrames;
-    std::vector<MapPoint *> mvpLocalMapPoints;
-
-private:
-    std::vector<KeyFrame *> keyframes;
-    std::vector<MapPoint *> mapStruct;
 };
 
 } // namespace SLAM

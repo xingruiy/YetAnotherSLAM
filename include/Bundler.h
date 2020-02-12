@@ -6,7 +6,7 @@
 namespace SLAM
 {
 
-class Optimizer
+class Bundler
 {
 public:
     void static BundleAdjustment(const std::vector<KeyFrame *> &vpKF, const std::vector<MapPoint *> &vpMP,

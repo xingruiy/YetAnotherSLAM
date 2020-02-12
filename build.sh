@@ -18,16 +18,9 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building tools/CudaUtils ..."
+echo "Configuring and building tools/CudaUtilities ..."
 
-cd ../../CudaUtils/
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=RELEASE
-make -j
-
-echo "Configuring and building tools/DENSE ..."
-
-cd ../../DENSE/
+cd ../../CudaUtilities/
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j

@@ -3,46 +3,46 @@
 namespace SLAM
 {
 
-vector<MapPoint *> Map::GetAllMapPoints()
+std::vector<MapPoint *> Map::GetAllMapPoints()
 {
-    unique_lock<mutex> lock(mMutexMap);
-    return vector<MapPoint *>(mspMapPoints.begin(), mspMapPoints.end());
+    std::unique_lock<std::mutex> lock(mMutexMap);
+    return std::vector<MapPoint *>(mspMapPoints.begin(), mspMapPoints.end());
 }
 
-vector<KeyFrame *> Map::GetAllKeyFrames()
+std::vector<KeyFrame *> Map::GetAllKeyFrames()
 {
-    unique_lock<mutex> lock(mMutexMap);
-    return vector<KeyFrame *>(mspKeyFrames.begin(), mspKeyFrames.end());
+    std::unique_lock<std::mutex> lock(mMutexMap);
+    return std::vector<KeyFrame *>(mspKeyFrames.begin(), mspKeyFrames.end());
 }
 
 void Map::AddKeyFrame(KeyFrame *pKF)
 {
-    unique_lock<mutex> lock(mMutexMap);
+    std::unique_lock<std::mutex> lock(mMutexMap);
     mspKeyFrames.insert(pKF);
 }
 
 void Map::AddMapPoint(MapPoint *pMP)
 {
-    unique_lock<mutex> lock(mMutexMap);
+    std::unique_lock<std::mutex> lock(mMutexMap);
     mspMapPoints.insert(pMP);
 }
 
 unsigned long Map::KeyFramesInMap()
 {
-    unique_lock<mutex> lock(mMutexMap);
+    std::unique_lock<std::mutex> lock(mMutexMap);
     return mspKeyFrames.size();
 }
 
 void Map::reset()
 {
-    unique_lock<mutex> lock(mMutexMap);
+    std::unique_lock<std::mutex> lock(mMutexMap);
     mspKeyFrames.clear();
     mspMapPoints.clear();
 }
 
 void Map::EraseMapPoint(MapPoint *pMP)
 {
-    unique_lock<mutex> lock(mMutexMap);
+    std::unique_lock<std::mutex> lock(mMutexMap);
     mspMapPoints.erase(pMP);
 
     // TODO: This only erase the pointer.
@@ -51,7 +51,7 @@ void Map::EraseMapPoint(MapPoint *pMP)
 
 void Map::EraseKeyFrame(KeyFrame *pKF)
 {
-    unique_lock<mutex> lock(mMutexMap);
+    std::unique_lock<std::mutex> lock(mMutexMap);
     mspKeyFrames.erase(pKF);
 
     // TODO: This only erase the pointer.

@@ -121,7 +121,7 @@ void Viewer::setLiveDepth(const cv::Mat &ImgDepth)
 
 void Viewer::draw3DMapPoints()
 {
-    vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
+    std::vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
     glPointSize(5);
     glBegin(GL_POINTS);
     glColor3f(1.0, 0.0, 0.0);
@@ -140,7 +140,7 @@ void Viewer::draw3DMapPoints()
 
 void Viewer::drawKeyFrameHistory()
 {
-    vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
+    std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
     glColor3f(0.0, 1.0, 0.0);
     for (size_t i = 0, iend = vpKFs.size(); i < iend; i++)
     {

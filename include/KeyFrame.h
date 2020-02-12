@@ -17,59 +17,49 @@ class KeyFrame
 {
 public:
     KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor);
+    bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
+    void AddMapPoint(MapPoint *pMP, const size_t &idx);
+    Eigen::Vector3d UnprojectKeyPoint(int i);
+    std::vector<MapPoint *> GetMapPointMatches();
+    std::vector<size_t> GetFeaturesInArea(float &x, float &y, float r, int minlvl, int maxlvl);
 
-private:
-    void UndistortKeys();
-    void AssignFeaturesToGrid();
-    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
-    void ComputeDepth(const cv::Mat depth);
-
-public:
-    KeyFrame(Frame &F, Map *pMap);
+    bool isBad();
 
     // Bag of Words Representation
     void ComputeBoW();
+    // Destroy frame
     void SetBadFlag();
 
-    bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
-    void AddMapPoint(MapPoint *pMP, const size_t &idx);
-
     // Covisibility Graph
+    int GetWeight(KeyFrame *pKF);
     void UpdateConnections();
     void UpdateBestCovisibles();
     void AddConnection(KeyFrame *pKF, int &weight);
     void EraseConnection(KeyFrame *pKF);
-    int GetWeight(KeyFrame *pKF);
+    std::vector<KeyFrame *> GetVectorCovisibleKeyFrames();
 
     // Spanning tree functions
+    KeyFrame *GetParent();
     void AddChild(KeyFrame *pKF);
     void EraseChild(KeyFrame *pKF);
     void ChangeParent(KeyFrame *pKF);
     std::set<KeyFrame *> GetChilds();
-    KeyFrame *GetParent();
     bool hasChild(KeyFrame *pKF);
-    std::vector<KeyFrame *> GetVectorCovisibleKeyFrames();
-
-    Eigen::Vector3d UnprojectKeyPoint(int i);
-    std::vector<MapPoint *> GetMapPointMatches();
-    std::vector<size_t> GetFeaturesInArea(float &x, float &y, float &r, int minLevel, int maxLevel);
 
 public:
-    bool isBad();
     bool mbBad;
 
     bool mbNotErase;
     bool mbToBeErased;
 
-    cv::Mat mImGray;
+    // cv::Mat mImGray;
     double mTimeStamp;
+
+    Map *mpMap;
 
     unsigned long mnId;
     static unsigned long nNextId;
 
-    // Grid (to speed up feature matching)
-    int mnGridCols;
-    int mnGridRows;
     // Grid over the image to speed up feature matching
     std::vector<std::vector<std::vector<size_t>>> mGrid;
 
@@ -79,7 +69,6 @@ public:
 
     // Calibration parameters
     float mbf, mThDepth;
-    int mnMinX, mnMinY, mnMaxX, mnMaxY;
     float fx, fy, cx, cy, invfx, invfy;
 
     // Number of KeyPoints
@@ -95,32 +84,13 @@ public:
     // MapPoints associated to keypoints
     std::vector<bool> mvbOutlier;
     std::vector<MapPoint *> mvpMapPoints;
-    std::vector<MapPoint *> mvpObservedMapPoints;
 
-    // BoW
-    // DBoW2::BowVector mBowVec;
-    // DBoW2::FeatureVector mFeatVec;
-
-    // Feature extractor
-    // ORB_SLAM2::ORBVocabulary *mpORBvocabulary;
-
-    // Scale data
-    // This is extracted from ORB extractor
-
-    // Total scale levels
-    int mnScaleLevels;
-    // scale factor of each level
-    float mfScaleFactor;
-    // log scale factor of each level
-    float mfLogScaleFactor;
-    // scale pyramid
-    std::vector<float> mvScaleFactors;
-    // scale pyramid ^2
-    std::vector<float> mvLevelSigma2;
-    // inverse scale pyramid^2
-    std::vector<float> mvInvLevelSigma2;
-
-    Map *mpMap;
+    int mnScaleLevels;                   // Total scale levels
+    float mfScaleFactor;                 // scale factor of each level
+    float mfLogScaleFactor;              // log scale factor of each level
+    std::vector<float> mvScaleFactors;   // scale pyramid
+    std::vector<float> mvLevelSigma2;    // scale pyramid ^2
+    std::vector<float> mvInvLevelSigma2; // inverse scale pyramid^2
 
     // Covisiblity graph
     std::map<KeyFrame *, int> mConnectedKeyFrameWeights;
@@ -135,11 +105,17 @@ public:
 
     // Keyframe in World coord
     Sophus::SE3d mTcw;
-    std::mutex mMutexPose;
+    std::mutex poseMutex;
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
 
     ORB_SLAM2::ORBextractor *mpExtractor;
+
+private:
+    void UndistortKeys();
+    void AssignFeaturesToGrid();
+    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
+    void ComputeDepth(const cv::Mat depth);
 };
 
 } // namespace SLAM

@@ -15,8 +15,6 @@ class Frame;
 class MapPoint;
 class KeyFrame;
 
-using namespace std;
-
 class Map
 {
 public:
@@ -31,8 +29,8 @@ public:
     std::vector<MapPoint *> GetAllMapPoints();
 
 private:
-    set<KeyFrame *> mspKeyFrames;
-    set<MapPoint *> mspMapPoints;
+    std::set<KeyFrame *> mspKeyFrames;
+    std::set<MapPoint *> mspMapPoints;
 
     std::mutex mMutexMap;
 };

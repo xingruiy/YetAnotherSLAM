@@ -24,9 +24,9 @@ public:
     void reset();
 
 private:
-    enum class TrackingState
+    enum TrackingState
     {
-        NotInitialized,
+        Null,
         OK,
         Lost
     };
@@ -38,48 +38,15 @@ private:
     void initialisation();
     bool trackLastFrame();
     bool relocalisation();
-    bool needNewKeyFrame();
-    void addKeyFrameCandidate();
+    bool NeedNewKeyFrame();
+    void MakeNewKeyFrame();
 
-    // Local map management
-    void UpdateLocalMap();
-    void UpdateLocalPoints();
-    void UpdateLocalKeyFrames();
-
-    TrackingState mTrackingState;
-
-    // Dense Tracker
-    DenseTracking *tracker;
-
-    // Sparse Mapping
-    Mapping *mapping;
-
-    // Dense Mapping
-    DenseMapping *mpMapper;
-
-    // Disable mapping
-    bool mbOnlyTracking;
-
-    // Frames
-    Frame mCurrentFrame;
-    Frame mLastFrame;
-
-    // ORB_SLAM2::ORBextractor *mpORBextractor;
-    // ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
-
-    // System
-    System *mpFullSystem;
-
-    // Map
+    System *slamSystem;
     Map *mpMap;
-
-    // Map Viewr
     Viewer *viewer;
-
-    // Used for local map
-    KeyFrame *mpReferenceKF;
-    std::vector<KeyFrame *> mvpLocalKeyFrames;
-    std::vector<MapPoint *> mvpLocalMapPoints;
+    TrackingState trackingState;
+    DenseTracking *tracker;
+    Mapping *mapping;
 };
 
 } // namespace SLAM
