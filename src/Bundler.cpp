@@ -30,8 +30,9 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
 
     // Set keyframe vertex
     g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
-    Eigen::Matrix<double, 3, 3> R = pKF->mTcw.inverse().rotationMatrix();
-    Eigen::Matrix<double, 3, 1> t = pKF->mTcw.inverse().translation();
+    Sophus::SE3d Twc = pKF->mTcw.inverse();
+    Eigen::Matrix<double, 3, 3> R = Twc.rotationMatrix();
+    Eigen::Matrix<double, 3, 1> t = Twc.translation();
     g2o::SE3Quat estimate(R, t);
     vSE3->setEstimate(estimate);
     vSE3->setId(0);
@@ -111,7 +112,6 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
         for (size_t i = 0, iend = vpEdgesStereo.size(); i < iend; i++)
         {
             g2o::EdgeStereoSE3ProjectXYZOnlyPose *e = vpEdgesStereo[i];
-
             const size_t idx = vnIndexEdgeStereo[i];
 
             if (pKF->mvbOutlier[idx])
@@ -120,7 +120,6 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
             }
 
             const float chi2 = e->chi2();
-
             if (chi2 > chi2Th[it])
             {
                 pKF->mvbOutlier[idx] = true;
@@ -146,8 +145,7 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
     R = SE3quat_recov.rotation().matrix();
     t = SE3quat_recov.translation();
-    Sophus::SE3d Twc(R, t);
-    pKF->mTcw = Twc.inverse();
+    pKF->mTcw = Sophus::SE3d(R, t).inverse();
 
     return nInitialCorrespondences - nBad;
 }

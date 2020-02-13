@@ -27,6 +27,7 @@ private:
     void TriangulatePoints();
     void CreateNewMapPoints();
     void UpdateConnections();
+    void UpdateKeyFrame();
 
     // keyframe candidate
     std::mutex frameMutex;

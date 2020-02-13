@@ -10,6 +10,25 @@ Tracking::Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping)
 {
     tracker = new DenseTracking(g_width[0], g_height[0], g_calib[0].cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
 
+    if (g_bUseDepth && g_bUseColour)
+    {
+        trackingModal = TrackingModal::RGB_AND_DEPTH;
+    }
+    else if (g_bUseColour)
+    {
+        trackingModal = TrackingModal::RGB_ONLY;
+    }
+    else if (g_bUseDepth)
+    {
+        trackingModal = TrackingModal::DEPTH_ONLY;
+    }
+    else
+    {
+        std::cout << "You must choose a tracking modality." << std::endl;
+        std::cout << "Otherwise the system will do NOTHING." << std::endl;
+        trackingModal = TrackingModal::IDLE;
+    }
+
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
         int wLvl = g_width[lvl];

@@ -45,6 +45,7 @@ void Mapping::Run()
             if (!HasFrameToProcess())
                 KeyFrameCulling();
 
+            UpdateKeyFrame();
             // Update reference keyframe
             lastKeyFrame = NextKeyFrame;
         }
@@ -538,6 +539,7 @@ void Mapping::TriangulatePoints()
 
 void Mapping::CreateNewMapPoints()
 {
+
     // We sort points by the measured depth by the stereo/RGBD sensor.
     // We create all those MapPoints whose depth < mThDepth.
     // If there are less than 100 close points we create the 100 closest.
@@ -565,7 +567,7 @@ void Mapping::CreateNewMapPoints()
             MapPoint *pMP = NextKeyFrame->mvpMapPoints[i];
             if (!pMP)
                 bCreateNew = true;
-            else if (pMP->Observations() < 1)
+            else if (pMP->Observations() < 1 || NextKeyFrame->mvbOutlier[i])
             {
                 bCreateNew = true;
                 NextKeyFrame->mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
@@ -589,14 +591,11 @@ void Mapping::CreateNewMapPoints()
                     nPoints++;
                     nCreated++;
                 }
-                // auto x3D = NextKeyFrame->UnprojectKeyPoint(i);
             }
             else
-            {
                 nPoints++;
-            }
 
-            if (vDepthIdx[j].first > g_thDepth && nPoints > 100)
+            if ((vDepthIdx[j].first > g_thDepth && nPoints > 100) || nPoints >= 500)
                 break;
         }
     }
@@ -673,6 +672,37 @@ void Mapping::UpdateConnections()
 
     std::cout << "local frame: " << localKeyFrames.size() << std::endl;
     std::cout << "local points: " << localMapPoints.size() << std::endl;
+}
+
+void Mapping::UpdateKeyFrame()
+{
+    int nOutliers = 0;
+    int nMatchedPoints = 0;
+    for (int i = 0; i < NextKeyFrame->mvpMapPoints.size(); ++i)
+    {
+        MapPoint *pMP = NextKeyFrame->mvpMapPoints[i];
+        bool bOutlier = NextKeyFrame->mvbOutlier[i];
+
+        if (pMP)
+        {
+            int nObs = pMP->mObservations.size();
+            if (nObs < 1 || bOutlier)
+            {
+                pMP->SetBadFlag();
+                NextKeyFrame->mvpMapPoints[i] = NULL;
+                nOutliers++;
+            }
+            else
+            {
+                nMatchedPoints++;
+            }
+        }
+    }
+
+    std::cout << "number of outliers in keyframe: " << nOutliers << std::endl;
+    std::cout << "number of matched points in keyframe: " << nMatchedPoints << std::endl;
+    if (nMatchedPoints >= 500)
+        return;
 }
 
 cv::Mat Mapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)

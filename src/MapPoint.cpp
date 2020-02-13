@@ -99,6 +99,7 @@ void MapPoint::EraseObservation(KeyFrame *pKF)
 
 void MapPoint::SetBadFlag()
 {
+    mbBad = true;
 }
 
 bool MapPoint::isBad()
