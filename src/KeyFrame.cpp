@@ -660,11 +660,11 @@ cv::Mat KeyFrame::GetInvTransform() const
 
 void KeyFrame::SetPose(cv::Mat cvMat)
 {
-  Eigen::Matrix4d Twc;
+  Eigen::Matrix4d Twc = Eigen::Matrix4d::Identity();
   Twc.setIdentity();
   for (int i = 0; i < 4; i++)
     for (int j = 0; j < 4; j++)
-      Twc(i, j) = cvMat.at<float>(i, j);
+      Twc(i, j) = (double)cvMat.at<float>(i, j);
   mTcw = Sophus::SE3d(Twc.inverse());
 }
 

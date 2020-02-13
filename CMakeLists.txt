@@ -4,6 +4,7 @@ project(athena CXX)
 find_package(OpenCV 3.4 REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(g2o 1.0.0 REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED "")
 
@@ -43,14 +44,15 @@ PUBLIC
 target_link_libraries(${PROJECT_NAME}
 PUBLIC
     Eigen3::Eigen
-    ${g2o_LIBRARIES}
+    g2o_core 
+    g2o_types_sba
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
     ${PROJECT_SOURCE_DIR}/tools/CudaUtilities/lib/libCudaUtilities.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
-    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/g2o/lib/libg2o.so
+    # ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/g2o/lib/libg2o.so
 )
 
 # Build Examples

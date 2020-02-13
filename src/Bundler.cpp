@@ -1,11 +1,11 @@
-#include <Thirdparty/g2o/g2o/core/block_solver.h>
-#include <Thirdparty/g2o/g2o/core/optimizable_graph.h>
-#include <Thirdparty/g2o/g2o/core/optimization_algorithm_levenberg.h>
-#include <Thirdparty/g2o/g2o/solvers/linear_solver_eigen.h>
-#include <Thirdparty/g2o/g2o/types/types_six_dof_expmap.h>
-#include <Thirdparty/g2o/g2o/core/robust_kernel_impl.h>
-#include <Thirdparty/g2o/g2o/solvers/linear_solver_dense.h>
-#include <Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h>
+#include <g2o/solvers/eigen/linear_solver_eigen.h>
+#include <g2o/core/block_solver.h>
+#include <g2o/core/optimizable_graph.h>
+#include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/types/sba/types_six_dof_expmap.h>
+#include <g2o/types/sim3/types_seven_dof_expmap.h>
+#include <g2o/solvers/dense/linear_solver_dense.h>
+#include <g2o/core/robust_kernel_impl.h>
 #include <mutex>
 #include <unistd.h>
 #include <Eigen/StdVector>
@@ -18,14 +18,13 @@ namespace SLAM
 
 int Bundler::PoseOptimization(KeyFrame *pKF)
 {
+    // Setup optimizer
     g2o::SparseOptimizer optimizer;
-    g2o::BlockSolver_6_3::LinearSolverType *linearSolver;
+    std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
+    linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>>();
+    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(
+        g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
 
-    linearSolver = new g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>();
-
-    g2o::BlockSolver_6_3 *solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
-
-    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
     optimizer.setAlgorithm(solver);
     int nInitialCorrespondences = 0;
 
@@ -101,8 +100,8 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
     int nBad = 0;
     for (size_t it = 0; it < 4; it++)
     {
-        Eigen::Matrix<double, 3, 3> R = pKF->mTcw.inverse().rotationMatrix();
-        Eigen::Matrix<double, 3, 1> t = pKF->mTcw.inverse().translation();
+        R = pKF->mTcw.inverse().rotationMatrix();
+        t = pKF->mTcw.inverse().translation();
         g2o::SE3Quat estimate(R, t);
         vSE3->setEstimate(estimate);
         optimizer.initializeOptimization(0);
@@ -145,8 +144,10 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
     // Recover optimized pose and return number of inliers
     g2o::VertexSE3Expmap *vSE3_recov = static_cast<g2o::VertexSE3Expmap *>(optimizer.vertex(0));
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
-    cv::Mat pose = ORB_SLAM2::Converter::toCvMat(SE3quat_recov);
-    pKF->SetPose(pose);
+    R = SE3quat_recov.rotation().matrix();
+    t = SE3quat_recov.translation();
+    Sophus::SE3d Twc(R, t);
+    pKF->mTcw = Twc.inverse();
 
     return nInitialCorrespondences - nBad;
 }
@@ -207,13 +208,11 @@ void Bundler::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
 
     // Setup optimizer
     g2o::SparseOptimizer optimizer;
-    g2o::BlockSolver_6_3::LinearSolverType *linearSolver;
+    std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
+    linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>>();
+    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(
+        g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
 
-    linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolver_6_3::PoseMatrixType>();
-
-    g2o::BlockSolver_6_3 *solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
-
-    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
     optimizer.setAlgorithm(solver);
 
     if (pbStopFlag)

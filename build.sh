@@ -33,13 +33,6 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building tools/ORB_SLAM2/Thirdparty/g2o ..."
-
-cd ../../g2o
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=RELEASE
-make -j
-
 echo "Configuring and building tools/ORB_SLAM2 ..."
 
 cd ../../../
@@ -47,9 +40,14 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
+echo "Uncompress vocabulary ..."
+
+cd ../../../vocabulary
+tar -xf ORBvoc.txt.tar.gz
+cd ..
+
 echo "building SLAM..."
 
-cd ../../../
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=$BuildType
 make -j

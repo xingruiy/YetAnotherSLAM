@@ -127,6 +127,7 @@ void System::readSettings(const std::string &strSettingFile)
 
     std::cout << "===================================================\n"
               << "The system is created with the following parameters:\n"
+              << "image bounds: " << g_minX << " " << g_maxX << " " << g_minY << " " << g_maxY << "\n"
               << "pyramid level - " << NUM_PYR << "\n";
     for (int i = 0; i < NUM_PYR; ++i)
     {

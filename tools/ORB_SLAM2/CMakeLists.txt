@@ -30,6 +30,7 @@ LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
 find_package(OpenCV 3.4 REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
+find_package(g2o 1.0.0 REQUIRED)
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -48,8 +49,9 @@ SHARED
 )
 
 target_link_libraries(${PROJECT_NAME}
-${OpenCV_LIBS}
-${EIGEN3_LIBS}
-${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
-${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
+PUBLIC
+   g2o_types_sba
+   ${OpenCV_LIBS}
+   ${EIGEN3_LIBS}
+   ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 )
