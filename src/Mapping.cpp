@@ -28,25 +28,24 @@ void Mapping::Run()
         if (HasFrameToProcess())
         {
             MakeNewKeyFrame();
+            int nMatches = MatchLocalPoints();
+            std::cout << "num local points matched: " << nMatches << std::endl;
 
-            LookforPointMatches();
+            if (nMatches > 0)
+                Bundler::PoseOptimization(NextKeyFrame);
+
+            TriangulatePoints();  // Triangulate new points from image pairs
+            CreateNewMapPoints(); // Create new points from depth observations
 
             if (!HasFrameToProcess())
-            {
                 SearchInNeighbors();
-            }
-
-            if (!HasFrameToProcess())
-            {
-                KeyFrameCulling();
-            }
-
-            TriangulatePoints();
-
-            CreateNewMapPoints();
 
             UpdateConnections();
 
+            if (!HasFrameToProcess())
+                KeyFrameCulling();
+
+            // Update reference keyframe
             lastKeyFrame = NextKeyFrame;
         }
     }
@@ -91,8 +90,8 @@ void Mapping::MakeNewKeyFrame()
     // Update Frame Pose
     if (lastKeyFrame != NULL)
     {
-        // NextKeyFrame->mTcw = lastKeyFrame->mTcw * NextFrame.T_frame2Ref;
-        // NextKeyFrame->mReferenceKeyFrame = lastKeyFrame;
+        NextKeyFrame->mTcw = lastKeyFrame->mTcw * NextFrame.T_frame2Ref;
+        NextKeyFrame->mReferenceKeyFrame = lastKeyFrame;
     }
 
     // Create map points for the first frame
@@ -119,10 +118,10 @@ void Mapping::MakeNewKeyFrame()
     mpMap->AddKeyFrame(NextKeyFrame);
 }
 
-void Mapping::LookforPointMatches()
+int Mapping::MatchLocalPoints()
 {
     if (localMapPoints.size() == 0)
-        return;
+        return 0;
 
     int nToMatch = 0;
     // Project points in frame and check its visibility
@@ -161,8 +160,7 @@ void Mapping::LookforPointMatches()
 
     // Update covisibility based on the correspondences
     NextKeyFrame->UpdateConnections();
-
-    std::cout << "matched map points: " << nToMatch << std::endl;
+    return nToMatch;
 }
 
 void Mapping::KeyFrameCulling()

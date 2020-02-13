@@ -21,7 +21,7 @@ public:
 private:
     void MakeNewKeyFrame();
     bool HasFrameToProcess();
-    void LookforPointMatches();
+    int MatchLocalPoints();
     void KeyFrameCulling();
     void SearchInNeighbors();
     void TriangulatePoints();

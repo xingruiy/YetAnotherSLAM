@@ -127,14 +127,18 @@ void System::readSettings(const std::string &strSettingFile)
 
     std::cout << "===================================================\n"
               << "The system is created with the following parameters:\n"
-              << "fx - " << g_fx[0] << "\n"
-              << "fy - " << g_fy[0] << "\n"
-              << "cx - " << g_cx[0] << "\n"
-              << "cy - " << g_cy[0] << "\n"
-              << "frame width - " << g_width[0] << "\n"
-              << "frame height - " << g_height[0] << "\n"
-              << "pyramid level - " << NUM_PYR << "\n"
-              << "camera baseline - " << g_bf / fx << "\n"
+              << "pyramid level - " << NUM_PYR << "\n";
+    for (int i = 0; i < NUM_PYR; ++i)
+    {
+        std::cout << "pyramid " << i << " -"
+                  << " width: " << g_width[i]
+                  << " height: " << g_height[i]
+                  << " fx: " << g_fx[i]
+                  << " fy: " << g_fy[i]
+                  << " cx: " << g_cx[i]
+                  << " cy: " << g_cy[i] << "\n";
+    }
+    std::cout << "camera baseline - " << g_bf / fx << "\n"
               << "close point th - " << g_thDepth << "\n"
               << "enable viewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
               << "===================================================" << std::endl;

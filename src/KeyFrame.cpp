@@ -19,6 +19,7 @@ KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
 
   (*pExtractor)(F->mImGray, cv::Mat(), mvKeys, mDescriptors);
   N = mvKeys.size();
+  mvbOutlier.resize(N, false);
   mvpMapPoints.resize(N, static_cast<MapPoint *>(NULL));
 
   UndistortKeys();
@@ -111,7 +112,7 @@ bool KeyFrame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
   posX = round((kp.pt.x - g_minX) * g_gridElementWidthInv);
   posY = round((kp.pt.y - g_minY) * g_gridElementHeightInv);
 
-  //Keypoint's coordinates are undistorted, which could cause to go out of the image
+  // Keypoint's coordinates are undistorted, which could cause to go out of the image
   if (posX < 0 || posX >= FRAME_GRID_COLS || posY < 0 || posY >= FRAME_GRID_ROWS)
     return false;
 
@@ -644,6 +645,27 @@ cv::Mat KeyFrame::GetTranslation() const
     cvMat.at<float>(i) = Ow(i);
 
   return cvMat;
+}
+
+cv::Mat KeyFrame::GetInvTransform() const
+{
+  cv::Mat cvMat(4, 4, CV_32F);
+  Eigen::Matrix4d Twc = mTcw.inverse().matrix();
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++)
+      cvMat.at<float>(i, j) = Twc(i, j);
+
+  return cvMat;
+}
+
+void KeyFrame::SetPose(cv::Mat cvMat)
+{
+  Eigen::Matrix4d Twc;
+  Twc.setIdentity();
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++)
+      Twc(i, j) = cvMat.at<float>(i, j);
+  mTcw = Sophus::SE3d(Twc.inverse());
 }
 
 } // namespace SLAM

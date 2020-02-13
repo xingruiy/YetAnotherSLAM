@@ -18,12 +18,15 @@ class MapPoint;
 class KeyFrame
 {
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor);
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
     void AddMapPoint(MapPoint *pMP, const size_t &idx);
 
     cv::Mat GetRotation() const;
     cv::Mat GetTranslation() const;
+    cv::Mat GetInvTransform() const;
 
     bool UnprojectKeyPoint(Eigen::Vector3d &posWorld, const int &i);
     Eigen::Vector3d UnprojectKeyPoint(int i);
@@ -58,6 +61,8 @@ public:
     void ChangeParent(KeyFrame *pKF);
     std::set<KeyFrame *> GetChilds();
     bool hasChild(KeyFrame *pKF);
+
+    void SetPose(cv::Mat Tcw);
 
 public:
     Map *mpMap;
