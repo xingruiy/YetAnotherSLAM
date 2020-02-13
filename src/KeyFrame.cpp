@@ -8,7 +8,8 @@ namespace SLAM
 unsigned long KeyFrame::nNextId = 0;
 
 KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
-    : mpMap(map), mTcw(F->mTcw)
+    : mpMap(map), mTcw(F->mTcw), mnBALocalForKF(-1), mbBad(false),
+      mnBAFixedForKF(-1), mnFuseTargetForKF(-1)
 {
   mnId = nNextId++;
 
@@ -173,6 +174,25 @@ std::set<MapPoint *> KeyFrame::GetMapPoints()
       s.insert(pMP);
   }
   return s;
+}
+
+bool KeyFrame::UnprojectKeyPoint(Eigen::Vector3d &posWorld, const int &i)
+{
+  const float z = mvDepth[i];
+
+  if (z > 0)
+  {
+    const float u = mvKeysUn[i].pt.x;
+    const float v = mvKeysUn[i].pt.y;
+    const float x = (u - cx) * z * invfx;
+    const float y = (v - cy) * z * invfy;
+    std::unique_lock<std::mutex> lock(poseMutex);
+    posWorld = mTcw * Eigen::Vector3d(x, y, z);
+
+    return true;
+  }
+
+  return false;
 }
 
 Eigen::Vector3d KeyFrame::UnprojectKeyPoint(int i)

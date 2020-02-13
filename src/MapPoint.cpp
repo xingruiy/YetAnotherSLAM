@@ -11,17 +11,16 @@ unsigned long MapPoint::nNextId = 0;
 MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
     : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1),
       mnTrackReferenceForFrame(-1), mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0),
-      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId)
+      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
 {
     mNormalVector = Eigen::Vector3d::Zero();
-
     mnId = nNextId++;
 }
 
 MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF)
     : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1),
       mnTrackReferenceForFrame(-1), mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0),
-      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId)
+      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
 {
     mnId = nNextId++;
 
@@ -230,7 +229,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
     for (size_t i = 0; i < N; i++)
     {
         std::vector<int> vDists(Distances[i], Distances[i] + N);
-        sort(vDists.begin(), vDists.end());
+        std::sort(vDists.begin(), vDists.end());
         int median = vDists[0.5 * (N - 1)];
 
         if (median < BestMedian)
@@ -273,23 +272,6 @@ int MapPoint::PredictScale(const float &currentDist, KeyFrame *pKF)
         nScale = pKF->mnScaleLevels - 1;
 
     return nScale;
-}
-
-int MapPoint::PredictScale(const float &currentDist, Frame *pFrame)
-{
-    // float ratio;
-    // {
-    //     std::unique_lock<std::mutex> lock(mMutexPos);
-    //     ratio = mfMaxDistance / currentDist;
-    // }
-
-    // int nScale = ceil(log(ratio) / pFrame->mfLogScaleFactor);
-    // if (nScale < 0)
-    //     nScale = 0;
-    // else if (nScale >= pFrame->mnScaleLevels)
-    //     nScale = pFrame->mnScaleLevels - 1;
-
-    // return nScale;
 }
 
 } // namespace SLAM

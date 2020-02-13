@@ -25,7 +25,9 @@ public:
     cv::Mat GetRotation() const;
     cv::Mat GetTranslation() const;
 
+    bool UnprojectKeyPoint(Eigen::Vector3d &posWorld, const int &i);
     Eigen::Vector3d UnprojectKeyPoint(int i);
+
     MapPoint *GetMapPoint(const size_t &idx);
     std::set<MapPoint *> GetMapPoints();
     std::vector<MapPoint *> GetMapPointMatches();

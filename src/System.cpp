@@ -134,6 +134,8 @@ void System::readSettings(const std::string &strSettingFile)
               << "frame width - " << g_width[0] << "\n"
               << "frame height - " << g_height[0] << "\n"
               << "pyramid level - " << NUM_PYR << "\n"
+              << "camera baseline - " << g_bf / fx << "\n"
+              << "close point th - " << g_thDepth << "\n"
               << "enable viewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
               << "===================================================" << std::endl;
 }

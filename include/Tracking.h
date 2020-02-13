@@ -48,6 +48,30 @@ private:
     TrackingState trackingState;
     DenseTracking *tracker;
     Mapping *mapping;
+
+    cv::cuda::GpuMat mvCurrentDepth[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceDepth[NUM_PYR];
+    cv::cuda::GpuMat mvCurrentIntensity[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceIntensity[NUM_PYR];
+    cv::cuda::GpuMat mvIntensityGradientX[NUM_PYR];
+    cv::cuda::GpuMat mvIntensityGradientY[NUM_PYR];
+    cv::cuda::GpuMat mvReferencePointTransformed[NUM_PYR];
+    cv::cuda::GpuMat mvCurrentInvDepth[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceInvDepth[NUM_PYR];
+    cv::cuda::GpuMat mvInvDepthGradientX[NUM_PYR];
+    cv::cuda::GpuMat mvInvDepthGradientY[NUM_PYR];
+
+    // GPU buffer for temporary data
+    cv::cuda::GpuMat mGpuBufferFloat96x29;
+    cv::cuda::GpuMat mGpuBufferFloat96x3;
+    cv::cuda::GpuMat mGpuBufferFloat96x2;
+    cv::cuda::GpuMat mGpuBufferFloat96x1;
+    cv::cuda::GpuMat mGpuBufferFloat1x29;
+    cv::cuda::GpuMat mGpuBufferFloat1x3;
+    cv::cuda::GpuMat mGpuBufferFloat1x2;
+    cv::cuda::GpuMat mGpuBufferFloat1x1;
+    cv::cuda::GpuMat mGpuBufferVector4HxW;
+    cv::cuda::GpuMat mGpuBufferVector7HxW;
 };
 
 } // namespace SLAM

@@ -84,6 +84,10 @@ void Mapping::MakeNewKeyFrame()
     NextKeyFrame = new KeyFrame(&NextFrame, mpMap, ORBExtractor);
     NextKeyFrame->ComputeBoW(ORBvocabulary);
 
+    std::cout << "============================\n"
+              << "processing keyframe: "
+              << NextKeyFrame->mnId << std::endl;
+
     // Update Frame Pose
     if (lastKeyFrame != NULL)
     {
@@ -121,18 +125,16 @@ void Mapping::LookforPointMatches()
         return;
 
     int nToMatch = 0;
-
     // Project points in frame and check its visibility
     for (auto vit = localMapPoints.begin(), vend = localMapPoints.end(); vit != vend; vit++)
     {
         MapPoint *pMP = *vit;
-        if (pMP->isBad())
+        if (!pMP || pMP->isBad())
             continue;
 
         // Project (this fills MapPoint variables for matching)
         if (NextKeyFrame->IsInFrustum(pMP, 0.5))
         {
-            pMP->IncreaseVisible();
             nToMatch++;
         }
     }
@@ -142,13 +144,25 @@ void Mapping::LookforPointMatches()
         Matcher matcher(0.8);
         // Project points to the current keyframe
         // And search for potential corresponding points
-        nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 3);
+        nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 5);
+    }
+
+    const auto vpMPs = NextKeyFrame->GetMapPointMatches();
+    for (int i = 0; i < vpMPs.size(); ++i)
+    {
+        MapPoint *pMP = vpMPs[i];
+        if (!pMP || pMP->isBad())
+            continue;
+
+        pMP->AddObservation(NextKeyFrame, i);
+        pMP->UpdateNormalAndDepth();
+        pMP->ComputeDistinctiveDescriptors();
     }
 
     // Update covisibility based on the correspondences
     NextKeyFrame->UpdateConnections();
 
-    std::cout << "matched map points: " << nToMatch;
+    std::cout << "matched map points: " << nToMatch << std::endl;
 }
 
 void Mapping::KeyFrameCulling()
@@ -207,7 +221,10 @@ void Mapping::KeyFrameCulling()
         }
 
         if (nRedundantObservations > 0.9 * nMPs)
+        {
             pKF->SetBadFlag();
+            std::cout << "keyframe " << pKF->mnId << " is flaged redundant" << std::endl;
+        }
     }
 }
 
@@ -519,8 +536,6 @@ void Mapping::TriangulatePoints()
             nnew++;
         }
     }
-
-    std::cout << "triangulated points: " << nnew << std::endl;
 }
 
 void Mapping::CreateNewMapPoints()
@@ -540,7 +555,7 @@ void Mapping::CreateNewMapPoints()
     }
 
     int nPoints = 0;
-
+    int nCreated = 0;
     if (!vDepthIdx.empty())
     {
         std::sort(vDepthIdx.begin(), vDepthIdx.end());
@@ -560,15 +575,23 @@ void Mapping::CreateNewMapPoints()
 
             if (bCreateNew)
             {
-                auto x3D = NextKeyFrame->UnprojectKeyPoint(i);
-                MapPoint *pNewMP = new MapPoint(x3D, NextKeyFrame, mpMap);
-                pNewMP->AddObservation(NextKeyFrame, i);
-                NextKeyFrame->AddMapPoint(pNewMP, i);
-                pNewMP->ComputeDistinctiveDescriptors();
-                pNewMP->UpdateNormalAndDepth();
-                mpMap->AddMapPoint(pNewMP);
-                NextKeyFrame->AddMapPoint(pNewMP, i);
-                nPoints++;
+                Eigen::Vector3d x3D;
+                if (NextKeyFrame->UnprojectKeyPoint(x3D, i))
+                {
+                    MapPoint *pNewMP = new MapPoint(x3D, NextKeyFrame, mpMap);
+                    pNewMP->AddObservation(NextKeyFrame, i);
+                    NextKeyFrame->AddMapPoint(pNewMP, i);
+
+                    pNewMP->ComputeDistinctiveDescriptors();
+                    pNewMP->UpdateNormalAndDepth();
+
+                    mpMap->AddMapPoint(pNewMP);
+                    NextKeyFrame->AddMapPoint(pNewMP, i);
+
+                    nPoints++;
+                    nCreated++;
+                }
+                // auto x3D = NextKeyFrame->UnprojectKeyPoint(i);
             }
             else
             {
@@ -580,7 +603,7 @@ void Mapping::CreateNewMapPoints()
         }
     }
 
-    std::cout << "points created in the keyframe: " << nPoints << std::endl;
+    std::cout << "points created in the keyframe: " << nCreated << std::endl;
 }
 
 void Mapping::UpdateConnections()
@@ -634,8 +657,7 @@ void Mapping::UpdateConnections()
     {
         KeyFrame *pKF = *itKF;
         // Get map points in the keyframe
-        const std::vector<MapPoint *> vpMPs = pKF->GetMapPointMatches();
-
+        const auto vpMPs = pKF->GetMapPointMatches();
         for (auto itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
         {
             MapPoint *pMP = *itMP;
