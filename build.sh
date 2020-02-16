@@ -18,6 +18,13 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
+echo "Configuring and building tools/DatasetLoader ..."
+
+cd ../../DatasetLoader/
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=RELEASE
+make -j
+
 echo "Configuring and building tools/CudaUtilities ..."
 
 cd ../../CudaUtilities/

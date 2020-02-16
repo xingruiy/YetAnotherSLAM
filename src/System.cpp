@@ -86,7 +86,7 @@ void System::readSettings(const std::string &strSettingFile)
     // read system configurations
     g_bEnableViewer = (int)settingsFile["System.EnableViewer"] == 1;
     g_bReverseRGB = (int)settingsFile["System.ReverseRGB"] == 1;
-    g_DepthScaleInv = 1.0 / (float)settingsFile["System.DepthScale"];
+    g_DepthScaleInv = 1.0 / (double)settingsFile["System.DepthScale"];
 
     // read orb parameters
     g_ORBScaleFactor = settingsFile["ORB_SLAM2.scaleFactor"];

@@ -6,7 +6,8 @@
 namespace SLAM
 {
 
-Mapping::Mapping(const std::string &strVocFile, Map *map) : mpMap(map)
+Mapping::Mapping(const std::string &strVocFile, Map *map)
+    : mpMap(map), lastKeyFrame(NULL)
 {
     ORBExtractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
 
@@ -38,7 +39,11 @@ void Mapping::Run()
             CreateNewMapPoints(); // Create new points from depth observations
 
             if (!HasFrameToProcess())
+            {
                 SearchInNeighbors();
+                bool bStopFlag;
+                Bundler::LocalBundleAdjustment(NextKeyFrame, &bStopFlag, mpMap);
+            }
 
             UpdateConnections();
 

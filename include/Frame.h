@@ -19,8 +19,8 @@ struct Frame
     Frame(cv::Mat image, cv::Mat depth, double timeStamp);
 
     // Frame ID
-    // unsigned long mnId;
-    // static unsigned long mnNextId;
+    unsigned long mnId;
+    static unsigned long mnNextId;
 
     // Pose
     Sophus::SE3d mTcw;

@@ -151,6 +151,7 @@ struct CheckEntryVisibilityFunctor
     float voxelSize;
     int hashTableSize;
     int voxelBlockSize;
+    unsigned int FrameId;
 
     __device__ __forceinline__ void operator()() const
     {
@@ -169,6 +170,7 @@ struct CheckEntryVisibilityFunctor
             HashEntry *current = &hashTable[idx];
             if (current->ptr >= 0)
             {
+
                 bool rval = checkBlockVisible(
                     current->pos,
                     Tinv,
@@ -183,8 +185,9 @@ struct CheckEntryVisibilityFunctor
                 {
                     needScan = true;
                     increment = 1;
+                    current->TimeStamp = FrameId;
                 }
-                else
+                else if ((current->TimeStamp + 300) > FrameId)
                 {
                     int voxelPtr = current->ptr;
                     memset(&voxelBlock[voxelPtr], 0, sizeof(Voxel) * BlockSize3);
@@ -278,6 +281,7 @@ void fuseDepth(
     const cv::cuda::GpuMat depth,
     const Sophus::SE3d &T,
     const Eigen::Matrix3d &K,
+    unsigned int frameId,
     uint &visible_block_count)
 {
     float fx = K(0, 0);
@@ -335,6 +339,7 @@ void fuseDepth(
     cfunctor.depthMax = 3.0f;
     cfunctor.voxelSize = map_struct.voxelSize;
     cfunctor.hashTableSize = map_struct.hashTableSize;
+    cfunctor.FrameId = frameId;
 
     thread = dim3(1024);
     block = dim3(div_up(map_struct.hashTableSize, thread.x));

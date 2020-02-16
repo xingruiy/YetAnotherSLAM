@@ -3,8 +3,8 @@
 # =============================
 # Control
 # =============================
-System.ReverseRGB: 0
-System.DepthScale: 1000
+System.ReverseRGB: 1
+System.DepthScale: 5000
 System.EnableViewer: 1
 
 # =============================
@@ -30,7 +30,7 @@ UnDistortion.k3: 0.000000
 # =============================
 # ORB Features
 # =============================
-ORB_SLAM2.nFeatures: 1000
+ORB_SLAM2.nFeatures: 500
 ORB_SLAM2.scaleFactor: 1.2
 ORB_SLAM2.nLevels: 8
 ORB_SLAM2.iniThFAST: 20

@@ -12,6 +12,7 @@ struct HashEntry
 {
     int ptr;
     int offset;
+    unsigned int TimeStamp;
     Eigen::Vector3i pos;
 };
 

@@ -127,7 +127,7 @@ void Viewer::draw3DMapPoints()
 
     for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
     {
-        if (!vpMPs[i])
+        if (!vpMPs[i] || vpMPs[i]->isBad())
             continue;
         Eigen::Vector3d &pos = vpMPs[i]->mWorldPos;
         glVertex3f(pos(0), pos(1), pos(2));

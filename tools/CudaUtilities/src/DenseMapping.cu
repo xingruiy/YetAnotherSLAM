@@ -1,13 +1,14 @@
 #include "mapFunctors.h"
 #include "DenseMapping.h"
 
-DenseMapping::DenseMapping(int w, int h, Eigen::Matrix3d &K)
+DenseMapping::DenseMapping(int w, int h, const Eigen::Matrix3d &K)
     : mK(K)
 {
   deviceMap.create(80000, 40000, 40000, 0.006f, 0.02f);
   deviceMap.reset();
   zRangeX.create(h / 8, w / 8, CV_32FC1);
   zRangeY.create(h / 8, w / 8, CV_32FC1);
+  BufferFloat4WxH.create(h, w, CV_32FC4);
 
   cudaMalloc((void **)&listRenderingBlock, sizeof(RenderingBlock) * 100000);
 }
@@ -18,7 +19,7 @@ DenseMapping::~DenseMapping()
   cudaFree((void **)&listRenderingBlock);
 }
 
-void DenseMapping::fuseFrame(cv::cuda::GpuMat depth, const Sophus::SE3d &T)
+void DenseMapping::fuseFrame(cv::cuda::GpuMat depth, const Sophus::SE3d &T, unsigned int id)
 {
   count_visible_block = 0;
 
@@ -27,10 +28,11 @@ void DenseMapping::fuseFrame(cv::cuda::GpuMat depth, const Sophus::SE3d &T)
       depth,
       T,
       mK,
+      id,
       count_visible_block);
 }
 
-void DenseMapping::raytrace(cv::cuda::GpuMat &vertex, const Sophus::SE3d &T)
+void DenseMapping::raytrace(const Sophus::SE3d &T)
 {
   if (count_visible_block == 0)
     return;
@@ -50,7 +52,7 @@ void DenseMapping::raytrace(cv::cuda::GpuMat &vertex, const Sophus::SE3d &T)
 
     ::raycast(
         deviceMap,
-        vertex,
+        BufferFloat4WxH,
         zRangeX,
         zRangeY,
         T,
@@ -61,6 +63,11 @@ void DenseMapping::raytrace(cv::cuda::GpuMat &vertex, const Sophus::SE3d &T)
 void DenseMapping::reset()
 {
   deviceMap.reset();
+}
+
+cv::cuda::GpuMat DenseMapping::GetSyntheticVertexMap()
+{
+  return BufferFloat4WxH;
 }
 
 size_t DenseMapping::fetchMeshWithNormal(void *vertex, void *normal)

@@ -5,10 +5,11 @@
 #include <Eigen/Core>
 
 void fuseDepth(
-    MapStruct map,
+    MapStruct map_struct,
     const cv::cuda::GpuMat depth,
     const Sophus::SE3d &T,
     const Eigen::Matrix3d &K,
+    unsigned int frameId,
     uint &visible_block_count);
 
 void create_rendering_blocks(

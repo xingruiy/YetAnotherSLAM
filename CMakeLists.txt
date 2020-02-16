@@ -35,6 +35,7 @@ PUBLIC
     ${Pangolin_INCLUDE_DIRS}  
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/tools/
+    ${PROJECT_SOURCE_DIR}/tools/DatasetLoader/include
     ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/include
     ${PROJECT_SOURCE_DIR}/tools/CudaUtilities/include
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/
@@ -52,7 +53,6 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
     ${PROJECT_SOURCE_DIR}/tools/CudaUtilities/lib/libCudaUtilities.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
-    # ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/g2o/lib/libg2o.so
 )
 
 # Build Examples
@@ -62,4 +62,12 @@ target_link_libraries(liveDemo
 PRIVATE 
     athena 
     ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/lib/libCameraOpenNI.so
+)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+add_executable(tumDemo ${PROJECT_SOURCE_DIR}/demo/TUMDemo.cpp)
+target_link_libraries(tumDemo 
+PRIVATE 
+    athena 
+    ${PROJECT_SOURCE_DIR}/tools/DatasetLoader/lib/libDatasetLoader.so
 )
