@@ -46,11 +46,6 @@ int main(int argc, char **argv)
         imRGB = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesRGB[i], CV_LOAD_IMAGE_UNCHANGED);
         imDepth = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesD[i], CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[i];
-
-        cv::imshow("rgb", imRGB);
-        cv::imshow("depth", imDepth);
-        cv::waitKey(1);
-
         sys.trackImage(imRGB, imDepth, tframe);
     }
 }

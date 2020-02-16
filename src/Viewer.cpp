@@ -121,19 +121,20 @@ void Viewer::setLiveDepth(const cv::Mat &ImgDepth)
 void Viewer::draw3DMapPoints()
 {
     std::vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
-    glPointSize(5);
+    glPointSize(g_pointSize);
     glBegin(GL_POINTS);
     glColor3f(1.0, 0.0, 0.0);
 
     for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
     {
-        if (!vpMPs[i] || vpMPs[i]->isBad())
+        if (!vpMPs[i] || vpMPs[i]->isBad() || vpMPs[i]->mObservations.size() <= 1)
             continue;
         Eigen::Vector3d &pos = vpMPs[i]->mWorldPos;
         glVertex3f(pos(0), pos(1), pos(2));
     }
 
     glEnd();
+    glPointSize(1);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 

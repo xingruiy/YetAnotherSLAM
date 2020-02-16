@@ -47,10 +47,11 @@ void Mapping::Run()
 
             UpdateConnections();
 
+            UpdateKeyFrame();
+
             if (!HasFrameToProcess())
                 KeyFrameCulling();
 
-            UpdateKeyFrame();
             // Update reference keyframe
             lastKeyFrame = NextKeyFrame;
         }
@@ -149,7 +150,7 @@ int Mapping::MatchLocalPoints()
         Matcher matcher(0.8);
         // Project points to the current keyframe
         // And search for potential corresponding points
-        nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 5);
+        nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 3);
     }
 
     const auto vpMPs = NextKeyFrame->GetMapPointMatches();
@@ -540,6 +541,8 @@ void Mapping::TriangulatePoints()
             nnew++;
         }
     }
+
+    std::cout << nnew << " Points created by triangulation." << std::endl;
 }
 
 void Mapping::CreateNewMapPoints()
@@ -694,6 +697,7 @@ void Mapping::UpdateKeyFrame()
             if (pMP->mObservations.size() < 1 || bOutlier)
             {
                 pMP->SetBadFlag();
+                mpMap->EraseMapPoint(pMP);
                 NextKeyFrame->mvpMapPoints[i] = NULL;
                 nOutliers++;
             }
@@ -706,8 +710,6 @@ void Mapping::UpdateKeyFrame()
 
     std::cout << "number of outliers in keyframe: " << nOutliers << std::endl;
     std::cout << "number of matched points in keyframe: " << nMatchedPoints << std::endl;
-    if (nMatchedPoints >= 500)
-        return;
 }
 
 cv::Mat Mapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)

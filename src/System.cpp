@@ -125,6 +125,8 @@ void System::readSettings(const std::string &strSettingFile)
 
     computeImageBounds();
 
+    g_pointSize = settingsFile["Viewer.PointSize"];
+
     std::cout << "===================================================\n"
               << "The system is created with the following parameters:\n"
               << "image bounds: " << g_minX << " " << g_maxX << " " << g_minY << " " << g_maxY << "\n"

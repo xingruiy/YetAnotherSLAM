@@ -122,4 +122,6 @@ void computeImageBounds()
     g_gridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (g_maxY - g_minY);
 }
 
+float g_pointSize = 1;
+
 } // namespace SLAM
