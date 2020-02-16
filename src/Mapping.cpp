@@ -578,6 +578,7 @@ void Mapping::CreateNewMapPoints()
                 Eigen::Vector3d x3D;
                 if (NextKeyFrame->UnprojectKeyPoint(x3D, i))
                 {
+                    NextKeyFrame->mvbOutlier[i] = false;
                     MapPoint *pNewMP = new MapPoint(x3D, NextKeyFrame, mpMap);
                     pNewMP->AddObservation(NextKeyFrame, i);
                     NextKeyFrame->AddMapPoint(pNewMP, i);
@@ -685,8 +686,7 @@ void Mapping::UpdateKeyFrame()
 
         if (pMP)
         {
-            int nObs = pMP->mObservations.size();
-            if (nObs < 1 || bOutlier)
+            if (pMP->mObservations.size() < 1 || bOutlier)
             {
                 pMP->SetBadFlag();
                 NextKeyFrame->mvpMapPoints[i] = NULL;

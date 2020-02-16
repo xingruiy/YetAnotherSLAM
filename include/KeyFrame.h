@@ -42,6 +42,7 @@ public:
     void ComputeBoW(ORB_SLAM2::ORBVocabulary *voc);
     // Destroy frame
     void SetBadFlag();
+    void EraseMapPointMatch(MapPoint *pMP);
 
     // Covisibility Graph
     int GetWeight(KeyFrame *pKF);

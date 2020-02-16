@@ -95,6 +95,13 @@ void KeyFrame::ComputeBoW(ORB_SLAM2::ORBVocabulary *voc)
   }
 }
 
+void KeyFrame::EraseMapPointMatch(MapPoint *pMP)
+{
+  int idx = pMP->GetIndexInKeyFrame(this);
+  if (idx >= 0)
+    mvpMapPoints[idx] = static_cast<MapPoint *>(NULL);
+}
+
 void KeyFrame::AssignFeaturesToGrid()
 {
   for (int i = 0; i < N; i++)

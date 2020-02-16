@@ -28,10 +28,11 @@ public:
     std::vector<KeyFrame *> GetAllKeyFrames();
     std::vector<MapPoint *> GetAllMapPoints();
 
+    std::mutex mMutexMapUpdate;
+
 private:
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
-
     std::mutex mMutexMap;
 };
 

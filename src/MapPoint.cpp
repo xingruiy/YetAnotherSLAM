@@ -179,6 +179,15 @@ void MapPoint::UpdateNormalAndDepth()
     }
 }
 
+int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    if (mObservations.count(pKF))
+        return mObservations[pKF];
+    else
+        return -1;
+}
+
 void MapPoint::ComputeDistinctiveDescriptors()
 {
     // Retrieve all observed descriptors

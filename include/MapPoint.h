@@ -37,6 +37,7 @@ public:
     bool IsInKeyFrame(KeyFrame *pKF);
     void UpdateNormalAndDepth();
     void ComputeDistinctiveDescriptors();
+    int GetIndexInKeyFrame(KeyFrame *pKF);
 
     float GetMinDistanceInvariance();
     float GetMaxDistanceInvariance();
