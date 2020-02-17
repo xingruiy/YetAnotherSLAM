@@ -12,25 +12,25 @@ System.EnableViewer: 1
 # =============================
 Calibration.width: 640
 Calibration.height: 480
-Calibration.fx: 580.0
-Calibration.fy: 580.0
-Calibration.cx: 319.5
-Calibration.cy: 239.5
+Calibration.fx: 535.4
+Calibration.fy: 539.2
+Calibration.cx: 320.1
+Calibration.cy: 247.6
 Calibration.bf: 40.0 # IR projector baseline times fx (aprox.)
 
 # =============================
 # DistCoeff
 # =============================
-UnDistortion.k1: 0.069515
-UnDistortion.k2: -0.113363
-UnDistortion.p1: 0.007882
-UnDistortion.p2: 0.010799
-UnDistortion.k3: 0.000000
+UnDistortion.k1: 0
+UnDistortion.k2: 0
+UnDistortion.p1: 0
+UnDistortion.p2: 0
+UnDistortion.k3: 0
 
 # =============================
 # ORB Features
 # =============================
-ORB_SLAM2.nFeatures: 500
+ORB_SLAM2.nFeatures: 1000
 ORB_SLAM2.scaleFactor: 1.2
 ORB_SLAM2.nLevels: 8
 ORB_SLAM2.iniThFAST: 20

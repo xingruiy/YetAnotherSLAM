@@ -21,7 +21,7 @@ Calibration.bf: 40.0 # IR projector baseline times fx (aprox.)
 # =============================
 # DistCoeff
 # =============================
-UnDistortion.k1: 0.069515
+UnDistortion.k1: 0
 UnDistortion.k2: -0.113363
 UnDistortion.p1: 0.007882
 UnDistortion.p2: 0.010799
