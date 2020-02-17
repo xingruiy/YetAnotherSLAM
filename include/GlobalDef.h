@@ -51,6 +51,6 @@ extern float g_gridElementHeightInv;
 void setGlobalCalibration(const int width, const int height, const Eigen::Matrix3d &K);
 void computeImageBounds();
 
-extern float g_pointSize;
+extern int g_pointSize;
 
 } // namespace SLAM

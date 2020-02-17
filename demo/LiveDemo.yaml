@@ -46,4 +46,4 @@ Tracking.ThDepth: 40.0 # Close/Far threshold. Baseline times.
 # =============================
 # Map Viewer
 # =============================
-Viewer.PointSize: 3
+Viewer.PointSize: 4

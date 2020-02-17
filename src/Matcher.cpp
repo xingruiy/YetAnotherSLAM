@@ -16,9 +16,9 @@ Matcher::Matcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbCheckOrie
 float Matcher::RadiusByViewingCos(const float &viewCos)
 {
     if (viewCos > 0.998)
-        return 2.5;
+        return 1.5;
     else
-        return 4.0;
+        return 2.0;
 }
 
 int Matcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
@@ -37,6 +37,7 @@ int Matcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vp
         // The size of the window will depend on the viewing direction
         float r = RadiusByViewingCos(pMP->mTrackViewCos);
         const int &nPredictedLevel = pMP->mnTrackScaleLevel;
+        Eigen::Vector3d NormalDir = pMP->mPointNormal;
 
         if (bFactor)
             r *= th;
@@ -67,15 +68,18 @@ int Matcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vp
                 if (pKF->mvpMapPoints[idx]->Observations() > 0)
                     continue;
 
-            if (pKF->mvuRight[idx] > 0)
-            {
-                const float er = fabs(pMP->mTrackProjXR - pKF->mvuRight[idx]);
-                if (er > r * pKF->mvScaleFactors[nPredictedLevel])
-                    continue;
-            }
+            if (pKF->mvuRight[idx] < 0)
+                continue;
+
+            Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
+            if (NormalDir.dot(FrameNormal) < 0.3)
+                continue;
+
+            const float er = fabs(pMP->mTrackProjXR - pKF->mvuRight[idx]);
+            if (er > r * pKF->mvScaleFactors[nPredictedLevel])
+                continue;
 
             const cv::Mat &d = pKF->mDescriptors.row(idx);
-
             const int dist = DescriptorDistance(MPdescriptor, d);
 
             if (dist < bestDist)
@@ -162,7 +166,7 @@ int Matcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, con
             continue;
 
         // Viewing angle must be less than 60 deg
-        Eigen::Vector3d Pn = pMP->GetNormal();
+        Eigen::Vector3d Pn = pMP->GetViewingDirection();
 
         if (PO.dot(Pn) < 0.5 * dist3D)
             continue;
@@ -182,14 +186,12 @@ int Matcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, con
 
         int bestDist = 256;
         int bestIdx = -1;
+        Eigen::Vector3d PointNormal = pMP->mPointNormal;
         for (auto vit = vIndices.begin(), vend = vIndices.end(); vit != vend; vit++)
         {
             const size_t idx = *vit;
-
             const cv::KeyPoint &kp = pKF->mvKeysUn[idx];
-
             const int &kpLevel = kp.octave;
-
             if (kpLevel < nPredictedLevel - 1 || kpLevel > nPredictedLevel)
                 continue;
 
@@ -206,21 +208,25 @@ int Matcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, con
 
                 if (e2 * pKF->mvInvLevelSigma2[kpLevel] > 7.8)
                     continue;
+
+                Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
+                if (PointNormal.dot(FrameNormal) < 0.3)
+                    continue;
             }
             else
             {
-                const float &kpx = kp.pt.x;
-                const float &kpy = kp.pt.y;
-                const float ex = u - kpx;
-                const float ey = v - kpy;
-                const float e2 = ex * ex + ey * ey;
+                // const float &kpx = kp.pt.x;
+                // const float &kpy = kp.pt.y;
+                // const float ex = u - kpx;
+                // const float ey = v - kpy;
+                // const float e2 = ex * ex + ey * ey;
 
-                if (e2 * pKF->mvInvLevelSigma2[kpLevel] > 5.99)
-                    continue;
+                // if (e2 * pKF->mvInvLevelSigma2[kpLevel] > 5.99)
+                //     continue;
+                continue;
             }
 
             const cv::Mat &dKF = pKF->mDescriptors.row(idx);
-
             const int dist = DescriptorDistance(dMP, dKF);
 
             if (dist < bestDist)

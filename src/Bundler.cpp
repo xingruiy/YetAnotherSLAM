@@ -101,9 +101,6 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
     int nBad = 0;
     for (size_t it = 0; it < 4; it++)
     {
-        R = pKF->mTcw.inverse().rotationMatrix();
-        t = pKF->mTcw.inverse().translation();
-        g2o::SE3Quat estimate(R, t);
         vSE3->setEstimate(estimate);
         optimizer.initializeOptimization(0);
         optimizer.optimize(its[it]);
@@ -366,7 +363,7 @@ void Bundler::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
         if (e->chi2() > 7.815 || !e->isDepthPositive())
         {
             KeyFrame *pKFi = vpEdgeKFStereo[i];
-            vToErase.push_back(make_pair(pKFi, pMP));
+            vToErase.push_back(std::make_pair(pKFi, pMP));
         }
     }
 
@@ -402,7 +399,8 @@ void Bundler::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
         MapPoint *pMP = *lit;
         g2o::VertexSBAPointXYZ *vPoint = static_cast<g2o::VertexSBAPointXYZ *>(optimizer.vertex(pMP->mnId + maxKFid + 1));
         pMP->mWorldPos = vPoint->estimate();
-        pMP->UpdateNormalAndDepth();
+        pMP->UpdateDepthAndViewingDir();
+        pMP->ComputeDistinctiveDescriptors();
     }
 }
 

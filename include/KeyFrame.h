@@ -43,6 +43,8 @@ public:
     // Destroy frame
     void SetBadFlag();
     void EraseMapPointMatch(MapPoint *pMP);
+    void EraseMapPointMatch(const size_t &idx);
+    void ReplaceMapPointMatch(const size_t &idx, MapPoint *pMP);
 
     // Covisibility Graph
     int GetWeight(KeyFrame *pKF);
@@ -86,6 +88,7 @@ public:
     int N; // Number of KeyPoints
     std::vector<float> mvDepth;
     std::vector<float> mvuRight;
+    std::vector<Eigen::Vector3f> mvNormal;
     std::vector<cv::KeyPoint> mvKeys;
     std::vector<cv::KeyPoint> mvKeysUn;
     cv::Mat mDescriptors;

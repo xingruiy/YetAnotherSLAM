@@ -104,6 +104,7 @@ void Mapping::MakeNewKeyFrame()
     // Create map points for the first frame
     if (NextKeyFrame->mnId == 0)
     {
+        size_t nPoints = 0;
         for (int i = 0; i < NextKeyFrame->mvKeysUn.size(); ++i)
         {
             const float d = NextKeyFrame->mvDepth[i];
@@ -112,13 +113,16 @@ void Mapping::MakeNewKeyFrame()
                 auto posWorld = NextKeyFrame->UnprojectKeyPoint(i);
                 MapPoint *pMP = new MapPoint(posWorld, mpMap, NextKeyFrame, i);
                 pMP->AddObservation(NextKeyFrame, i);
-                pMP->UpdateNormalAndDepth();
+                pMP->UpdateDepthAndViewingDir();
                 pMP->ComputeDistinctiveDescriptors();
 
                 NextKeyFrame->AddMapPoint(pMP, i);
                 mpMap->AddMapPoint(pMP);
+                nPoints++;
             }
         }
+
+        std::cout << "Initial map created with " << nPoints << " points" << std::endl;
     }
 
     // Insert the keyframe in the map
@@ -150,7 +154,7 @@ int Mapping::MatchLocalPoints()
         Matcher matcher(0.8);
         // Project points to the current keyframe
         // And search for potential corresponding points
-        nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 3);
+        nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 1);
     }
 
     const auto vpMPs = NextKeyFrame->GetMapPointMatches();
@@ -161,7 +165,7 @@ int Mapping::MatchLocalPoints()
             continue;
 
         pMP->AddObservation(NextKeyFrame, i);
-        pMP->UpdateNormalAndDepth();
+        pMP->UpdateDepthAndViewingDir();
         pMP->ComputeDistinctiveDescriptors();
     }
 
@@ -301,7 +305,7 @@ void Mapping::SearchInNeighbors()
             if (!pMP->isBad())
             {
                 pMP->ComputeDistinctiveDescriptors();
-                pMP->UpdateNormalAndDepth();
+                pMP->UpdateDepthAndViewingDir();
             }
         }
     }
@@ -533,7 +537,7 @@ void Mapping::TriangulatePoints()
 
             pMP->ComputeDistinctiveDescriptors();
 
-            pMP->UpdateNormalAndDepth();
+            pMP->UpdateDepthAndViewingDir();
 
             mpMap->AddMapPoint(pMP);
             mlpRecentAddedMapPoints.push_back(pMP);
@@ -592,7 +596,7 @@ void Mapping::CreateNewMapPoints()
                     NextKeyFrame->AddMapPoint(pNewMP, i);
 
                     pNewMP->ComputeDistinctiveDescriptors();
-                    pNewMP->UpdateNormalAndDepth();
+                    pNewMP->UpdateDepthAndViewingDir();
 
                     mpMap->AddMapPoint(pNewMP);
                     NextKeyFrame->AddMapPoint(pNewMP, i);

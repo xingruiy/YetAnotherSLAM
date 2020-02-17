@@ -27,7 +27,7 @@ void Viewer::Run()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     auto RenderState = pangolin::OpenGlRenderState(
-        pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 389, 0.1, 1000),
+        pangolin::ProjectionMatrix(640, 480, g_fx[0], g_fy[0], g_cx[0], g_cy[0], 0.1, 1000),
         pangolin::ModelViewLookAtRDF(0, 0, 0, 0, 0, -1, 0, 1, 0));
 
     auto MenuDividerLeft = pangolin::Attach::Pix(200);
@@ -56,6 +56,8 @@ void Viewer::Run()
     pangolin::Var<bool> varReset = pangolin::Var<bool>("menu.reset", false, false);
     pangolin::Var<bool> varRunning = pangolin::Var<bool>("menu.Running", false, true);
     pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Running"));
+    pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", 3, 1, 10);
+    pangolin::Var<bool> varDrawImmaturePoint = pangolin::Var<bool>("menu. Draw Immature Point", true, true);
 
     while (!pangolin::ShouldQuit())
     {
@@ -71,7 +73,7 @@ void Viewer::Run()
 
         mapViewer->Activate(RenderState);
         renderLiveCameraFrustum();
-        draw3DMapPoints();
+        draw3DMapPoints(varPointSize, varDrawImmaturePoint);
         drawKeyFrameHistory();
 
         pangolin::FinishFrame();
@@ -118,17 +120,20 @@ void Viewer::setLiveDepth(const cv::Mat &ImgDepth)
     needUpdateDepth = true;
 }
 
-void Viewer::draw3DMapPoints()
+void Viewer::draw3DMapPoints(const int &PointSize, const bool &drawImmature)
 {
     std::vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
-    glPointSize(g_pointSize);
+    glPointSize(PointSize);
     glBegin(GL_POINTS);
     glColor3f(1.0, 0.0, 0.0);
 
     for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
     {
-        if (!vpMPs[i] || vpMPs[i]->isBad() || vpMPs[i]->mObservations.size() <= 1)
+        if (!vpMPs[i] || vpMPs[i]->isBad())
             continue;
+        if (!drawImmature && vpMPs[i]->mObservations.size() <= 1)
+            continue;
+
         Eigen::Vector3d &pos = vpMPs[i]->mWorldPos;
         glVertex3f(pos(0), pos(1), pos(2));
     }
@@ -149,6 +154,7 @@ void Viewer::drawKeyFrameHistory()
         KeyFrame *pKF = vpKFs[i];
         pangolin::glDrawFrustum<double>(mCalib.inverse(), mWidth, mHeight, pKF->mTcw.matrix(), 0.1);
     }
+
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 

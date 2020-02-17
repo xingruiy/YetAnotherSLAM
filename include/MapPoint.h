@@ -27,7 +27,7 @@ public:
     bool isBad();
 
     Eigen::Vector3d GetWorldPos();
-    Eigen::Vector3d GetNormal();
+    Eigen::Vector3d GetViewingDirection();
     void Replace(MapPoint *pMP);
     MapPoint *GetReplaced();
 
@@ -35,7 +35,7 @@ public:
     void IncreaseVisible(int n = 1);
 
     bool IsInKeyFrame(KeyFrame *pKF);
-    void UpdateNormalAndDepth();
+    void UpdateDepthAndViewingDir();
     void ComputeDistinctiveDescriptors();
     int GetIndexInKeyFrame(KeyFrame *pKF);
 
@@ -62,7 +62,7 @@ public:
     Eigen::Vector3d mWorldPos;
 
     // Mean viewing direction
-    Eigen::Vector3d mNormalVector;
+    Eigen::Vector3d mAvgViewingDir;
 
     // The point's normal direction
     Eigen::Vector3d mPointNormal;

@@ -13,7 +13,7 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
       mnTrackReferenceForFrame(-1), mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0),
       mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
 {
-    mNormalVector = Eigen::Vector3d::Zero();
+    mAvgViewingDir = Eigen::Vector3d::Zero();
     mnId = nNextId++;
 }
 
@@ -25,8 +25,10 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, cons
     mnId = nNextId++;
 
     Eigen::Vector3d Ow = pRefKF->mTcw.matrix().topRightCorner(3, 1);
-    mNormalVector = mWorldPos - Ow;
-    mNormalVector.normalize();
+    mAvgViewingDir = mWorldPos - Ow;
+    mAvgViewingDir.normalize();
+
+    mPointNormal = pRefKF->mvNormal[idxF].cast<double>();
 
     Eigen::Vector3d PC = pos - Ow;
     const float dist = PC.norm();
@@ -113,12 +115,46 @@ void MapPoint::Replace(MapPoint *pMP)
 {
     if (pMP->mnId == this->mnId)
         return;
+
+    int nvisible, nfound;
+    std::map<KeyFrame *, size_t> obs;
+    {
+        std::unique_lock<std::mutex> lock1(mMutexFeatures);
+        std::unique_lock<std::mutex> lock2(mMutexPos);
+        obs = mObservations;
+        mObservations.clear();
+        mbBad = true;
+        // nvisible = mnVisible;
+        // nfound = mnFound;
+        mpReplaced = pMP;
+    }
+
+    for (auto mit = obs.begin(), mend = obs.end(); mit != mend; mit++)
+    {
+        // Replace measurement in keyframe
+        KeyFrame *pKF = mit->first;
+
+        if (!pMP->IsInKeyFrame(pKF))
+        {
+            pKF->ReplaceMapPointMatch(mit->second, pMP);
+            pMP->AddObservation(pKF, mit->second);
+        }
+        else
+        {
+            pKF->EraseMapPointMatch(mit->second);
+        }
+    }
+    // pMP->IncreaseFound(nfound);
+    // pMP->IncreaseVisible(nvisible);
+    // pMP->ComputeDistinctiveDescriptors();
+    // pMP->UpdateDepthAndViewingDir();
+    mpMap->EraseMapPoint(this);
 }
 
-Eigen::Vector3d MapPoint::GetNormal()
+Eigen::Vector3d MapPoint::GetViewingDirection()
 {
     std::unique_lock<std::mutex> lock2(mMutexPos);
-    return mNormalVector;
+    return mAvgViewingDir;
 }
 
 Eigen::Vector3d MapPoint::GetWorldPos()
@@ -136,7 +172,7 @@ bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
 {
 }
 
-void MapPoint::UpdateNormalAndDepth()
+void MapPoint::UpdateDepthAndViewingDir()
 {
     std::map<KeyFrame *, size_t> observations;
     KeyFrame *pRefKF;
@@ -154,14 +190,17 @@ void MapPoint::UpdateNormalAndDepth()
     if (observations.empty())
         return;
 
+    Eigen::Vector3d viewingDir = Eigen::Vector3d::Zero();
     Eigen::Vector3d normal = Eigen::Vector3d::Zero();
     int n = 0;
     for (auto mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
     {
         KeyFrame *pKF = mit->first;
         Eigen::Vector3d Owi = pKF->mTcw.translation();
-        Eigen::Vector3d normali = mWorldPos - Owi;
-        normal += normali.normalized();
+        Eigen::Vector3d viewingDiri = mWorldPos - Owi;
+        Eigen::Vector3d normali = pKF->mvNormal[mit->second].cast<double>();
+        viewingDir += viewingDiri.normalized();
+        normal += normali;
         n++;
     }
 
@@ -175,7 +214,8 @@ void MapPoint::UpdateNormalAndDepth()
         std::unique_lock<std::mutex> lock3(mMutexPos);
         mfMaxDistance = dist * levelScaleFactor;
         mfMinDistance = mfMaxDistance / pRefKF->mvScaleFactors[nLevels - 1];
-        mNormalVector = normal / n;
+        mAvgViewingDir = viewingDir / n;
+        mPointNormal = normal / n;
     }
 }
 

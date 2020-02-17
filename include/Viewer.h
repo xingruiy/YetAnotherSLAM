@@ -26,7 +26,7 @@ public:
 private:
     void renderImagesToScreen();
     void renderLiveCameraFrustum();
-    void draw3DMapPoints();
+    void draw3DMapPoints(const int &PointSize, const bool &drawImmature);
     void drawKeyFrameHistory();
 
     bool needUpdateImage;

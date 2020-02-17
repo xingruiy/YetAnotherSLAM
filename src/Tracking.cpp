@@ -62,7 +62,7 @@ void Tracking::initialisation()
 {
     tracker->SetReferenceImage(NextFrame.mImGray);
     tracker->SetReferenceDepth(NextFrame.mImDepth);
-    mapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw, (uint)NextFrame.mnId);
+    // mapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw, (uint)NextFrame.mnId);
 
     T_ref2World = NextFrame.mTcw;
     NextFrame.mTcw = Sophus::SE3d(Eigen::Matrix4d::Identity());
@@ -86,9 +86,9 @@ bool Tracking::trackLastFrame()
     if (g_bEnableViewer)
         viewer->setLivePose(NextFrame.mTcw.matrix());
 
-    mapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw, (uint)NextFrame.mnId);
-    mapper->raytrace(NextFrame.mTcw);
-    tracker->SetReferenceInvD(mapper->GetSyntheticVertexMap());
+    // mapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw, (uint)NextFrame.mnId);
+    // mapper->raytrace(NextFrame.mTcw);
+    // tracker->SetReferenceInvD(mapper->GetSyntheticVertexMap());
 
     return true;
 }

@@ -13,6 +13,22 @@ KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
 {
   mnId = nNextId++;
 
+  fx = g_fx[0];
+  fy = g_fy[0];
+  cx = g_cx[0];
+  cy = g_cy[0];
+  invfx = g_invfx[0];
+  invfy = g_invfy[0];
+  mbf = g_bf;
+  mb = mbf / fx;
+  mThDepth = g_thDepth;
+
+  mK = cv::Mat::eye(3, 3, CV_32F);
+  mK.at<float>(0, 0) = fx;
+  mK.at<float>(1, 1) = fy;
+  mK.at<float>(0, 2) = cx;
+  mK.at<float>(1, 2) = cy;
+
   mGrid.resize(FRAME_GRID_COLS);
   for (int i = 0; i < FRAME_GRID_COLS; i++)
     mGrid[i].resize(FRAME_GRID_ROWS);
@@ -33,22 +49,6 @@ KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
   mvScaleFactors = pExtractor->GetScaleFactors();
   mvLevelSigma2 = pExtractor->GetScaleSigmaSquares();
   mvInvLevelSigma2 = pExtractor->GetInverseScaleSigmaSquares();
-
-  fx = g_fx[0];
-  fy = g_fy[0];
-  cx = g_cx[0];
-  cy = g_cy[0];
-  invfx = g_invfx[0];
-  invfy = g_invfy[0];
-  mbf = g_bf;
-  mb = mbf / fx;
-  mThDepth = g_thDepth;
-
-  mK = cv::Mat::eye(3, 3, CV_32F);
-  mK.at<float>(0, 0) = fx;
-  mK.at<float>(1, 1) = fy;
-  mK.at<float>(0, 2) = cx;
-  mK.at<float>(1, 2) = cy;
 }
 
 void KeyFrame::UndistortKeys()
@@ -102,6 +102,16 @@ void KeyFrame::EraseMapPointMatch(MapPoint *pMP)
     mvpMapPoints[idx] = static_cast<MapPoint *>(NULL);
 }
 
+void KeyFrame::EraseMapPointMatch(const size_t &idx)
+{
+  mvpMapPoints[idx] = static_cast<MapPoint *>(NULL);
+}
+
+void KeyFrame::ReplaceMapPointMatch(const size_t &idx, MapPoint *pMP)
+{
+  mvpMapPoints[idx] = pMP;
+}
+
 void KeyFrame::AssignFeaturesToGrid()
 {
   for (int i = 0; i < N; i++)
@@ -132,6 +142,7 @@ void KeyFrame::ComputeDepth(const cv::Mat depth_image)
   mvuRight = std::vector<float>(N, -1);
   // Key point depth
   mvDepth = std::vector<float>(N, -1);
+  mvNormal = std::vector<Eigen::Vector3f>(N, Eigen::Vector3f::Zero());
 
   for (int i = 0; i < N; i++)
   {
@@ -141,12 +152,25 @@ void KeyFrame::ComputeDepth(const cv::Mat depth_image)
     const float &v = kp.pt.y;
     const float &u = kp.pt.x;
 
-    const float d = depth_image.at<float>(v, u);
+    if (v < 1 && u < 1 && v >= g_width[0] - 1 && u >= g_height[0] - 1)
+      continue;
 
-    if (d > 0)
+    const float d = depth_image.at<float>(v, u);
+    const float d00 = depth_image.at<float>(v - 1, u);
+    const float d01 = depth_image.at<float>(v + 1, u);
+    const float d10 = depth_image.at<float>(v, u - 1);
+    const float d11 = depth_image.at<float>(v, u + 1);
+
+    if (d > 0 && d00 > 0 && d01 > 0 && d10 > 0 && d11 > 0)
     {
       mvDepth[i] = d;
       mvuRight[i] = kpU.pt.x - g_bf / d;
+
+      Eigen::Vector3d p00((u - 1 - cx) * invfx * d00, (v - cy) * invfy * d00, d00);
+      Eigen::Vector3d p01((u + 1 - cx) * invfx * d01, (v - cy) * invfy * d01, d01);
+      Eigen::Vector3d p10((u - cx) * invfx * d10, (v - 1 - cy) * invfy * d10, d10);
+      Eigen::Vector3d p11((u - cx) * invfx * d11, (v + 1 - cy) * invfy * d11, d11);
+      mvNormal[i] = ((p01 - p00).cross(p11 - p10).normalized()).cast<float>();
     }
   }
 }
@@ -315,7 +339,7 @@ bool KeyFrame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
     return false;
 
   // Check viewing angle
-  Eigen::Vector3d Pn = pMP->GetNormal();
+  Eigen::Vector3d Pn = pMP->GetViewingDirection();
 
   float viewCos = PO.dot(Pn) / dist;
 
