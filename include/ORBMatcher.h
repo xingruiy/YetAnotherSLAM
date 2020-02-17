@@ -7,10 +7,10 @@
 namespace SLAM
 {
 
-class Matcher
+class ORBMatcher
 {
 public:
-    Matcher(float nnratio = 0.6, bool checkOri = true);
+    ORBMatcher(float nnratio = 0.6, bool checkOri = true);
 
     // Computes the Hamming distance between two ORB descriptors
     static int DescriptorDistance(const cv::Mat &a, const cv::Mat &b);

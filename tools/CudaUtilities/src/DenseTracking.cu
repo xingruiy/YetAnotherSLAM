@@ -160,9 +160,18 @@ void DenseTracking::SetReferenceInvD(cv::cuda::GpuMat vmap)
     }
 }
 
-Sophus::SE3d DenseTracking::GetTransform()
+void DenseTracking::SwitchFrame()
 {
-    Sophus::SE3d estimate = Sophus::SE3d();
+    for (int lvl = 0; lvl < mnNumPyr; ++lvl)
+    {
+        std::swap(mvReferenceInvDepth[lvl], mvCurrentInvDepth[lvl]);
+        std::swap(mvReferenceIntensity[lvl], mvCurrentIntensity[lvl]);
+    }
+}
+
+Sophus::SE3d DenseTracking::GetTransform(Sophus::SE3d estimate, const bool &bSwitchFrame)
+{
+    // Sophus::SE3d estimate = Sophus::SE3d();
     Sophus::SE3d lastSuccessEstimate = estimate;
     for (int lvl = mnNumPyr - 1; lvl >= 0; --lvl)
     {
@@ -210,11 +219,12 @@ Sophus::SE3d DenseTracking::GetTransform()
         }
     }
 
-    for (int lvl = 0; lvl < mnNumPyr; ++lvl)
-    {
-        std::swap(mvReferenceInvDepth[lvl], mvCurrentInvDepth[lvl]);
-        std::swap(mvReferenceIntensity[lvl], mvCurrentIntensity[lvl]);
-    }
+    if (bSwitchFrame)
+        for (int lvl = 0; lvl < mnNumPyr; ++lvl)
+        {
+            std::swap(mvReferenceInvDepth[lvl], mvCurrentInvDepth[lvl]);
+            std::swap(mvReferenceIntensity[lvl], mvCurrentIntensity[lvl]);
+        }
 
     mbTrackingGood = true;
     return lastSuccessEstimate;

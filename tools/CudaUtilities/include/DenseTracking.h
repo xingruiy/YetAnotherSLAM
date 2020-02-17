@@ -14,6 +14,7 @@ public:
                   const bool &bUseRGB, const bool &bUseDepth);
 
     bool IsTrackingGood() const;
+    void SwitchFrame();
 
     void SetReferenceImage(const cv::Mat &imGray);
     void SetReferenceDepth(const cv::Mat &imDepth);
@@ -23,7 +24,7 @@ public:
 
     void SetReferenceInvD(cv::cuda::GpuMat imInvD);
 
-    Sophus::SE3d GetTransform();
+    Sophus::SE3d GetTransform(Sophus::SE3d estimate, const bool &bSwitchFrame = true);
 
     cv::cuda::GpuMat GetReferenceDepth(const int lvl = 0) const;
 

@@ -1,19 +1,19 @@
 #include "Converter.h"
-#include "Matcher.h"
+#include "ORBMatcher.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 
 namespace SLAM
 {
 
-const int Matcher::TH_HIGH = 100;
-const int Matcher::TH_LOW = 50;
-const int Matcher::HISTO_LENGTH = 30;
+const int ORBMatcher::TH_HIGH = 100;
+const int ORBMatcher::TH_LOW = 50;
+const int ORBMatcher::HISTO_LENGTH = 30;
 
-Matcher::Matcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbCheckOrientation(checkOri)
+ORBMatcher::ORBMatcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbCheckOrientation(checkOri)
 {
 }
 
-float Matcher::RadiusByViewingCos(const float &viewCos)
+float ORBMatcher::RadiusByViewingCos(const float &viewCos)
 {
     if (viewCos > 0.998)
         return 2.0;
@@ -21,7 +21,7 @@ float Matcher::RadiusByViewingCos(const float &viewCos)
         return 3.0;
 }
 
-int Matcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
+int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
 {
     int nmatches = 0;
 
@@ -111,7 +111,7 @@ int Matcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vp
     return nmatches;
 }
 
-int Matcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
+int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
 {
     Sophus::SE3d Twc = pKF->mTcw.inverse();
     Eigen::Vector3d Ow = pKF->mTcw.translation();
@@ -262,7 +262,7 @@ int Matcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, con
     return nFused;
 }
 
-int Matcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12,
+int ORBMatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12,
                                     std::vector<std::pair<size_t, size_t>> &vMatchedPairs,
                                     const bool bOnlyStereo)
 {
@@ -429,7 +429,7 @@ int Matcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12,
     return nmatches;
 }
 
-void Matcher::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
+void ORBMatcher::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
 {
     int max1 = 0;
     int max2 = 0;
@@ -472,7 +472,7 @@ void Matcher::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1
     }
 }
 
-bool Matcher::CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const cv::Mat &F12, const KeyFrame *pKF2)
+bool ORBMatcher::CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const cv::Mat &F12, const KeyFrame *pKF2)
 {
     // Epipolar line in second image l = x1'F12 = [a b c]
     const float a = kp1.pt.x * F12.at<float>(0, 0) + kp1.pt.y * F12.at<float>(1, 0) + F12.at<float>(2, 0);
@@ -493,7 +493,7 @@ bool Matcher::CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint 
 
 // Bit set count operation from
 // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-int Matcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
+int ORBMatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 {
     const int *pa = a.ptr<int32_t>();
     const int *pb = b.ptr<int32_t>();

@@ -19,7 +19,7 @@ PRIVATE
     src/Viewer.cpp
     src/Tracking.cpp
     src/Bundler.cpp
-    src/Matcher.cpp
+    src/ORBMatcher.cpp
     src/GlobalDef.cpp
     src/LoopFinder.cpp
     src/KeyFrameDatabase.cpp

@@ -1,5 +1,5 @@
 #include "Mapping.h"
-#include "Matcher.h"
+#include "ORBMatcher.h"
 #include "Bundler.h"
 #include "Converter.h"
 
@@ -151,7 +151,7 @@ int Mapping::MatchLocalPoints()
 
     if (nToMatch > 0)
     {
-        Matcher matcher(0.8);
+        ORBMatcher matcher(0.8);
         // Project points to the current keyframe
         // And search for potential corresponding points
         nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 1);
@@ -265,7 +265,7 @@ void Mapping::SearchInNeighbors()
     }
 
     // Search matches by projection from current KF in target KFs
-    Matcher matcher;
+    ORBMatcher matcher;
     auto vpMapPointMatches = NextKeyFrame->GetMapPointMatches();
     for (auto vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
     {
@@ -321,7 +321,7 @@ void Mapping::TriangulatePoints()
     if (vpNeighKFs.size() == 0)
         return;
 
-    Matcher matcher(0.6, false);
+    ORBMatcher matcher(0.6, false);
 
     cv::Mat Rcw1 = NextKeyFrame->GetRotation();
     cv::Mat Ow1 = NextKeyFrame->GetTranslation();

@@ -1,5 +1,5 @@
 #include "MapPoint.h"
-#include "Matcher.h"
+#include "ORBMatcher.h"
 #include <cmath>
 
 namespace SLAM
@@ -267,7 +267,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
         Distances[i][i] = 0;
         for (size_t j = i + 1; j < N; j++)
         {
-            int distij = Matcher::DescriptorDistance(vDescriptors[i], vDescriptors[j]);
+            int distij = ORBMatcher::DescriptorDistance(vDescriptors[i], vDescriptors[j]);
             Distances[i][j] = distij;
             Distances[j][i] = distij;
         }

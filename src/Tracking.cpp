@@ -78,10 +78,12 @@ bool Tracking::trackLastFrame()
     tracker->SetTrackingImage(NextFrame.mImGray);
     tracker->SetTrackingDepth(NextFrame.mImDepth);
 
-    Sophus::SE3d Tpc = tracker->GetTransform();
+    Sophus::SE3d Tpc = tracker->GetTransform(lastFrame.T_frame2Ref.inverse(), false);
 
-    NextFrame.mTcw = lastFrame.mTcw * Tpc.inverse();
-    NextFrame.T_frame2Ref = lastFrame.T_frame2Ref * Tpc.inverse();
+    // NextFrame.mTcw = lastFrame.mTcw * Tpc.inverse();
+    // NextFrame.T_frame2Ref = lastFrame.T_frame2Ref * Tpc.inverse();
+    NextFrame.mTcw = T_ref2World * Tpc.inverse();
+    NextFrame.T_frame2Ref = Tpc.inverse();
 
     if (g_bEnableViewer)
         viewer->setLivePose(NextFrame.mTcw.matrix());
@@ -101,7 +103,8 @@ bool Tracking::relocalisation()
 bool Tracking::NeedNewKeyFrame()
 {
 
-    Sophus::SE3d DT = T_ref2World.inverse() * NextFrame.mTcw;
+    // Sophus::SE3d DT = T_ref2World.inverse() * NextFrame.mTcw;
+    Sophus::SE3d DT = NextFrame.T_frame2Ref;
 
     if (DT.log().topRows<3>().norm() > 0.15)
         return true;
@@ -118,6 +121,7 @@ void Tracking::MakeNewKeyFrame()
     T_ref2World = NextFrame.mTcw;
 
     mapping->AddKeyFrameCandidate(NextFrame);
+    tracker->SwitchFrame();
 
     // Set to the reference frame
     NextFrame.T_frame2Ref = Sophus::SE3d();
