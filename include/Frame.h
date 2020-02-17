@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include "KeyFrame.h"
 #include "GlobalDef.h"
+#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
 
 namespace SLAM
 {
@@ -37,6 +38,9 @@ struct Frame
     KeyFrame *mpReferenceKF;
 
     bool mbIsKeyFrame;
+
+    // Bag of Words Vector structures.
+    DBoW2::BowVector mBowVec;
 };
 
 } // namespace SLAM

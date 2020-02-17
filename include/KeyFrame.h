@@ -144,6 +144,14 @@ public:
     void AssignFeaturesToGrid();
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
     void ComputeDepth(const cv::Mat depth);
+
+    // Variables used by the keyframe database
+    long unsigned int mnLoopQuery;
+    int mnLoopWords;
+    float mLoopScore;
+    long unsigned int mnRelocQuery;
+    int mnRelocWords;
+    float mRelocScore;
 };
 
 } // namespace SLAM

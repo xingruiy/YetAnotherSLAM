@@ -21,6 +21,8 @@ PRIVATE
     src/Bundler.cpp
     src/Matcher.cpp
     src/GlobalDef.cpp
+    src/LoopFinder.cpp
+    src/KeyFrameDatabase.cpp
 )
 
 target_compile_features(${PROJECT_NAME}

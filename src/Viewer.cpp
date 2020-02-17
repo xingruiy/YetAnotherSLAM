@@ -54,9 +54,9 @@ void Viewer::Run()
     // Create menus
     pangolin::CreatePanel("menu").SetBounds(0, 1, 0, MenuDividerLeft);
     pangolin::Var<bool> varReset = pangolin::Var<bool>("menu.reset", false, false);
-    pangolin::Var<bool> varRunning = pangolin::Var<bool>("menu.Running", false, true);
+    pangolin::Var<bool> varRunning = pangolin::Var<bool>("menu.Running", g_bSystemRunning, true);
     pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Running"));
-    pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", 3, 1, 10);
+    pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
     pangolin::Var<bool> varDrawImmaturePoint = pangolin::Var<bool>("menu. Draw Immature Point", true, true);
 
     while (!pangolin::ShouldQuit())
