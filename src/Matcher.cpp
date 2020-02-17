@@ -16,9 +16,9 @@ Matcher::Matcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbCheckOrie
 float Matcher::RadiusByViewingCos(const float &viewCos)
 {
     if (viewCos > 0.998)
-        return 1.5;
-    else
         return 2.0;
+    else
+        return 3.0;
 }
 
 int Matcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
