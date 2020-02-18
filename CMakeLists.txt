@@ -39,7 +39,7 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}/tools/
     ${PROJECT_SOURCE_DIR}/tools/DatasetLoader/include
     ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/include
-    ${PROJECT_SOURCE_DIR}/tools/CUDATracking/include
+    ${PROJECT_SOURCE_DIR}/tools/RGBDTracking/include
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/include
 )
@@ -53,7 +53,7 @@ PUBLIC
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
-    ${PROJECT_SOURCE_DIR}/tools/CUDATracking/lib/libCUDATracking.so
+    ${PROJECT_SOURCE_DIR}/tools/RGBDTracking/lib/libRGBDTracking.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
 )
 

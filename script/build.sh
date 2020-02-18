@@ -25,9 +25,9 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building tools/CUDATracking ..."
+echo "Configuring and building tools/RGBDTracking ..."
 
-cd ../../CUDATracking/
+cd ../../RGBDTracking/
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j

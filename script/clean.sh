@@ -3,8 +3,8 @@
 rm -rf build/
 rm -rf bin/
 rm -rf vocabulary/ORBvoc.txt
-rm -rf tools/CUDATracking/build
-rm -rf tools/CUDATracking/lib
+rm -rf tools/RGBDTracking/build
+rm -rf tools/RGBDTracking/lib
 rm -rf tools/ORB_SLAM2/build
 rm -rf tools/ORB_SLAM2/lib
 rm -rf tools/CameraOpenNI/build

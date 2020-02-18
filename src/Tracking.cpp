@@ -6,7 +6,13 @@ namespace SLAM
 Tracking::Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping)
     : slamSystem(system), mpMap(map), viewer(viewer), mapping(mapping), trackingState(Null)
 {
-    tracker = new DenseTracking(g_width[0], g_height[0], g_calib[0].cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
+    tracker = new RGBDTracking(g_width[0],
+                               g_height[0],
+                               g_calib[0].cast<double>(),
+                               NUM_PYR,
+                               {10, 5, 3, 3, 3},
+                               g_bUseColour,
+                               g_bUseDepth);
 }
 
 void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)

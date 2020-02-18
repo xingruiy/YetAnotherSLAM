@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(CUDATracking LANGUAGES CXX CUDA)
+project(RGBDTracking LANGUAGES CXX CUDA)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
@@ -11,7 +11,7 @@ add_library(${PROJECT_NAME} SHARED "")
 target_sources(${PROJECT_NAME}
 PRIVATE
     src/CUDAImageProc.cu
-    src/DenseTracking.cu
+    src/RGBDTracking.cu
 )
 
 set_target_properties(${PROJECT_NAME}

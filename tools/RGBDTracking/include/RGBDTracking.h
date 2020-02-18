@@ -4,17 +4,17 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 
-class DenseTracking
+class RGBDTracking
 {
 
 public:
-    DenseTracking(const int &w,
-                  const int &h,
-                  const Eigen::Matrix3d &K,
-                  const int &nNumPyr,
-                  const std::vector<int> &vIterations,
-                  const bool &bUseRGB,
-                  const bool &bUseDepth);
+    RGBDTracking(const int &w,
+                 const int &h,
+                 const Eigen::Matrix3d &K,
+                 const int &nNumPyr,
+                 const std::vector<int> &vIterations,
+                 const bool &bUseRGB,
+                 const bool &bUseDepth);
 
     bool IsTrackingGood() const;
     void SwitchFrame();

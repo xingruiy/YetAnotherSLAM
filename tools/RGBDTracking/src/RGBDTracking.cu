@@ -1,9 +1,9 @@
-#include "DenseTracking.h"
+#include "RGBDTracking.h"
 #include "se3StepFunctor.h"
 #include "CUDAImageProc.h"
 #include "statisticsFunctor.h"
 
-DenseTracking::DenseTracking(const int &imgWidth,
+RGBDTracking::RGBDTracking(const int &imgWidth,
                              const int &imgHeight,
                              const Eigen::Matrix3d &K,
                              const int &nPyrLvl,
@@ -86,7 +86,7 @@ DenseTracking::DenseTracking(const int &imgWidth,
     mGpuBufferRawDepth.create(imgHeight, imgWidth, CV_32FC1);
 }
 
-void DenseTracking::SetReferenceImage(const cv::Mat &imGray)
+void RGBDTracking::SetReferenceImage(const cv::Mat &imGray)
 {
     cv::Mat imGrayFloat;
     imGray.convertTo(imGrayFloat, CV_32FC1);
@@ -100,7 +100,7 @@ void DenseTracking::SetReferenceImage(const cv::Mat &imGray)
     }
 }
 
-void DenseTracking::SetReferenceDepth(const cv::Mat &imDepth)
+void RGBDTracking::SetReferenceDepth(const cv::Mat &imDepth)
 {
     for (int lvl = 0; lvl < mnNumPyr; ++lvl)
     {
@@ -114,7 +114,7 @@ void DenseTracking::SetReferenceDepth(const cv::Mat &imDepth)
     }
 }
 
-void DenseTracking::SetTrackingImage(const cv::Mat &imGray)
+void RGBDTracking::SetTrackingImage(const cv::Mat &imGray)
 {
     cv::Mat imGrayFloat;
     imGray.convertTo(imGrayFloat, CV_32FC1);
@@ -130,7 +130,7 @@ void DenseTracking::SetTrackingImage(const cv::Mat &imGray)
     }
 }
 
-void DenseTracking::SetTrackingDepth(const cv::Mat &imDepth)
+void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
 {
     for (int lvl = 0; lvl < mnNumPyr; ++lvl)
     {
@@ -146,7 +146,7 @@ void DenseTracking::SetTrackingDepth(const cv::Mat &imDepth)
     }
 }
 
-void DenseTracking::SetReferenceInvD(cv::cuda::GpuMat vmap)
+void RGBDTracking::SetReferenceInvD(cv::cuda::GpuMat vmap)
 {
     for (int lvl = 0; lvl < mnNumPyr; ++lvl)
     {
@@ -157,7 +157,7 @@ void DenseTracking::SetReferenceInvD(cv::cuda::GpuMat vmap)
     }
 }
 
-void DenseTracking::SwitchFrame()
+void RGBDTracking::SwitchFrame()
 {
     for (int lvl = 0; lvl < mnNumPyr; ++lvl)
     {
@@ -166,7 +166,7 @@ void DenseTracking::SwitchFrame()
     }
 }
 
-Sophus::SE3d DenseTracking::GetTransform(Sophus::SE3d estimate, const bool &bSwitchFrame)
+Sophus::SE3d RGBDTracking::GetTransform(Sophus::SE3d estimate, const bool &bSwitchFrame)
 {
     // Sophus::SE3d estimate = Sophus::SE3d();
     Sophus::SE3d lastSuccessEstimate = estimate;
@@ -227,7 +227,7 @@ Sophus::SE3d DenseTracking::GetTransform(Sophus::SE3d estimate, const bool &bSwi
     return lastSuccessEstimate;
 }
 
-void DenseTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T)
+void RGBDTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T)
 {
     auto refInvDepth = mvReferenceInvDepth[lvl];
     auto refPtTransformedLvl = mvReferencePointTransformed[lvl];
@@ -236,7 +236,7 @@ void DenseTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T
     ::TransformReferencePoint(refInvDepth, refPtTransformedLvl, KLvl, T);
 }
 
-void DenseTracking::ComputeSingleStepRGB(
+void RGBDTracking::ComputeSingleStepRGB(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -305,7 +305,7 @@ void DenseTracking::ComputeSingleStepRGB(
     residualSum = hostData.ptr<float>(0)[27];
 }
 
-void DenseTracking::ComputeSingleStepDepth(
+void RGBDTracking::ComputeSingleStepDepth(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -374,7 +374,7 @@ void DenseTracking::ComputeSingleStepDepth(
     residualSum = hostData.ptr<float>(0)[27];
 }
 
-void DenseTracking::ComputeSingleStepRGBD(
+void RGBDTracking::ComputeSingleStepRGBD(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -452,7 +452,7 @@ void DenseTracking::ComputeSingleStepRGBD(
     residualSum = hostData.ptr<float>(0)[27];
 }
 
-void DenseTracking::ComputeSingleStepRGBDLinear(
+void RGBDTracking::ComputeSingleStepRGBDLinear(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -483,12 +483,12 @@ void DenseTracking::ComputeSingleStepRGBDLinear(
     residualMapped += residualBuffer;
 }
 
-cv::cuda::GpuMat DenseTracking::GetReferenceDepth(const int lvl) const
+cv::cuda::GpuMat RGBDTracking::GetReferenceDepth(const int lvl) const
 {
     return mGpuBufferRawDepth;
 }
 
-bool DenseTracking::IsTrackingGood() const
+bool RGBDTracking::IsTrackingGood() const
 {
     return mbTrackingGood;
 }
