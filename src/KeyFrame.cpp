@@ -493,6 +493,15 @@ void KeyFrame::AddChild(KeyFrame *pKF)
   mspChildrens.insert(pKF);
 }
 
+std::set<KeyFrame *> KeyFrame::GetConnectedKeyFrames()
+{
+  std::unique_lock<std::mutex> lock(mMutexConnections);
+  std::set<KeyFrame *> s;
+  for (auto mit = mConnectedKeyFrameWeights.begin(); mit != mConnectedKeyFrameWeights.end(); mit++)
+    s.insert(mit->first);
+  return s;
+}
+
 std::vector<KeyFrame *> KeyFrame::GetVectorCovisibleKeyFrames()
 {
   std::unique_lock<std::mutex> lock(mMutexConnections);

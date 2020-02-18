@@ -19,8 +19,10 @@ PRIVATE
     src/Viewer.cpp
     src/Tracking.cpp
     src/Bundler.cpp
-    src/Matcher.cpp
+    src/ORBMatcher.cpp
     src/GlobalDef.cpp
+    src/LoopFinder.cpp
+    src/KeyFrameDatabase.cpp
 )
 
 target_compile_features(${PROJECT_NAME}
@@ -37,7 +39,7 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}/tools/
     ${PROJECT_SOURCE_DIR}/tools/DatasetLoader/include
     ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/include
-    ${PROJECT_SOURCE_DIR}/tools/CudaUtilities/include
+    ${PROJECT_SOURCE_DIR}/tools/RGBDTracking/include
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/include
 )
@@ -51,7 +53,7 @@ PUBLIC
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
-    ${PROJECT_SOURCE_DIR}/tools/CudaUtilities/lib/libCudaUtilities.so
+    ${PROJECT_SOURCE_DIR}/tools/RGBDTracking/lib/libRGBDTracking.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
 )
 

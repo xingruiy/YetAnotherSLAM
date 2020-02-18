@@ -1,5 +1,5 @@
 #include "Mapping.h"
-#include "Matcher.h"
+#include "ORBMatcher.h"
 #include "Bundler.h"
 #include "Converter.h"
 
@@ -35,6 +35,7 @@ void Mapping::Run()
             if (nMatches > 0)
                 Bundler::PoseOptimization(NextKeyFrame);
 
+            UpdateKeyFrame();
             TriangulatePoints();  // Triangulate new points from image pairs
             CreateNewMapPoints(); // Create new points from depth observations
 
@@ -46,9 +47,6 @@ void Mapping::Run()
             }
 
             UpdateConnections();
-
-            UpdateKeyFrame();
-
             if (!HasFrameToProcess())
                 KeyFrameCulling();
 
@@ -145,13 +143,14 @@ int Mapping::MatchLocalPoints()
         // Project (this fills MapPoint variables for matching)
         if (NextKeyFrame->IsInFrustum(pMP, 0.5))
         {
+            pMP->IncreaseVisible();
             nToMatch++;
         }
     }
 
     if (nToMatch > 0)
     {
-        Matcher matcher(0.8);
+        ORBMatcher matcher(0.8);
         // Project points to the current keyframe
         // And search for potential corresponding points
         nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 1);
@@ -265,7 +264,7 @@ void Mapping::SearchInNeighbors()
     }
 
     // Search matches by projection from current KF in target KFs
-    Matcher matcher;
+    ORBMatcher matcher;
     auto vpMapPointMatches = NextKeyFrame->GetMapPointMatches();
     for (auto vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
     {
@@ -321,7 +320,7 @@ void Mapping::TriangulatePoints()
     if (vpNeighKFs.size() == 0)
         return;
 
-    Matcher matcher(0.6, false);
+    ORBMatcher matcher(0.6, false);
 
     cv::Mat Rcw1 = NextKeyFrame->GetRotation();
     cv::Mat Ow1 = NextKeyFrame->GetTranslation();
@@ -579,10 +578,10 @@ void Mapping::CreateNewMapPoints()
             MapPoint *pMP = NextKeyFrame->mvpMapPoints[i];
             if (!pMP)
                 bCreateNew = true;
-            else if (pMP->Observations() < 1 || NextKeyFrame->mvbOutlier[i])
+            else if (pMP->Observations() < 1)
             {
                 bCreateNew = true;
-                NextKeyFrame->mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
+                NextKeyFrame->mvpMapPoints[i] = NULL;
             }
 
             if (bCreateNew)
@@ -590,7 +589,7 @@ void Mapping::CreateNewMapPoints()
                 Eigen::Vector3d x3D;
                 if (NextKeyFrame->UnprojectKeyPoint(x3D, i))
                 {
-                    NextKeyFrame->mvbOutlier[i] = false;
+                    // NextKeyFrame->mvbOutlier[i] = false;
                     MapPoint *pNewMP = new MapPoint(x3D, NextKeyFrame, mpMap);
                     pNewMP->AddObservation(NextKeyFrame, i);
                     NextKeyFrame->AddMapPoint(pNewMP, i);
@@ -689,31 +688,47 @@ void Mapping::UpdateConnections()
 
 void Mapping::UpdateKeyFrame()
 {
-    int nOutliers = 0;
-    int nMatchedPoints = 0;
-    for (int i = 0; i < NextKeyFrame->mvpMapPoints.size(); ++i)
+    // Update MapPoints Statistics
+    for (int i = 0; i < NextKeyFrame->N; i++)
     {
-        MapPoint *pMP = NextKeyFrame->mvpMapPoints[i];
-        bool bOutlier = NextKeyFrame->mvbOutlier[i];
-
-        if (pMP)
+        if (NextKeyFrame->mvpMapPoints[i])
         {
-            if (pMP->mObservations.size() < 1 || bOutlier)
+            if (!NextKeyFrame->mvbOutlier[i])
             {
-                pMP->SetBadFlag();
-                mpMap->EraseMapPoint(pMP);
-                NextKeyFrame->mvpMapPoints[i] = NULL;
-                nOutliers++;
+                NextKeyFrame->mvpMapPoints[i]->IncreaseFound();
             }
             else
             {
-                nMatchedPoints++;
+                NextKeyFrame->mvbOutlier[i] = false;
+                NextKeyFrame->mvpMapPoints[i] = NULL;
             }
         }
     }
+    // int nOutliers = 0;
+    // int nMatchedPoints = 0;
+    // for (int i = 0; i < NextKeyFrame->mvpMapPoints.size(); ++i)
+    // {
+    //     MapPoint *pMP = NextKeyFrame->mvpMapPoints[i];
+    //     bool bOutlier = NextKeyFrame->mvbOutlier[i];
 
-    std::cout << "number of outliers in keyframe: " << nOutliers << std::endl;
-    std::cout << "number of matched points in keyframe: " << nMatchedPoints << std::endl;
+    //     if (pMP)
+    //     {
+    //         if (pMP->mObservations.size() < 1 || bOutlier)
+    //         {
+    //             pMP->SetBadFlag();
+    //             mpMap->EraseMapPoint(pMP);
+    //             NextKeyFrame->mvpMapPoints[i] = NULL;
+    //             nOutliers++;
+    //         }
+    //         else
+    //         {
+    //             nMatchedPoints++;
+    //         }
+    //     }
+    // }
+
+    // std::cout << "number of outliers in keyframe: " << nOutliers << std::endl;
+    // std::cout << "number of matched points in keyframe: " << nMatchedPoints << std::endl;
 }
 
 cv::Mat Mapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)

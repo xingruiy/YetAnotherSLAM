@@ -12,8 +12,8 @@ System.EnableViewer: 1
 # =============================
 Calibration.width: 640
 Calibration.height: 480
-Calibration.fx: 580.0
-Calibration.fy: 580.0
+Calibration.fx: 525.0
+Calibration.fy: 525.0
 Calibration.cx: 319.5
 Calibration.cy: 239.5
 Calibration.bf: 40.0 # IR projector baseline times fx (aprox.)
@@ -21,7 +21,7 @@ Calibration.bf: 40.0 # IR projector baseline times fx (aprox.)
 # =============================
 # DistCoeff
 # =============================
-UnDistortion.k1: 0.069515
+UnDistortion.k1: 0
 UnDistortion.k2: -0.113363
 UnDistortion.p1: 0.007882
 UnDistortion.p2: 0.010799
@@ -39,11 +39,12 @@ ORB_SLAM2.minThFAST: 7
 # =============================
 # Tracking
 # =============================
-Tracking.UseDepth: 1
+Tracking.UseDepth: 0
 Tracking.UseColour: 1
 Tracking.ThDepth: 40.0 # Close/Far threshold. Baseline times.
 
 # =============================
 # Map Viewer
 # =============================
-Viewer.PointSize: 4
+Viewer.PointSize: 3
+Viewer.StartWhenReady: 0

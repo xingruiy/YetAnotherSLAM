@@ -10,6 +10,7 @@
 #include "Tracking.h"
 #include "Mapping.h"
 #include "GlobalDef.h"
+#include "LoopFinder.h"
 
 namespace SLAM
 {
@@ -18,6 +19,7 @@ class Viewer;
 class Mapping;
 class Tracking;
 class MapViewer;
+class LoopFinder;
 
 class System
 {
@@ -33,11 +35,13 @@ private:
 
     std::thread *mappingThread;
     std::thread *viewerThread;
+    std::thread *loopThread;
 
     Map *mpMap;
     Tracking *tracker;
     Viewer *viewer;
     Mapping *mapping;
+    LoopFinder *loopClosing;
 
     cv::Mat grayScale;
     cv::Mat depthFloat;

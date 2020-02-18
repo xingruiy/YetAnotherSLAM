@@ -20,6 +20,9 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     mappingThread = new std::thread(&Mapping::Run, mapping);
     tracker = new Tracking(this, mpMap, viewer, mapping);
 
+    loopClosing = new LoopFinder();
+    loopThread = new std::thread(&LoopFinder::Run, loopClosing);
+
     std::cout << "Main Thread Started." << std::endl;
 }
 
@@ -60,7 +63,7 @@ void System::kill()
 System::~System()
 {
     std::cout << "System Waits for Other Threads." << std::endl;
-
+    loopThread->join();
     mappingThread->join();
     viewerThread->join();
 
@@ -68,9 +71,10 @@ System::~System()
     delete viewer;
     delete tracker;
     delete mapping;
+    delete loopClosing;
     delete mappingThread;
     delete viewerThread;
-
+    delete loopThread;
     std::cout << "System Killed." << std::endl;
 }
 
@@ -126,6 +130,7 @@ void System::readSettings(const std::string &strSettingFile)
     computeImageBounds();
 
     g_pointSize = settingsFile["Viewer.PointSize"];
+    g_bSystemRunning = (int)settingsFile["Viewer.StartWhenReady"] == 1;
 
     std::cout << "===================================================\n"
               << "The system is created with the following parameters:\n"

@@ -48,9 +48,17 @@ extern float g_minX, g_minY, g_maxX, g_maxY;
 extern float g_gridElementWidthInv;
 extern float g_gridElementHeightInv;
 
-void setGlobalCalibration(const int width, const int height, const Eigen::Matrix3d &K);
+void setGlobalCalibration(const int width,
+                          const int height,
+                          const Eigen::Matrix3d &K);
+
 void computeImageBounds();
 
 extern int g_pointSize;
+
+// Statistics
+extern size_t g_nFailedFrame;
+extern size_t g_nTrackedFrame;
+extern size_t g_nTrackedKeyframe;
 
 } // namespace SLAM

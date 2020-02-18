@@ -1,5 +1,5 @@
 #include "MapPoint.h"
-#include "Matcher.h"
+#include "ORBMatcher.h"
 #include <cmath>
 
 namespace SLAM
@@ -8,19 +8,44 @@ namespace SLAM
 std::mutex MapPoint::mGlobalMutex;
 unsigned long MapPoint::nNextId = 0;
 
-MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
-    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1),
-      mnTrackReferenceForFrame(-1), mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0),
-      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
+MapPoint::MapPoint(const Eigen::Vector3d &pos,
+                   KeyFrame *pRefKF,
+                   Map *pMap)
+    : mpMap(pMap),
+      mpRefKF(pRefKF),
+      mWorldPos(pos),
+      nObs(0),
+      mnVisible(1),
+      mnFound(1),
+      mnTrackReferenceForFrame(-1),
+      mpReplaced(NULL),
+      mfMinDistance(0),
+      mfMaxDistance(0),
+      mnFuseCandidateForKF(0),
+      mnFirstKFid(pRefKF->mnId),
+      mbBad(false)
 {
     mAvgViewingDir = Eigen::Vector3d::Zero();
     mnId = nNextId++;
 }
 
-MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF)
-    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1),
-      mnTrackReferenceForFrame(-1), mpReplaced(static_cast<MapPoint *>(NULL)), mfMinDistance(0),
-      mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
+MapPoint::MapPoint(const Eigen::Vector3d &pos,
+                   Map *pMap,
+                   KeyFrame *pRefKF,
+                   const int &idxF)
+    : mpMap(pMap),
+      mpRefKF(pRefKF),
+      mWorldPos(pos),
+      nObs(0),
+      mnVisible(1),
+      mnFound(1),
+      mnTrackReferenceForFrame(-1),
+      mpReplaced(NULL),
+      mfMinDistance(0),
+      mfMaxDistance(0),
+      mnFuseCandidateForKF(0),
+      mnFirstKFid(pRefKF->mnId),
+      mbBad(false)
 {
     mnId = nNextId++;
 
@@ -60,6 +85,12 @@ cv::Mat MapPoint::GetDescriptor()
     return mDescriptor.clone();
 }
 
+void MapPoint::IncreaseFound(int n)
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    mnFound += n;
+}
+
 void MapPoint::IncreaseVisible(int n)
 {
     std::unique_lock<std::mutex> lock(mMutexFeatures);
@@ -72,7 +103,11 @@ void MapPoint::AddObservation(KeyFrame *pKF, size_t idx)
     if (mObservations.count(pKF))
         return;
     mObservations[pKF] = idx;
-    nObs++;
+
+    if (pKF->mvuRight[idx] >= 0)
+        nObs += 2;
+    else
+        nObs++;
 }
 
 void MapPoint::EraseObservation(KeyFrame *pKF)
@@ -83,7 +118,11 @@ void MapPoint::EraseObservation(KeyFrame *pKF)
         if (mObservations.count(pKF))
         {
             int idx = mObservations[pKF];
-            nObs--;
+            if (pKF->mvuRight[idx] >= 0)
+                nObs -= 2;
+            else
+                nObs--;
+
             mObservations.erase(pKF);
 
             if (mpRefKF == pKF)
@@ -111,6 +150,12 @@ bool MapPoint::isBad()
     return mbBad;
 }
 
+bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    return (mObservations.count(pKF));
+}
+
 void MapPoint::Replace(MapPoint *pMP)
 {
     if (pMP->mnId == this->mnId)
@@ -124,8 +169,8 @@ void MapPoint::Replace(MapPoint *pMP)
         obs = mObservations;
         mObservations.clear();
         mbBad = true;
-        // nvisible = mnVisible;
-        // nfound = mnFound;
+        nvisible = mnVisible;
+        nfound = mnFound;
         mpReplaced = pMP;
     }
 
@@ -144,10 +189,10 @@ void MapPoint::Replace(MapPoint *pMP)
             pKF->EraseMapPointMatch(mit->second);
         }
     }
-    // pMP->IncreaseFound(nfound);
-    // pMP->IncreaseVisible(nvisible);
-    // pMP->ComputeDistinctiveDescriptors();
-    // pMP->UpdateDepthAndViewingDir();
+    pMP->IncreaseFound(nfound);
+    pMP->IncreaseVisible(nvisible);
+    pMP->ComputeDistinctiveDescriptors();
+
     mpMap->EraseMapPoint(this);
 }
 
@@ -168,13 +213,9 @@ MapPoint *MapPoint::GetReplaced()
     return mpReplaced;
 }
 
-bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
-{
-}
-
 void MapPoint::UpdateDepthAndViewingDir()
 {
-    std::map<KeyFrame *, size_t> observations;
+    std::map<KeyFrame *, size_t> Obs;
     KeyFrame *pRefKF;
     Eigen::Vector3d Pos;
     {
@@ -182,18 +223,18 @@ void MapPoint::UpdateDepthAndViewingDir()
         std::unique_lock<std::mutex> lock2(mMutexPos);
         if (mbBad)
             return;
-        observations = mObservations;
+        Obs = mObservations;
         pRefKF = mpRefKF;
         Pos = mWorldPos;
     }
 
-    if (observations.empty())
+    if (Obs.empty())
         return;
 
     Eigen::Vector3d viewingDir = Eigen::Vector3d::Zero();
     Eigen::Vector3d normal = Eigen::Vector3d::Zero();
     int n = 0;
-    for (auto mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+    for (auto mit = Obs.begin(), mend = Obs.end(); mit != mend; mit++)
     {
         KeyFrame *pKF = mit->first;
         Eigen::Vector3d Owi = pKF->mTcw.translation();
@@ -206,7 +247,7 @@ void MapPoint::UpdateDepthAndViewingDir()
 
     Eigen::Vector3d PC = Pos - pRefKF->mTcw.translation();
     const float dist = PC.norm();
-    const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
+    const int level = pRefKF->mvKeysUn[Obs[pRefKF]].octave;
     const float levelScaleFactor = pRefKF->mvScaleFactors[level];
     const int nLevels = pRefKF->mnScaleLevels;
 
@@ -232,7 +273,6 @@ void MapPoint::ComputeDistinctiveDescriptors()
 {
     // Retrieve all observed descriptors
     std::vector<cv::Mat> vDescriptors;
-
     std::map<KeyFrame *, size_t> observations;
 
     {
@@ -267,7 +307,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
         Distances[i][i] = 0;
         for (size_t j = i + 1; j < N; j++)
         {
-            int distij = Matcher::DescriptorDistance(vDescriptors[i], vDescriptors[j]);
+            int distij = ORBMatcher::DescriptorDistance(vDescriptors[i], vDescriptors[j]);
             Distances[i][j] = distij;
             Distances[j][i] = distij;
         }
