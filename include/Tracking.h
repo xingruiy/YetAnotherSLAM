@@ -6,7 +6,6 @@
 #include "Mapping.h"
 #include "System.h"
 #include "GlobalDef.h"
-#include "DenseMapping.h"
 #include "DenseTracking.h"
 
 namespace SLAM
@@ -52,7 +51,6 @@ private:
     System *slamSystem;
     Map *mpMap;
     Viewer *viewer;
-    DenseMapping *mapper;
     DenseTracking *tracker;
     Mapping *mapping;
 

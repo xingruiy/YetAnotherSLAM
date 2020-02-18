@@ -1,5 +1,4 @@
 #include "Tracking.h"
-#include "ImageProc.h"
 
 namespace SLAM
 {
@@ -7,7 +6,6 @@ namespace SLAM
 Tracking::Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping)
     : slamSystem(system), mpMap(map), viewer(viewer), mapping(mapping), trackingState(Null)
 {
-    mapper = new DenseMapping(g_width[0], g_height[0], g_calib[0].cast<double>());
     tracker = new DenseTracking(g_width[0], g_height[0], g_calib[0].cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
 }
 

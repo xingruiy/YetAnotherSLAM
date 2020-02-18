@@ -8,24 +8,23 @@ class DenseTracking
 {
 
 public:
-    DenseTracking(const int &nImageWidth, const int &nImageHeight,
-                  const Eigen::Matrix3d &K, const int &nPyrLvl,
+    DenseTracking(const int &w,
+                  const int &h,
+                  const Eigen::Matrix3d &K,
+                  const int &nNumPyr,
                   const std::vector<int> &vIterations,
-                  const bool &bUseRGB, const bool &bUseDepth);
+                  const bool &bUseRGB,
+                  const bool &bUseDepth);
 
     bool IsTrackingGood() const;
     void SwitchFrame();
-
     void SetReferenceImage(const cv::Mat &imGray);
     void SetReferenceDepth(const cv::Mat &imDepth);
-
     void SetTrackingImage(const cv::Mat &imGray);
     void SetTrackingDepth(const cv::Mat &imDepth);
-
     void SetReferenceInvD(cv::cuda::GpuMat imInvD);
 
     Sophus::SE3d GetTransform(Sophus::SE3d estimate, const bool &bSwitchFrame = true);
-
     cv::cuda::GpuMat GetReferenceDepth(const int lvl = 0) const;
 
 private:
