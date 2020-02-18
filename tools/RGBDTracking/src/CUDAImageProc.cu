@@ -1,10 +1,9 @@
 #include "CUDAImageProc.h"
 #include "CUDAUtils.h"
 
-__global__ void ComputeImageGradientCentralDifference_kernel(
-    cv::cuda::PtrStepSz<float> src,
-    cv::cuda::PtrStep<float> gradientX,
-    cv::cuda::PtrStep<float> gradientY)
+__global__ void ComputeImageGradientCentralDifference_kernel(cv::cuda::PtrStepSz<float> src,
+                                                             cv::cuda::PtrStep<float> gradientX,
+                                                             cv::cuda::PtrStep<float> gradientY)
 {
     const int x = threadIdx.x + blockDim.x * blockIdx.x;
     const int y = threadIdx.y + blockDim.y * blockIdx.y;
@@ -21,8 +20,8 @@ __global__ void ComputeImageGradientCentralDifference_kernel(
 }
 
 void ComputeImageGradientCentralDifference(const cv::cuda::GpuMat image,
-                                                          cv::cuda::GpuMat &gx,
-                                                          cv::cuda::GpuMat &gy)
+                                           cv::cuda::GpuMat &gx,
+                                           cv::cuda::GpuMat &gy)
 {
     if (gx.empty())
         gx.create(image.size(), CV_32FC1);
@@ -57,9 +56,9 @@ __global__ void TransformReferencePoint_kernel(const cv::cuda::PtrStepSz<float> 
 }
 
 void TransformReferencePoint(const cv::cuda::GpuMat depth,
-                                            cv::cuda::GpuMat &vmap,
-                                            const Eigen::Matrix3d &K,
-                                            const Sophus::SE3d &T)
+                             cv::cuda::GpuMat &vmap,
+                             const Eigen::Matrix3d &K,
+                             const Sophus::SE3d &T)
 {
     if (vmap.empty())
         vmap.create(depth.size(), CV_32FC4);
@@ -135,8 +134,8 @@ __global__ void RenderScene_kernel(
 }
 
 void RenderScene(const cv::cuda::GpuMat vmap,
-                                const cv::cuda::GpuMat nmap,
-                                cv::cuda::GpuMat &image)
+                 const cv::cuda::GpuMat nmap,
+                 cv::cuda::GpuMat &image)
 {
     if (image.empty())
         image.create(vmap.size(), CV_8UC4);
@@ -200,7 +199,8 @@ __global__ void ConvertDepthToInvDepthKernel(
     }
 }
 
-void ConvertDepthToInvDepth(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &invDepth)
+void ConvertDepthToInvDepth(const cv::cuda::GpuMat depth,
+                            cv::cuda::GpuMat &invDepth)
 {
     if (invDepth.empty())
         invDepth.create(depth.size(), depth.type());
@@ -212,9 +212,8 @@ void ConvertDepthToInvDepth(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &invD
     // cudaCheckError();
 }
 
-__global__ void ConvertVMAPToInvDepthKernel(
-    cv::cuda::PtrStep<Eigen::Vector4f> vmap,
-    cv::cuda::PtrStepSz<float> invDepth)
+__global__ void ConvertVMAPToInvDepthKernel(cv::cuda::PtrStep<Eigen::Vector4f> vmap,
+                                            cv::cuda::PtrStepSz<float> invDepth)
 {
     const int x = threadIdx.x + blockDim.x * blockIdx.x;
     const int y = threadIdx.y + blockDim.y * blockIdx.y;
@@ -228,7 +227,8 @@ __global__ void ConvertVMAPToInvDepthKernel(
     }
 }
 
-void ConvertVMAPToInvDepth(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &invDepth)
+void ConvertVMAPToInvDepth(const cv::cuda::GpuMat vmap,
+                           cv::cuda::GpuMat &invDepth)
 {
     if (invDepth.empty())
         invDepth.create(vmap.size(), CV_32FC1);
@@ -250,7 +250,8 @@ __global__ void PyrDownInvDepth_kernel(const cv::cuda::PtrStep<float> src,
     dst.ptr(y)[x] = src.ptr(2 * y)[2 * x];
 }
 
-void PyrDownInvDepth(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst)
+void PyrDownInvDepth(const cv::cuda::GpuMat src,
+                     cv::cuda::GpuMat &dst)
 {
     if (dst.empty())
         dst.create(src.size(), CV_32FC1);
@@ -289,8 +290,8 @@ __global__ void BackprojectDepth_kernel(const cv::cuda::PtrStep<float> depth,
 }
 
 void BackprojectDepth(const cv::cuda::GpuMat depth,
-                                     cv::cuda::GpuMat &vmap,
-                                     const Eigen::Matrix3d &K)
+                      cv::cuda::GpuMat &vmap,
+                      const Eigen::Matrix3d &K)
 {
     if (vmap.empty())
         vmap.create(depth.rows, depth.cols, CV_32FC4);

@@ -84,6 +84,19 @@ bool Tracking::trackLastFrame()
 
     Sophus::SE3d Tpc = tracker->GetTransform(lastFrame.T_frame2Ref.inverse(), false);
 
+    auto CovMat = tracker->GetCovariance();
+
+    bool trackingGood = true;
+    for (int i = 0; i < 6; ++i)
+    {
+        if (CovMat(i, i) > 1e-4)
+        {
+            trackingGood = false;
+            g_nFailedFrame++;
+            break;
+        }
+    }
+
     // NextFrame.mTcw = lastFrame.mTcw * Tpc.inverse();
     // NextFrame.T_frame2Ref = lastFrame.T_frame2Ref * Tpc.inverse();
     NextFrame.mTcw = T_ref2World * Tpc.inverse();
@@ -92,10 +105,7 @@ bool Tracking::trackLastFrame()
     if (g_bEnableViewer)
         viewer->setLivePose(NextFrame.mTcw.matrix());
 
-    // mapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw, (uint)NextFrame.mnId);
-    // mapper->raytrace(NextFrame.mTcw);
-    // tracker->SetReferenceInvD(mapper->GetSyntheticVertexMap());
-
+    g_nTrackedFrame++;
     return true;
 }
 

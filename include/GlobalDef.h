@@ -56,4 +56,9 @@ void computeImageBounds();
 
 extern int g_pointSize;
 
+// Statistics
+extern size_t g_nFailedFrame;
+extern size_t g_nTrackedFrame;
+extern size_t g_nTrackedKeyframe;
+
 } // namespace SLAM

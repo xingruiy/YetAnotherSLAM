@@ -4,12 +4,12 @@
 #include "statisticsFunctor.h"
 
 RGBDTracking::RGBDTracking(const int &imgWidth,
-                             const int &imgHeight,
-                             const Eigen::Matrix3d &K,
-                             const int &nPyrLvl,
-                             const std::vector<int> &vIterations,
-                             const bool &bUseRGB,
-                             const bool &bUseDepth)
+                           const int &imgHeight,
+                           const Eigen::Matrix3d &K,
+                           const int &nPyrLvl,
+                           const std::vector<int> &vIterations,
+                           const bool &bUseRGB,
+                           const bool &bUseDepth)
     : mnNumPyr(nPyrLvl),
       mbTrackingGood(false),
       mvIterations(vIterations)
@@ -157,6 +157,11 @@ void RGBDTracking::SetReferenceInvD(cv::cuda::GpuMat vmap)
     }
 }
 
+Eigen::Matrix<double, 6, 6> RGBDTracking::GetCovariance()
+{
+    return hessian.cast<double>().lu().inverse();
+}
+
 void RGBDTracking::SwitchFrame()
 {
     for (int lvl = 0; lvl < mnNumPyr; ++lvl)
@@ -177,8 +182,8 @@ Sophus::SE3d RGBDTracking::GetTransform(Sophus::SE3d estimate, const bool &bSwit
         for (int iter = 0; iter < mvIterations[lvl]; ++iter)
         {
 
-            Eigen::Matrix<float, 6, 6> hessian = Eigen::Matrix<float, 6, 6>::Zero();
-            Eigen::Matrix<float, 6, 1> residual = Eigen::Matrix<float, 6, 1>::Zero();
+            hessian = Eigen::Matrix<float, 6, 6>::Zero();
+            residual = Eigen::Matrix<float, 6, 1>::Zero();
 
             switch (mModal)
             {

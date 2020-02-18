@@ -23,6 +23,7 @@ public:
     void SetTrackingImage(const cv::Mat &imGray);
     void SetTrackingDepth(const cv::Mat &imDepth);
     void SetReferenceInvD(cv::cuda::GpuMat imInvD);
+    Eigen::Matrix<double, 6, 6> GetCovariance();
 
     Sophus::SE3d GetTransform(Sophus::SE3d estimate, const bool &bSwitchFrame = true);
     cv::cuda::GpuMat GetReferenceDepth(const int lvl = 0) const;
@@ -88,4 +89,7 @@ private:
     float iResidualSum;
     float dResidualSum;
     float numResidual;
+
+    Eigen::Matrix<float, 6, 6> hessian;
+    Eigen::Matrix<float, 6, 1> residual;
 };

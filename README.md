@@ -1,4 +1,4 @@
-# An SLAM system in development
+# A SLAM System In Development
 ## Dependancies
 1. [OpenCV](https://github.com/opencv/opencv) >= 3.4.5
 2. [Eigen3](https://github.com/eigenteam/eigen-git-mirror) >= 3.3.6
