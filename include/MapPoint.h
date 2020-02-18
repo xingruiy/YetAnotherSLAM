@@ -31,10 +31,11 @@ public:
     void Replace(MapPoint *pMP);
     MapPoint *GetReplaced();
 
+    bool IsInKeyFrame(KeyFrame *pKF);
     cv::Mat GetDescriptor();
+    void IncreaseFound(int n = 1);
     void IncreaseVisible(int n = 1);
 
-    bool IsInKeyFrame(KeyFrame *pKF);
     void UpdateDepthAndViewingDir();
     void ComputeDistinctiveDescriptors();
     int GetIndexInKeyFrame(KeyFrame *pKF);
