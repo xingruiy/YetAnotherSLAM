@@ -11,12 +11,12 @@ class Map;
 class Tracking;
 class Mapping;
 
-class LoopFinder
+class LoopClosing
 {
 public:
     typedef std::pair<std::set<KeyFrame *>, int> ConsistentGroup;
 
-    LoopFinder(Map *pMap, KeyFrameDatabase *pDB, ORB_SLAM2::ORBVocabulary *pVoc);
+    LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORB_SLAM2::ORBVocabulary *pVoc);
     void Run();
     void InsertKeyFrame(KeyFrame *pKF);
 

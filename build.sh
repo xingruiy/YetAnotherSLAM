@@ -25,9 +25,9 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building tools/RGBDTracking ..."
+echo "Configuring and building tools/RGBD_SLAM ..."
 
-cd ../../RGBDTracking/
+cd ../../RGBD_SLAM/
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j

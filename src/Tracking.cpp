@@ -4,15 +4,14 @@ namespace SLAM
 {
 
 Tracking::Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping)
-    : slamSystem(system), mpMap(map), viewer(viewer), mapping(mapping), trackingState(Null)
+    : mpSystem(system), mpMap(map), viewer(viewer), mapping(mapping), trackingState(Null)
 {
-    tracker = new RGBDTracking(g_width[0],
-                               g_height[0],
-                               g_calib[0].cast<double>(),
-                               NUM_PYR,
-                               {10, 5, 3, 3, 3},
-                               g_bUseColour,
-                               g_bUseDepth);
+    int w = g_width[0];
+    int h = g_height[0];
+    Eigen::Matrix3f calib = g_calib[0];
+
+    tracker = new DenseTracking(w, h, calib.cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
+    mpLocalMapper = new DenseMapping(w, h, calib);
 }
 
 void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
@@ -66,7 +65,7 @@ void Tracking::initialisation()
 {
     tracker->SetReferenceImage(NextFrame.mImGray);
     tracker->SetReferenceDepth(NextFrame.mImDepth);
-    // mapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw, (uint)NextFrame.mnId);
+    mpLocalMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
 
     T_ref2World = NextFrame.mTcw;
     NextFrame.mTcw = Sophus::SE3d(Eigen::Matrix4d::Identity());
@@ -84,26 +83,19 @@ bool Tracking::trackLastFrame()
 
     Sophus::SE3d Tpc = tracker->GetTransform(lastFrame.T_frame2Ref.inverse(), false);
 
-    auto CovMat = tracker->GetCovariance();
-
-    bool trackingGood = true;
-    for (int i = 0; i < 6; ++i)
-    {
-        if (CovMat(i, i) > 1e-4)
-        {
-            trackingGood = false;
-            g_nFailedFrame++;
-            break;
-        }
-    }
-
     // NextFrame.mTcw = lastFrame.mTcw * Tpc.inverse();
     // NextFrame.T_frame2Ref = lastFrame.T_frame2Ref * Tpc.inverse();
     NextFrame.mTcw = T_ref2World * Tpc.inverse();
     NextFrame.T_frame2Ref = Tpc.inverse();
 
     if (g_bEnableViewer)
-        viewer->setLivePose(NextFrame.mTcw.matrix());
+        viewer->setLivePose(NextFrame.T_frame2Ref.matrix());
+
+    cv::cuda::GpuMat vmap(480, 640, CV_32FC4);
+    mpLocalMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
+    mpLocalMapper->raytrace(vmap, NextFrame.mTcw);
+    cv::imshow("vmap", cv::Mat(vmap));
+    cv::waitKey(1);
 
     g_nTrackedFrame++;
     return true;
@@ -135,7 +127,7 @@ void Tracking::MakeNewKeyFrame()
     T_ref2World = NextFrame.mTcw;
 
     mapping->AddKeyFrameCandidate(NextFrame);
-    tracker->SwitchFrame();
+    tracker->SwapFrameBuffer();
 
     // Set to the reference frame
     NextFrame.T_frame2Ref = Sophus::SE3d();

@@ -6,7 +6,8 @@
 #include "Mapping.h"
 #include "System.h"
 #include "GlobalDef.h"
-#include "RGBDTracking.h"
+#include "DenseMapping.h"
+#include "DenseTracking.h"
 
 namespace SLAM
 {
@@ -48,10 +49,12 @@ private:
     bool NeedNewKeyFrame();
     void MakeNewKeyFrame();
 
-    System *slamSystem;
+    System *mpSystem;
     Map *mpMap;
     Viewer *viewer;
-    RGBDTracking *tracker;
+
+    DenseMapping *mpLocalMapper;
+    DenseTracking *tracker;
     Mapping *mapping;
 
     TrackingState trackingState;

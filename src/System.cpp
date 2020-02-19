@@ -18,10 +18,10 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
         viewerThread = new std::thread(&Viewer::Run, viewer);
     }
 
-    loopClosing = new LoopFinder(mpMap, mpKeyFrameDB, mpORBVocabulary);
-    loopThread = new std::thread(&LoopFinder::Run, loopClosing);
+    loopClosing = new LoopClosing(mpMap, mpKeyFrameDB, mpORBVocabulary);
+    loopThread = new std::thread(&LoopClosing::Run, loopClosing);
 
-    mapping = new Mapping(mpORBVocabulary, mpMap);
+    mapping = new Mapping(mpORBVocabulary, mpMap, viewer);
     mapping->setLoopCloser(loopClosing);
     mappingThread = new std::thread(&Mapping::Run, mapping);
     tracker = new Tracking(this, mpMap, viewer, mapping);

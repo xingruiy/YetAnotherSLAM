@@ -3,7 +3,7 @@ project(athena CXX)
 
 find_package(OpenCV 3.4 REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
-find_package(Pangolin REQUIRED)
+find_package(Pangolin 0.5 REQUIRED)
 find_package(g2o 1.0.0 REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED "")
@@ -21,7 +21,7 @@ PRIVATE
     src/Bundler.cpp
     src/ORBMatcher.cpp
     src/GlobalDef.cpp
-    src/LoopFinder.cpp
+    src/LoopClosing.cpp
     src/KeyFrameDatabase.cpp
 )
 
@@ -39,7 +39,7 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}/tools/
     ${PROJECT_SOURCE_DIR}/tools/DatasetLoader/include
     ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/include
-    ${PROJECT_SOURCE_DIR}/tools/RGBDTracking/include
+    ${PROJECT_SOURCE_DIR}/tools/RGBD_SLAM/include
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/include
 )
@@ -53,7 +53,7 @@ PUBLIC
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
-    ${PROJECT_SOURCE_DIR}/tools/RGBDTracking/lib/libRGBDTracking.so
+    ${PROJECT_SOURCE_DIR}/tools/RGBD_SLAM/lib/libRGBD_SLAM.so
     ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
 )
 

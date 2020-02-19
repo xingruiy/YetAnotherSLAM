@@ -8,19 +8,20 @@
 #include "GlobalDef.h"
 #include "KeyFrame.h"
 #include "Viewer.h"
-#include "LoopFinder.h"
+#include "LoopClosing.h"
 
 namespace SLAM
 {
 
-class LoopFinder;
+class Viewer;
+class LoopClosing;
 
 class Mapping
 {
 public:
-    Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map);
+    Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer);
     void AddKeyFrameCandidate(const Frame &F);
-    void setLoopCloser(LoopFinder *pLoopCloser);
+    void setLoopCloser(LoopClosing *pLoopCloser);
     void reset();
     void Run();
 
@@ -50,7 +51,8 @@ private:
     std::vector<MapPoint *> localMapPoints;
 
     Map *mpMap;
-    LoopFinder *mpLoopCloser;
+    Viewer *mpViewer;
+    LoopClosing *mpLoopCloser;
     std::list<MapPoint *> mlpRecentAddedMapPoints;
 
     cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);

@@ -4,19 +4,15 @@ namespace SLAM
 {
 
 Viewer::Viewer(System *pSys, Map *pMap)
-    : slamSystem(pSys), mpMap(pMap),
+    : mpSystem(pSys), mpMap(pMap),
       mTcw(Eigen::Matrix4d::Identity()),
       needUpdateImage(false),
       needUpdateDepth(false)
 {
-    mWidth = g_width[0];
-    mHeight = g_height[0];
-
-    mCalib.setIdentity();
-    mCalib(0, 0) = g_fx[0];
-    mCalib(1, 1) = g_fy[0];
-    mCalib(0, 2) = g_cx[0];
-    mCalib(1, 2) = g_cy[0];
+    width = g_width[0];
+    height = g_height[0];
+    mCalib = g_calib[0].cast<double>();
+    calibInv = g_calibInv[0];
 }
 
 void Viewer::Run()
@@ -48,8 +44,8 @@ void Viewer::Run()
     rightSideBar->AddDisplay(*depthViewer);
 
     // Create textures
-    mTextureColour.Reinitialise(mWidth, mHeight, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mTextureDepth.Reinitialise(mWidth, mHeight, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, NULL);
+    mTextureColour.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, NULL);
 
     // Create menus
     pangolin::CreatePanel("menu").SetBounds(0, 1, 0, MenuDividerLeft);
@@ -65,7 +61,7 @@ void Viewer::Run()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (pangolin::Pushed(varReset))
-            slamSystem->reset();
+            mpSystem->reset();
 
         g_bSystemRunning = varRunning;
 
@@ -73,13 +69,13 @@ void Viewer::Run()
 
         mapViewer->Activate(RenderState);
         renderLiveCameraFrustum();
-        draw3DMapPoints(varPointSize, varDrawImmaturePoint);
-        drawKeyFrameHistory();
+        renderMapPoints(varPointSize, varDrawImmaturePoint);
+        renderKeyframes();
 
         pangolin::FinishFrame();
     }
 
-    slamSystem->kill();
+    mpSystem->kill();
 }
 
 void Viewer::renderImagesToScreen()
@@ -98,29 +94,18 @@ void Viewer::renderImagesToScreen()
 
 void Viewer::renderLiveCameraFrustum()
 {
+    Eigen::Matrix4f T;
+    {
+        std::unique_lock<std::mutex> lock(mPoseMutex);
+        T = T_frame_world;
+    }
+
     glColor3f(1.0, 0.0, 0.0);
-    pangolin::glDrawFrustum<double>(mCalib.inverse(), mWidth, mHeight, mTcw, 0.1);
+    pangolin::glDrawFrustum(calibInv, width, height, T, 0.1f);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void Viewer::setLivePose(const Eigen::Matrix4d &Tcw)
-{
-    mTcw = Tcw;
-}
-
-void Viewer::setLiveImage(const cv::Mat &ImgRGB)
-{
-    cvImage8UC3 = ImgRGB;
-    needUpdateImage = true;
-}
-
-void Viewer::setLiveDepth(const cv::Mat &ImgDepth)
-{
-    cvImage32FC1 = ImgDepth;
-    needUpdateDepth = true;
-}
-
-void Viewer::draw3DMapPoints(const int &PointSize, const bool &drawImmature)
+void Viewer::renderMapPoints(const int &PointSize, const bool &drawImmature)
 {
     std::vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
     glPointSize(PointSize);
@@ -143,7 +128,7 @@ void Viewer::draw3DMapPoints(const int &PointSize, const bool &drawImmature)
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void Viewer::drawKeyFrameHistory()
+void Viewer::renderKeyframes()
 {
     std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
     glColor3f(0.0, 1.0, 0.0);
@@ -152,107 +137,35 @@ void Viewer::drawKeyFrameHistory()
         if (!vpKFs[i])
             continue;
         KeyFrame *pKF = vpKFs[i];
-        pangolin::glDrawFrustum<double>(mCalib.inverse(), mWidth, mHeight, pKF->mTcw.matrix(), 0.1);
+        pangolin::glDrawFrustum<double>(mCalib.inverse(), width, height, pKF->mTcw.matrix(), 0.1);
     }
-
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
+void Viewer::setLivePose(const Eigen::Matrix4d &TFrameRef)
+{
+    std::unique_lock<std::mutex> lock(mPoseMutex);
+    T_frame_world = T_ref_world * TFrameRef.cast<float>();
+}
+
+void Viewer::setReferenceFramePose(const Eigen::Matrix4d &TRefWorld)
+{
+    T_ref_world = TRefWorld.cast<float>();
+}
+
+void Viewer::setLiveImage(const cv::Mat &ImgRGB)
+{
+    cvImage8UC3 = ImgRGB;
+    needUpdateImage = true;
+}
+
+void Viewer::setLiveDepth(const cv::Mat &ImgDepth)
+{
+    cvImage32FC1 = ImgDepth;
+    needUpdateDepth = true;
+}
+
 } // namespace SLAM
-
-///////////////////////////////////////////////////
-
-// MapViewer::MapViewer(int w, int h, int fW, int fH, Eigen::Matrix3d &K)
-//     : numTriangles(0), maxNumTriangles(20000000), K(K), Kinv(K.inverse()),
-//       frameWidth(fW), frameHeight(fH), requestDebugMode(false), requestTestNextKF(false)
-// {
-//     pangolin::CreateWindowAndBind("MAP VIEWER", w, h);
-
-//     mainCamera = std::make_shared<pangolin::OpenGlRenderState>(
-//         pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, ZMIN, ZMAX),
-//         pangolin::ModelViewLookAtRDF(0, 0, 0, 0, 0, -1, 0, 1, 0));
-
-//     glEnable(GL_DEPTH_TEST);
-//     glEnable(GL_BLEND);
-
-//     setupDisplay();
-//     setupKeyBindings();
-//     initializeTextures();
-//     initializeBuffers();
-//     initializePrograms();
-// }
-
-// MapViewer::~MapViewer()
-// {
-//     pangolin::DestroyWindow("MAP VIEWER");
-// }
-
-// void MapViewer::setupDisplay()
-// {
-//     auto MenuDividerLeft = pangolin::Attach::Pix(200);
-//     float RightSideBarDividerLeft = 0.75f;
-
-//     modelView = &pangolin::Display("Local Map");
-//     modelView->SetBounds(0, 1, MenuDividerLeft, RightSideBarDividerLeft).SetHandler(new pangolin::Handler3D(*mainCamera));
-//     sidebarView = &pangolin::Display("Right Side Bar");
-//     sidebarView->SetBounds(0, 1, RightSideBarDividerLeft, 1);
-
-//     colourView = &pangolin::Display("RGB");
-//     colourView->SetBounds(0, 0.5, 0, 0.5);
-//     keyPointView = &pangolin::Display("Key Point");
-//     keyPointView->SetBounds(0, 0.5, 0.5, 1);
-
-//     subBarView = &pangolin::Display("Sub Side Bar");
-//     subBarView->SetBounds(0, 0.33, 0, 1);
-//     matchedView = &pangolin::Display("Matched Point");
-//     matchedView->SetBounds(0.33, 0.66, 0, 1);
-//     depthView = &pangolin::Display("Depth");
-//     depthView->SetBounds(0.66, 1, 0, 1);
-
-//     subBarView->AddDisplay(*colourView);
-//     subBarView->AddDisplay(*keyPointView);
-//     sidebarView->AddDisplay(*depthView);
-//     sidebarView->AddDisplay(*subBarView);
-//     sidebarView->AddDisplay(*matchedView);
-
-//     pangolin::CreatePanel("Menu").SetBounds(0, 1, 0, MenuDividerLeft);
-
-//     resetBtn = std::make_shared<pangolin::Var<bool>>("Menu.RESET", false, false);
-//     saveMapToDiskBtn = std::make_shared<pangolin::Var<bool>>("Menu.Save Map", false, false);
-//     readMapFromDiskBtn = std::make_shared<pangolin::Var<bool>>("Menu.Read Map", false, false);
-//     pauseSystemBox = std::make_shared<pangolin::Var<bool>>("Menu.PAUSE", true, true);
-//     displayColourBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Image", true, true);
-//     displayDepthBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Depth", true, true);
-//     displayModelBox = std::make_shared<pangolin::Var<bool>>("Menu.View Model", true, true);
-//     enableMappingBox = std::make_shared<pangolin::Var<bool>>("Menu.Enable Mapping", true, true);
-//     displayFrameHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Trajectory", true, true);
-//     displayPointBox = std::make_shared<pangolin::Var<bool>>("Menu.Diplay Points", true, true);
-//     displayKFHistoryBox = std::make_shared<pangolin::Var<bool>>("Menu.Display Keyframes", true, true);
-//     localizationMode = std::make_shared<pangolin::Var<bool>>("Menu.Localization Mode", false, true);
-//     allowMatchingAmbiguity = std::make_shared<pangolin::Var<bool>>("Menu.Graph Matching Mode", false, true);
-//     incorporateNormal = std::make_shared<pangolin::Var<bool>>("Menu.Incorporate Normal", false, true);
-//     displayMatchedPoints = std::make_shared<pangolin::Var<bool>>("Menu.Display Matchings", false, true);
-//     enteringDebuggingModeBtn = std::make_shared<pangolin::Var<bool>>("Menu.Debug Mode", false, false);
-//     testNextKeyframeBtn = std::make_shared<pangolin::Var<bool>>("Menu.Test Next", false, false);
-// }
-
-// void MapViewer::setupKeyBindings()
-// {
-//     // reset system
-//     pangolin::RegisterKeyPressCallback('r', pangolin::SetVarFunctor<bool>("Menu.RESET", true));
-//     pangolin::RegisterKeyPressCallback('R', pangolin::SetVarFunctor<bool>("Menu.RESET", true));
-//     // pause / unpause the system
-//     pangolin::RegisterKeyPressCallback(ENTER_KEY, pangolin::ToggleVarFunctor("Menu.PAUSE"));
-//     // toggle localization mode
-//     pangolin::RegisterKeyPressCallback('l', pangolin::ToggleVarFunctor("Menu.Localization Mode"));
-//     pangolin::RegisterKeyPressCallback('L', pangolin::ToggleVarFunctor("Menu.Localization Mode"));
-//     // toggle graph matching mode
-//     pangolin::RegisterKeyPressCallback('g', pangolin::ToggleVarFunctor("Menu.Graph Matching Mode"));
-//     pangolin::RegisterKeyPressCallback('G', pangolin::ToggleVarFunctor("Menu.Graph Matching Mode"));
-//     // toggle normal
-//     pangolin::RegisterKeyPressCallback('n', pangolin::ToggleVarFunctor("Menu.Incorporate Normal"));
-//     pangolin::RegisterKeyPressCallback('N', pangolin::ToggleVarFunctor("Menu.Incorporate Normal"));
-// }
 
 // void MapViewer::initializePrograms()
 // {

@@ -1,17 +1,17 @@
-#include "LoopFinder.h"
+#include "LoopClosing.h"
 
 namespace SLAM
 {
 
-LoopFinder::LoopFinder(Map *pMap, KeyFrameDatabase *pDB, ORB_SLAM2::ORBVocabulary *pVoc)
+LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORB_SLAM2::ORBVocabulary *pVoc)
     : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0)
 {
     mnCovisibilityConsistencyTh = 3;
 }
 
-void LoopFinder::Run()
+void LoopClosing::Run()
 {
-    std::cout << "LoopFinder Thread Started." << std::endl;
+    std::cout << "LoopClosing Thread Started." << std::endl;
 
     while (!g_bSystemKilled)
     {
@@ -24,23 +24,23 @@ void LoopFinder::Run()
         }
     }
 
-    std::cout << "LoopFinder Thread Killed." << std::endl;
+    std::cout << "LoopClosing Thread Killed." << std::endl;
 }
 
-void LoopFinder::InsertKeyFrame(KeyFrame *pKF)
+void LoopClosing::InsertKeyFrame(KeyFrame *pKF)
 {
     std::unique_lock<std::mutex> lock(mMutexLoopQueue);
     if (pKF->mnId != 0)
         mlpLoopKeyFrameQueue.push_back(pKF);
 }
 
-bool LoopFinder::CheckNewKeyFrames()
+bool LoopClosing::CheckNewKeyFrames()
 {
     std::unique_lock<std::mutex> lock(mMutexLoopQueue);
     return !mlpLoopKeyFrameQueue.empty();
 }
 
-bool LoopFinder::DetectLoop()
+bool LoopClosing::DetectLoop()
 {
     {
         std::unique_lock<std::mutex> lock(mMutexLoopQueue);

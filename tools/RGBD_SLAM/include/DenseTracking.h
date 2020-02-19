@@ -4,28 +4,28 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 
-class RGBDTracking
+class DenseTracking
 {
 
 public:
-    RGBDTracking(const int &w,
-                 const int &h,
-                 const Eigen::Matrix3d &K,
-                 const int &nNumPyr,
-                 const std::vector<int> &vIterations,
-                 const bool &bUseRGB,
-                 const bool &bUseDepth);
+    DenseTracking(const int &nImageWidth, const int &nImageHeight,
+                  const Eigen::Matrix3d &K, const int &nPyrLvl,
+                  const std::vector<int> &vIterations,
+                  const bool &bUseRGB, const bool &bUseDepth);
 
     bool IsTrackingGood() const;
-    void SwitchFrame();
+
     void SetReferenceImage(const cv::Mat &imGray);
     void SetReferenceDepth(const cv::Mat &imDepth);
+
     void SetTrackingImage(const cv::Mat &imGray);
     void SetTrackingDepth(const cv::Mat &imDepth);
-    void SetReferenceInvD(cv::cuda::GpuMat imInvD);
-    Eigen::Matrix<double, 6, 6> GetCovariance();
 
-    Sophus::SE3d GetTransform(Sophus::SE3d estimate, const bool &bSwitchFrame = true);
+    void SetReferenceInvD(cv::cuda::GpuMat imInvD);
+
+    Sophus::SE3d GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer);
+    void SwapFrameBuffer();
+
     cv::cuda::GpuMat GetReferenceDepth(const int lvl = 0) const;
 
 private:
@@ -89,7 +89,4 @@ private:
     float iResidualSum;
     float dResidualSum;
     float numResidual;
-
-    Eigen::Matrix<float, 6, 6> hessian;
-    Eigen::Matrix<float, 6, 1> residual;
 };

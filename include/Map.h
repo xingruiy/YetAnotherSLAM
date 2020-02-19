@@ -31,9 +31,9 @@ public:
     std::mutex mMutexMapUpdate;
 
 private:
+    std::mutex mMutexMap;
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
-    std::mutex mMutexMap;
 };
 
 } // namespace SLAM

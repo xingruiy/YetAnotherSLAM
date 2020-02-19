@@ -11,7 +11,7 @@
 #include "Tracking.h"
 #include "Mapping.h"
 #include "GlobalDef.h"
-#include "LoopFinder.h"
+#include "LoopClosing.h"
 #include "KeyFrameDatabase.h"
 
 namespace SLAM
@@ -21,7 +21,7 @@ class Viewer;
 class Mapping;
 class Tracking;
 class MapViewer;
-class LoopFinder;
+class LoopClosing;
 
 class System
 {
@@ -44,7 +44,7 @@ private:
     Tracking *tracker;
     Viewer *viewer;
     Mapping *mapping;
-    LoopFinder *loopClosing;
+    LoopClosing *loopClosing;
 
     KeyFrameDatabase *mpKeyFrameDB;
     ORB_SLAM2::ORBVocabulary *mpORBVocabulary;

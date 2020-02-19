@@ -6,8 +6,8 @@
 namespace SLAM
 {
 
-Mapping::Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map)
-    : mpMap(map), ORBvocabulary(pVoc), lastKeyFrame(NULL)
+Mapping::Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer)
+    : mpMap(map), ORBvocabulary(pVoc), mpViewer(pViewer), lastKeyFrame(NULL)
 {
     ORBExtractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
     localKeyFrames = std::vector<KeyFrame *>();
@@ -27,7 +27,11 @@ void Mapping::Run()
             std::cout << "num local points matched: " << nMatches << std::endl;
 
             if (nMatches > 0)
+            {
                 Bundler::PoseOptimization(NextKeyFrame);
+                if (mpViewer)
+                    mpViewer->setReferenceFramePose(NextKeyFrame->mTcw.matrix());
+            }
 
             UpdateKeyFrame();
             TriangulatePoints();  // Triangulate new points from image pairs
@@ -51,7 +55,7 @@ void Mapping::Run()
     }
 }
 
-void Mapping::setLoopCloser(LoopFinder *pLoopCloser)
+void Mapping::setLoopCloser(LoopClosing *pLoopCloser)
 {
     mpLoopCloser = pLoopCloser;
 }
@@ -171,39 +175,35 @@ void Mapping::KeyFrameCulling()
         for (size_t i = 0, iend = vpMapPoints.size(); i < iend; i++)
         {
             MapPoint *pMP = vpMapPoints[i];
-            if (pMP)
+            if (!pMP || pMP->isBad())
+                continue;
+
+            if (pKF->mvDepth[i] > pKF->mThDepth || pKF->mvDepth[i] < 0)
+                continue;
+
+            nMPs++;
+            if (pMP->Observations() > thObs)
             {
-                if (!pMP->isBad())
+                const int &scaleLevel = pKF->mvKeysUn[i].octave;
+                const std::map<KeyFrame *, size_t> observations = pMP->GetObservations();
+                int nObs = 0;
+                for (auto mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
                 {
-
-                    if (pKF->mvDepth[i] > pKF->mThDepth || pKF->mvDepth[i] < 0)
+                    KeyFrame *pKFi = mit->first;
+                    if (pKFi == pKF)
                         continue;
+                    const int &scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
 
-                    nMPs++;
-                    if (pMP->Observations() > thObs)
+                    if (scaleLeveli <= scaleLevel + 1)
                     {
-                        const int &scaleLevel = pKF->mvKeysUn[i].octave;
-                        const std::map<KeyFrame *, size_t> observations = pMP->GetObservations();
-                        int nObs = 0;
-                        for (auto mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
-                        {
-                            KeyFrame *pKFi = mit->first;
-                            if (pKFi == pKF)
-                                continue;
-                            const int &scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
-
-                            if (scaleLeveli <= scaleLevel + 1)
-                            {
-                                nObs++;
-                                if (nObs >= thObs)
-                                    break;
-                            }
-                        }
+                        nObs++;
                         if (nObs >= thObs)
-                        {
-                            nRedundantObservations++;
-                        }
+                            break;
                     }
+                }
+                if (nObs >= thObs)
+                {
+                    nRedundantObservations++;
                 }
             }
         }

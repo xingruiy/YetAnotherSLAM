@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pangolin/pangolin.h>
+#include <pangolin/gl/glcuda.h>
 #include <mutex>
 
 #include "System.h"
@@ -22,12 +23,17 @@ public:
     void setLiveImage(const cv::Mat &ImgRGB);
     void setLiveDepth(const cv::Mat &ImgDepth);
     void setLivePose(const Eigen::Matrix4d &Tcw);
+    void setReferenceFramePose(const Eigen::Matrix4d &Tcw);
 
 private:
+    Map *mpMap;
+    System *mpSystem;
+    Eigen::Matrix3f calibInv;
+
     void renderImagesToScreen();
     void renderLiveCameraFrustum();
-    void draw3DMapPoints(const int &PointSize, const bool &drawImmature);
-    void drawKeyFrameHistory();
+    void renderMapPoints(const int &PointSize, const bool &drawImmature);
+    void renderKeyframes();
 
     bool needUpdateImage;
     bool needUpdateDepth;
@@ -43,12 +49,23 @@ private:
     cv::Mat cvImage8UC3;  // Colour image
     cv::Mat cvImage32FC1; // Depth image
 
-    Map *mpMap;
-    System *slamSystem;
+    std::mutex mPoseMutex;
+    unsigned long ref_id;
+    Eigen::Matrix4f T_frame_ref;
+    Eigen::Matrix4f T_ref_world;
+    Eigen::Matrix4f T_frame_world;
 
-    int mWidth, mHeight;
+    int width, height;
     Eigen::Matrix4d mTcw;
     Eigen::Matrix3d mCalib;
+
+    pangolin::GlSlProgram shader;
+    pangolin::GlBufferCudaPtr vertexBuffer;
+    pangolin::GlBufferCudaPtr normalBuffer;
+    pangolin::GlBufferCudaPtr colourBuffer;
+    std::shared_ptr<pangolin::CudaScopedMappedPtr> vertexBufferPtr;
+    std::shared_ptr<pangolin::CudaScopedMappedPtr> normalBufferPtr;
+    std::shared_ptr<pangolin::CudaScopedMappedPtr> colourBufferPtr;
 };
 
 } // namespace SLAM
