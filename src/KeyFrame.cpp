@@ -9,7 +9,7 @@ unsigned long KeyFrame::nNextId = 0;
 
 KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
     : mpMap(map), mTcw(F->mTcw), mnBALocalForKF(-1), mbBad(false),
-      mnBAFixedForKF(-1), mnFuseTargetForKF(-1)
+      mnBAFixedForKF(-1), mnFuseTargetForKF(-1), mbToBeErased(false)
 {
   mnId = nNextId++;
 
@@ -706,6 +706,28 @@ void KeyFrame::SetPose(cv::Mat cvMat)
     for (int j = 0; j < 4; j++)
       Twc(i, j) = (double)cvMat.at<float>(i, j);
   mTcw = Sophus::SE3d(Twc.inverse());
+}
+
+void KeyFrame::SetNotErase()
+{
+  std::unique_lock<std::mutex> lock(mMutexConnections);
+  mbNotErase = true;
+}
+
+void KeyFrame::SetErase()
+{
+  {
+    std::unique_lock<std::mutex> lock(mMutexConnections);
+    if (mspLoopEdges.empty())
+    {
+      mbNotErase = false;
+    }
+  }
+
+  if (mbToBeErased)
+  {
+    SetBadFlag();
+  }
 }
 
 } // namespace SLAM

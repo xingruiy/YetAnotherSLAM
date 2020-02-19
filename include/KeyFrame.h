@@ -67,6 +67,10 @@ public:
 
     void SetPose(cv::Mat Tcw);
 
+    // Enable/Disable bad flag changes
+    void SetNotErase();
+    void SetErase();
+
 public:
     Map *mpMap;
 

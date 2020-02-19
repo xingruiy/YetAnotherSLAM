@@ -177,7 +177,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
         {
             std::list<KeyFrame *> &lKFs = mvInvertedFile[vit->first];
 
-            for (std::list<KeyFrame *>::iterator lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
+            for (auto lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
             {
                 KeyFrame *pKFi = *lit;
                 if (pKFi->mnRelocQuery != F->mnId)
@@ -195,7 +195,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
 
     // Only compare against those keyframes that share enough words
     int maxCommonWords = 0;
-    for (std::list<KeyFrame *>::iterator lit = lKFsSharingWords.begin(), lend = lKFsSharingWords.end(); lit != lend; lit++)
+    for (auto lit = lKFsSharingWords.begin(), lend = lKFsSharingWords.end(); lit != lend; lit++)
     {
         if ((*lit)->mnRelocWords > maxCommonWords)
             maxCommonWords = (*lit)->mnRelocWords;
@@ -208,7 +208,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
     int nscores = 0;
 
     // Compute similarity score.
-    for (std::list<KeyFrame *>::iterator lit = lKFsSharingWords.begin(), lend = lKFsSharingWords.end(); lit != lend; lit++)
+    for (auto lit = lKFsSharingWords.begin(), lend = lKFsSharingWords.end(); lit != lend; lit++)
     {
         KeyFrame *pKFi = *lit;
 

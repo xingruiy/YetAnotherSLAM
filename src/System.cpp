@@ -7,8 +7,10 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     : viewer(nullptr)
 {
     readSettings(strSettingFile);
+    loadORBVocabulary(strVocFile);
 
     mpMap = new Map();
+    mpKeyFrameDB = new KeyFrameDatabase(*mpORBVocabulary);
 
     if (g_bEnableViewer)
     {
@@ -16,12 +18,13 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
         viewerThread = new std::thread(&Viewer::Run, viewer);
     }
 
-    mapping = new Mapping(strVocFile, mpMap);
+    loopClosing = new LoopFinder(mpMap, mpKeyFrameDB, mpORBVocabulary);
+    loopThread = new std::thread(&LoopFinder::Run, loopClosing);
+
+    mapping = new Mapping(mpORBVocabulary, mpMap);
+    mapping->setLoopCloser(loopClosing);
     mappingThread = new std::thread(&Mapping::Run, mapping);
     tracker = new Tracking(this, mpMap, viewer, mapping);
-
-    loopClosing = new LoopFinder();
-    loopThread = new std::thread(&LoopFinder::Run, loopClosing);
 
     std::cout << "Main Thread Started." << std::endl;
 }
@@ -150,6 +153,14 @@ void System::readSettings(const std::string &strSettingFile)
               << "close point th - " << g_thDepth << "\n"
               << "enable viewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
               << "===================================================" << std::endl;
+}
+
+void System::loadORBVocabulary(const std::string &strVocFile)
+{
+    std::cout << "loading ORB vocabulary..." << std::endl;
+    mpORBVocabulary = new ORB_SLAM2::ORBVocabulary();
+    mpORBVocabulary->loadFromTextFile(strVocFile);
+    std::cout << "ORB vocabulary loaded..." << std::endl;
 }
 
 } // namespace SLAM

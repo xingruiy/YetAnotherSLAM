@@ -2,6 +2,7 @@
 #include <memory>
 #include <thread>
 #include <iostream>
+#include <ORBVocabulary.h>
 
 #include "Map.h"
 #include "Frame.h"
@@ -11,6 +12,7 @@
 #include "Mapping.h"
 #include "GlobalDef.h"
 #include "LoopFinder.h"
+#include "KeyFrameDatabase.h"
 
 namespace SLAM
 {
@@ -32,6 +34,7 @@ public:
 
 private:
     void readSettings(const std::string &strSettingFile);
+    void loadORBVocabulary(const std::string &strVocFile);
 
     std::thread *mappingThread;
     std::thread *viewerThread;
@@ -42,6 +45,9 @@ private:
     Viewer *viewer;
     Mapping *mapping;
     LoopFinder *loopClosing;
+
+    KeyFrameDatabase *mpKeyFrameDB;
+    ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
 
     cv::Mat grayScale;
     cv::Mat depthFloat;

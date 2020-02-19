@@ -6,16 +6,10 @@
 namespace SLAM
 {
 
-Mapping::Mapping(const std::string &strVocFile, Map *map)
-    : mpMap(map), lastKeyFrame(NULL)
+Mapping::Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map)
+    : mpMap(map), ORBvocabulary(pVoc), lastKeyFrame(NULL)
 {
     ORBExtractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
-
-    std::cout << "loading ORB vocabulary..." << std::endl;
-    ORBvocabulary = new ORB_SLAM2::ORBVocabulary();
-    ORBvocabulary->loadFromTextFile(strVocFile);
-    std::cout << "ORB vocabulary loaded..." << std::endl;
-
     localKeyFrames = std::vector<KeyFrame *>();
     localMapPoints = std::vector<MapPoint *>();
 }
@@ -50,12 +44,16 @@ void Mapping::Run()
             if (!HasFrameToProcess())
                 KeyFrameCulling();
 
+            mpLoopCloser->InsertKeyFrame(NextKeyFrame);
             // Update reference keyframe
             lastKeyFrame = NextKeyFrame;
         }
     }
+}
 
-    std::cout << "Mapping Thread Killed." << std::endl;
+void Mapping::setLoopCloser(LoopFinder *pLoopCloser)
+{
+    mpLoopCloser = pLoopCloser;
 }
 
 void Mapping::reset()
@@ -102,7 +100,6 @@ void Mapping::MakeNewKeyFrame()
     // Create map points for the first frame
     if (NextKeyFrame->mnId == 0)
     {
-        size_t nPoints = 0;
         for (int i = 0; i < NextKeyFrame->mvKeysUn.size(); ++i)
         {
             const float d = NextKeyFrame->mvDepth[i];
@@ -116,11 +113,8 @@ void Mapping::MakeNewKeyFrame()
 
                 NextKeyFrame->AddMapPoint(pMP, i);
                 mpMap->AddMapPoint(pMP);
-                nPoints++;
             }
         }
-
-        std::cout << "Initial map created with " << nPoints << " points" << std::endl;
     }
 
     // Insert the keyframe in the map
@@ -156,20 +150,6 @@ int Mapping::MatchLocalPoints()
         nToMatch = matcher.SearchByProjection(NextKeyFrame, localMapPoints, 1);
     }
 
-    const auto vpMPs = NextKeyFrame->GetMapPointMatches();
-    for (int i = 0; i < vpMPs.size(); ++i)
-    {
-        MapPoint *pMP = vpMPs[i];
-        if (!pMP || pMP->isBad())
-            continue;
-
-        pMP->AddObservation(NextKeyFrame, i);
-        pMP->UpdateDepthAndViewingDir();
-        pMP->ComputeDistinctiveDescriptors();
-    }
-
-    // Update covisibility based on the correspondences
-    NextKeyFrame->UpdateConnections();
     return nToMatch;
 }
 
@@ -688,6 +668,7 @@ void Mapping::UpdateConnections()
 
 void Mapping::UpdateKeyFrame()
 {
+    size_t nOutliers = 0;
     // Update MapPoints Statistics
     for (int i = 0; i < NextKeyFrame->N; i++)
     {
@@ -699,36 +680,29 @@ void Mapping::UpdateKeyFrame()
             }
             else
             {
+                nOutliers++;
                 NextKeyFrame->mvbOutlier[i] = false;
                 NextKeyFrame->mvpMapPoints[i] = NULL;
             }
         }
     }
-    // int nOutliers = 0;
-    // int nMatchedPoints = 0;
-    // for (int i = 0; i < NextKeyFrame->mvpMapPoints.size(); ++i)
-    // {
-    //     MapPoint *pMP = NextKeyFrame->mvpMapPoints[i];
-    //     bool bOutlier = NextKeyFrame->mvbOutlier[i];
 
-    //     if (pMP)
-    //     {
-    //         if (pMP->mObservations.size() < 1 || bOutlier)
-    //         {
-    //             pMP->SetBadFlag();
-    //             mpMap->EraseMapPoint(pMP);
-    //             NextKeyFrame->mvpMapPoints[i] = NULL;
-    //             nOutliers++;
-    //         }
-    //         else
-    //         {
-    //             nMatchedPoints++;
-    //         }
-    //     }
-    // }
+    const auto vpMPs = NextKeyFrame->GetMapPointMatches();
+    for (int i = 0; i < vpMPs.size(); ++i)
+    {
+        MapPoint *pMP = vpMPs[i];
+        if (!pMP || pMP->isBad())
+            continue;
 
-    // std::cout << "number of outliers in keyframe: " << nOutliers << std::endl;
-    // std::cout << "number of matched points in keyframe: " << nMatchedPoints << std::endl;
+        pMP->AddObservation(NextKeyFrame, i);
+        pMP->UpdateDepthAndViewingDir();
+        pMP->ComputeDistinctiveDescriptors();
+    }
+
+    // Update covisibility based on the correspondences
+    NextKeyFrame->UpdateConnections();
+
+    std::cout << nOutliers << " outliers found in keyframe" << std::endl;
 }
 
 cv::Mat Mapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)

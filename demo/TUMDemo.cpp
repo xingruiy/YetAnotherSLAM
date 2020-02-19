@@ -43,9 +43,16 @@ int main(int argc, char **argv)
         if (SLAM::g_bSystemKilled)
             break;
 
-        imRGB = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesRGB[i], CV_LOAD_IMAGE_UNCHANGED);
-        imDepth = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesD[i], CV_LOAD_IMAGE_UNCHANGED);
-        double tframe = vTimestamps[i];
-        sys.trackImage(imRGB, imDepth, tframe);
+        if (SLAM::g_bSystemRunning)
+        {
+            imRGB = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesRGB[i], CV_LOAD_IMAGE_UNCHANGED);
+            imDepth = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesD[i], CV_LOAD_IMAGE_UNCHANGED);
+            double tframe = vTimestamps[i];
+            sys.trackImage(imRGB, imDepth, tframe);
+        }
+        else
+        {
+            i--;
+        }
     }
 }

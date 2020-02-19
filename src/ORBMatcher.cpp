@@ -68,16 +68,16 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
                 if (pKF->mvpMapPoints[idx]->Observations() > 0)
                     continue;
 
-            if (pKF->mvuRight[idx] < 0)
-                continue;
+            if (pKF->mvuRight[idx] > 0)
+            {
+                Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
+                if (NormalDir.dot(FrameNormal) < 0.5)
+                    continue;
 
-            Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
-            if (NormalDir.dot(FrameNormal) < 0.3)
-                continue;
-
-            const float er = fabs(pMP->mTrackProjXR - pKF->mvuRight[idx]);
-            if (er > r * pKF->mvScaleFactors[nPredictedLevel])
-                continue;
+                const float er = fabs(pMP->mTrackProjXR - pKF->mvuRight[idx]);
+                if (er > r * pKF->mvScaleFactors[nPredictedLevel])
+                    continue;
+            }
 
             const cv::Mat &d = pKF->mDescriptors.row(idx);
             const int dist = DescriptorDistance(MPdescriptor, d);
@@ -263,8 +263,8 @@ int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, 
 }
 
 int ORBMatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12,
-                                    std::vector<std::pair<size_t, size_t>> &vMatchedPairs,
-                                    const bool bOnlyStereo)
+                                       std::vector<std::pair<size_t, size_t>> &vMatchedPairs,
+                                       const bool bOnlyStereo)
 {
     const DBoW2::FeatureVector &vFeatVec1 = pKF1->mFeatVec;
     const DBoW2::FeatureVector &vFeatVec2 = pKF2->mFeatVec;

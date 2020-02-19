@@ -2,19 +2,25 @@
 #include <memory>
 #include <mutex>
 #include <ORBextractor.h>
+#include <ORBVocabulary.h>
+
 #include "Map.h"
 #include "GlobalDef.h"
 #include "KeyFrame.h"
 #include "Viewer.h"
+#include "LoopFinder.h"
 
 namespace SLAM
 {
 
+class LoopFinder;
+
 class Mapping
 {
 public:
-    Mapping(const std::string &strVocFile, Map *map);
+    Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map);
     void AddKeyFrameCandidate(const Frame &F);
+    void setLoopCloser(LoopFinder *pLoopCloser);
     void reset();
     void Run();
 
@@ -44,6 +50,7 @@ private:
     std::vector<MapPoint *> localMapPoints;
 
     Map *mpMap;
+    LoopFinder *mpLoopCloser;
     std::list<MapPoint *> mlpRecentAddedMapPoints;
 
     cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
