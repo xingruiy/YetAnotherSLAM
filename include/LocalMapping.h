@@ -35,6 +35,7 @@ private:
     void CreateNewMapPoints();
     void UpdateConnections();
     void UpdateKeyFrame();
+    void MapPointCulling();
 
     // keyframe candidate
     std::mutex frameMutex;

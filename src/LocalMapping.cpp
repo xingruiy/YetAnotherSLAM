@@ -45,6 +45,8 @@ void LocalMapping::Run()
             }
 
             UpdateConnections();
+            MapPointCulling();
+
             if (!HasFrameToProcess())
                 KeyFrameCulling();
 
@@ -157,6 +159,19 @@ int LocalMapping::MatchLocalPoints()
     }
 
     return nToMatch;
+}
+
+void LocalMapping::MapPointCulling()
+{
+    for (auto vit = localMapPoints.begin(), vend = localMapPoints.end(); vit != vend; ++vit)
+    {
+        MapPoint *pMP = (*vit);
+        float ratio = pMP->GetFoundRatio();
+        if (ratio < 0.25f && pMP->Observations() < 3)
+        {
+            pMP->SetBadFlag();
+        }
+    }
 }
 
 void LocalMapping::KeyFrameCulling()

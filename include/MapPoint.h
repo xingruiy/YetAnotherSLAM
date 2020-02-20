@@ -35,6 +35,7 @@ public:
     cv::Mat GetDescriptor();
     void IncreaseFound(int n = 1);
     void IncreaseVisible(int n = 1);
+    float GetFoundRatio();
 
     void UpdateDepthAndViewingDir();
     void ComputeDistinctiveDescriptors();

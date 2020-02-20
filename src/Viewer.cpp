@@ -56,7 +56,6 @@ void Viewer::Run()
     pangolin::Var<bool> varShowKFGraph = pangolin::Var<bool>("menu.Display Covisibility Graph", true, true);
     pangolin::Var<bool> varShowMapPoints = pangolin::Var<bool>("menu.Display MapPoints", true, true);
     pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
-    pangolin::Var<int> varCovEdgeWeight = pangolin::Var<int>("menu.Covisibility Graph Edge Weight", 100, 1, 200);
 
     while (!pangolin::ShouldQuit())
     {
@@ -71,7 +70,7 @@ void Viewer::Run()
 
         mapViewer->Activate(RenderState);
         renderLiveCameraFrustum();
-        mpMapDrawer->DrawKeyFrames(varShowKeyFrames, varShowKFGraph, varCovEdgeWeight);
+        mpMapDrawer->DrawKeyFrames(varShowKeyFrames, varShowKFGraph, 100);
         if (varShowMapPoints)
             mpMapDrawer->DrawMapPoints(varPointSize);
 

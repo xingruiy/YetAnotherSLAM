@@ -214,6 +214,12 @@ MapPoint *MapPoint::GetReplaced()
     return mpReplaced;
 }
 
+float MapPoint::GetFoundRatio()
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    return static_cast<float>(mnFound) / mnVisible;
+}
+
 void MapPoint::UpdateDepthAndViewingDir()
 {
     std::map<KeyFrame *, size_t> Obs;

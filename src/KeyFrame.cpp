@@ -8,26 +8,17 @@ namespace SLAM
 unsigned long KeyFrame::nNextId = 0;
 
 KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
-    : mpMap(map), mTcw(F->mTcw), mnBALocalForKF(-1), mbBad(false),
-      mnBAFixedForKF(-1), mnFuseTargetForKF(-1), mbToBeErased(false)
+    : mpMap(map), mTcw(F->mTcw),
+      mbBad(false), mbToBeErased(false), mbNotErase(false), mbFirstConnection(true),
+      mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),
+      mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0),
+      fx(g_fx[0]), fy(g_fy[0]), cx(g_cx[0]), cy(g_cy[0]), mK(g_cvCalib),
+      invfx(g_invfx[0]), invfy(g_invfy[0]), mbf(g_bf), mThDepth(g_thDepth)
 {
   mnId = nNextId++;
 
-  fx = g_fx[0];
-  fy = g_fy[0];
-  cx = g_cx[0];
-  cy = g_cy[0];
-  invfx = g_invfx[0];
-  invfy = g_invfy[0];
-  mbf = g_bf;
+  // camera baseline
   mb = mbf / fx;
-  mThDepth = g_thDepth;
-
-  mK = cv::Mat::eye(3, 3, CV_32F);
-  mK.at<float>(0, 0) = fx;
-  mK.at<float>(1, 1) = fy;
-  mK.at<float>(0, 2) = cx;
-  mK.at<float>(1, 2) = cy;
 
   mGrid.resize(FRAME_GRID_COLS);
   for (int i = 0; i < FRAME_GRID_COLS; i++)
