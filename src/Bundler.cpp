@@ -204,7 +204,7 @@ void Bundler::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
     // Setup optimizer
     g2o::SparseOptimizer optimizer;
     std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
-    linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>>();
+    linearSolver = g2o::make_unique<g2o::LinearSolverEigen<g2o::BlockSolver_6_3::PoseMatrixType>>();
     g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(
         g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
 

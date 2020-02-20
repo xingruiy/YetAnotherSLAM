@@ -3,7 +3,7 @@
 #include <opencv2/opencv.hpp>
 #include "Frame.h"
 #include "Viewer.h"
-#include "Mapping.h"
+#include "LocalMapping.h"
 #include "System.h"
 #include "GlobalDef.h"
 #include "DenseMapping.h"
@@ -13,13 +13,13 @@ namespace SLAM
 {
 
 class Viewer;
-class Mapping;
+class LocalMapping;
 class System;
 
 class Tracking
 {
 public:
-    Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping);
+    Tracking(System *system, Map *map, Viewer *mpViewer, LocalMapping *mpLocalMapping);
     void trackImage(cv::Mat ImGray, cv::Mat Depth, const double TimeStamp);
     void reset();
 
@@ -43,19 +43,19 @@ private:
     Frame lastFrame;
     Sophus::SE3d T_ref2World;
 
-    void initialisation();
+    void Initialisation();
     bool trackLastFrame();
-    bool relocalisation();
+    bool Relocalisation();
     bool NeedNewKeyFrame();
     void MakeNewKeyFrame();
 
     System *mpSystem;
     Map *mpMap;
-    Viewer *viewer;
+    Viewer *mpViewer;
 
     DenseMapping *mpLocalMapper;
-    DenseTracking *tracker;
-    Mapping *mapping;
+    DenseTracking *mpTracker;
+    LocalMapping *mpLocalMapping;
 
     TrackingState trackingState;
     TrackingModal trackingModal;

@@ -1,4 +1,4 @@
-#include "Mapping.h"
+#include "LocalMapping.h"
 #include "ORBMatcher.h"
 #include "Bundler.h"
 #include "Converter.h"
@@ -6,7 +6,7 @@
 namespace SLAM
 {
 
-Mapping::Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer)
+LocalMapping::LocalMapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer)
     : mpMap(map), ORBvocabulary(pVoc), mpViewer(pViewer), lastKeyFrame(NULL)
 {
     ORBExtractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
@@ -14,9 +14,9 @@ Mapping::Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer)
     localMapPoints = std::vector<MapPoint *>();
 }
 
-void Mapping::Run()
+void LocalMapping::Run()
 {
-    std::cout << "Mapping Thread Started." << std::endl;
+    std::cout << "LocalMapping Thread Started." << std::endl;
 
     while (!g_bSystemKilled)
     {
@@ -29,8 +29,8 @@ void Mapping::Run()
             if (nMatches > 0)
             {
                 Bundler::PoseOptimization(NextKeyFrame);
-                if (mpViewer)
-                    mpViewer->setReferenceFramePose(NextKeyFrame->mTcw.matrix());
+                // if (mpViewer)
+                //     mpViewer->setReferenceFramePose(NextKeyFrame->mTcw.matrix());
             }
 
             UpdateKeyFrame();
@@ -55,30 +55,30 @@ void Mapping::Run()
     }
 }
 
-void Mapping::setLoopCloser(LoopClosing *pLoopCloser)
+void LocalMapping::setLoopCloser(LoopClosing *pLoopCloser)
 {
     mpLoopCloser = pLoopCloser;
 }
 
-void Mapping::reset()
+void LocalMapping::reset()
 {
     localKeyFrames = std::vector<KeyFrame *>();
     localMapPoints = std::vector<MapPoint *>();
 }
 
-void Mapping::AddKeyFrameCandidate(const Frame &F)
+void LocalMapping::AddKeyFrameCandidate(const Frame &F)
 {
     std::unique_lock<std::mutex> lock(frameMutex);
     mlFrameQueue.push_back(F);
 }
 
-bool Mapping::HasFrameToProcess()
+bool LocalMapping::HasFrameToProcess()
 {
     std::unique_lock<std::mutex> lock(frameMutex);
     return (!mlFrameQueue.empty());
 }
 
-void Mapping::MakeNewKeyFrame()
+void LocalMapping::MakeNewKeyFrame()
 {
     {
         std::unique_lock<std::mutex> lock(frameMutex);
@@ -117,15 +117,17 @@ void Mapping::MakeNewKeyFrame()
 
                 NextKeyFrame->AddMapPoint(pMP, i);
                 mpMap->AddMapPoint(pMP);
+                localMapPoints.push_back(pMP);
             }
         }
     }
 
+    mpMap->SetReferenceMapPoints(localMapPoints);
     // Insert the keyframe in the map
     mpMap->AddKeyFrame(NextKeyFrame);
 }
 
-int Mapping::MatchLocalPoints()
+int LocalMapping::MatchLocalPoints()
 {
     if (localMapPoints.size() == 0)
         return 0;
@@ -157,7 +159,7 @@ int Mapping::MatchLocalPoints()
     return nToMatch;
 }
 
-void Mapping::KeyFrameCulling()
+void LocalMapping::KeyFrameCulling()
 {
     auto vpLocalKeyFrames = NextKeyFrame->GetVectorCovisibleKeyFrames();
     for (auto vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
@@ -216,13 +218,13 @@ void Mapping::KeyFrameCulling()
     }
 }
 
-void Mapping::SearchInNeighbors()
+void LocalMapping::SearchInNeighbors()
 {
     // Retrieve neighbor keyframes
     const auto vpNeighKFs = NextKeyFrame->GetBestCovisibilityKeyFrames(10);
     if (vpNeighKFs.size() == 0)
         return;
-
+    std::cout << "Covisible Graph Size: " << vpNeighKFs.size() << std::endl;
     std::vector<KeyFrame *> vpTargetKFs;
     for (auto vit = vpNeighKFs.begin(), vend = vpNeighKFs.end(); vit != vend; vit++)
     {
@@ -293,7 +295,7 @@ void Mapping::SearchInNeighbors()
     NextKeyFrame->UpdateConnections();
 }
 
-void Mapping::TriangulatePoints()
+void LocalMapping::TriangulatePoints()
 {
     // Retrieve neighbor keyframes in covisibility graph
     const auto vpNeighKFs = NextKeyFrame->GetBestCovisibilityKeyFrames(10);
@@ -528,7 +530,7 @@ void Mapping::TriangulatePoints()
     std::cout << nnew << " Points created by triangulation." << std::endl;
 }
 
-void Mapping::CreateNewMapPoints()
+void LocalMapping::CreateNewMapPoints()
 {
 
     // We sort points by the measured depth by the stereo/RGBD sensor.
@@ -595,7 +597,7 @@ void Mapping::CreateNewMapPoints()
     std::cout << "points created in the keyframe: " << nCreated << std::endl;
 }
 
-void Mapping::UpdateConnections()
+void LocalMapping::UpdateConnections()
 {
     // Each map point vote for the keyframes
     // in which it has been observed
@@ -666,7 +668,7 @@ void Mapping::UpdateConnections()
     std::cout << "local points: " << localMapPoints.size() << std::endl;
 }
 
-void Mapping::UpdateKeyFrame()
+void LocalMapping::UpdateKeyFrame()
 {
     size_t nOutliers = 0;
     // Update MapPoints Statistics
@@ -705,7 +707,7 @@ void Mapping::UpdateKeyFrame()
     std::cout << nOutliers << " outliers found in keyframe" << std::endl;
 }
 
-cv::Mat Mapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
+cv::Mat LocalMapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
 {
     cv::Mat R1w = pKF1->GetRotation().t();
     cv::Mat t1w = -R1w * pKF1->GetTranslation();
@@ -723,7 +725,7 @@ cv::Mat Mapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
     return K1.t().inv() * t12x * R12 * K2.inv();
 }
 
-cv::Mat Mapping::SkewSymmetricMatrix(const cv::Mat &v)
+cv::Mat LocalMapping::SkewSymmetricMatrix(const cv::Mat &v)
 {
     return (cv::Mat_<float>(3, 3) << 0, -v.at<float>(2), v.at<float>(1),
             v.at<float>(2), 0, -v.at<float>(0),

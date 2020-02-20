@@ -23,8 +23,9 @@ public:
     void AddMapPoint(MapPoint *pMP);
     void EraseKeyFrame(KeyFrame *pKF);
     void EraseMapPoint(MapPoint *pMP);
+    void SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs);
+    std::vector<MapPoint *> GetReferenceMapPoints();
 
-    unsigned long KeyFramesInMap();
     std::vector<KeyFrame *> GetAllKeyFrames();
     std::vector<MapPoint *> GetAllMapPoints();
 
@@ -34,6 +35,7 @@ private:
     std::mutex mMutexMap;
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
+    std::vector<MapPoint *> mvpReferenceMapPoints;
 };
 
 } // namespace SLAM

@@ -524,7 +524,7 @@ std::vector<KeyFrame *> KeyFrame::GetCovisiblesByWeight(const int &w)
   if (mvpOrderedConnectedKeyFrames.empty())
     return std::vector<KeyFrame *>();
 
-  auto it = upper_bound(mvOrderedWeights.begin(), mvOrderedWeights.end(), w, KeyFrame::weightComp);
+  auto it = std::upper_bound(mvOrderedWeights.begin(), mvOrderedWeights.end(), w, [&](int a, int b) { return a >= b; });
   if (it == mvOrderedWeights.end())
     return std::vector<KeyFrame *>();
   else
@@ -647,6 +647,12 @@ void KeyFrame::SetBadFlag()
 
   mpMap->EraseKeyFrame(this);
   // mpKeyFrameDB->erase(this);
+}
+
+KeyFrame *KeyFrame::GetParent()
+{
+  std::unique_lock<std::mutex> lock(mMutexConnections);
+  return mpParent;
 }
 
 void KeyFrame::EraseConnection(KeyFrame *pKF)

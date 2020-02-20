@@ -27,12 +27,6 @@ void Map::AddMapPoint(MapPoint *pMP)
     mspMapPoints.insert(pMP);
 }
 
-unsigned long Map::KeyFramesInMap()
-{
-    std::unique_lock<std::mutex> lock(mMutexMap);
-    return mspKeyFrames.size();
-}
-
 void Map::reset()
 {
     std::unique_lock<std::mutex> lock(mMutexMap);
@@ -56,6 +50,18 @@ void Map::EraseKeyFrame(KeyFrame *pKF)
 
     // TODO: This only erase the pointer.
     // Delete the KeyFrame
+}
+
+void Map::SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs)
+{
+    std::unique_lock<std::mutex> lock(mMutexMap);
+    mvpReferenceMapPoints = vpMPs;
+}
+
+std::vector<MapPoint *> Map::GetReferenceMapPoints()
+{
+    std::unique_lock<std::mutex> lock(mMutexMap);
+    return mvpReferenceMapPoints;
 }
 
 } // namespace SLAM

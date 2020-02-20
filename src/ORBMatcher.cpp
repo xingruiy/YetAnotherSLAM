@@ -37,7 +37,7 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
         // The size of the window will depend on the viewing direction
         float r = RadiusByViewingCos(pMP->mTrackViewCos);
         const int &nPredictedLevel = pMP->mnTrackScaleLevel;
-        Eigen::Vector3d NormalDir = pMP->mPointNormal;
+        // Eigen::Vector3d NormalDir = pMP->mPointNormal;
 
         if (bFactor)
             r *= th;
@@ -70,9 +70,9 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
 
             if (pKF->mvuRight[idx] > 0)
             {
-                Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
-                if (NormalDir.dot(FrameNormal) < 0.5)
-                    continue;
+                // Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
+                // if (NormalDir.dot(FrameNormal) < 0.5)
+                //     continue;
 
                 const float er = fabs(pMP->mTrackProjXR - pKF->mvuRight[idx]);
                 if (er > r * pKF->mvScaleFactors[nPredictedLevel])
@@ -186,7 +186,7 @@ int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, 
 
         int bestDist = 256;
         int bestIdx = -1;
-        Eigen::Vector3d PointNormal = pMP->mPointNormal;
+        // Eigen::Vector3d PointNormal = pMP->mPointNormal;
         for (auto vit = vIndices.begin(), vend = vIndices.end(); vit != vend; vit++)
         {
             const size_t idx = *vit;
@@ -209,21 +209,20 @@ int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, 
                 if (e2 * pKF->mvInvLevelSigma2[kpLevel] > 7.8)
                     continue;
 
-                Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
-                if (PointNormal.dot(FrameNormal) < 0.3)
-                    continue;
+                // Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
+                // if (PointNormal.dot(FrameNormal) < 0.3)
+                //     continue;
             }
             else
             {
-                // const float &kpx = kp.pt.x;
-                // const float &kpy = kp.pt.y;
-                // const float ex = u - kpx;
-                // const float ey = v - kpy;
-                // const float e2 = ex * ex + ey * ey;
+                const float &kpx = kp.pt.x;
+                const float &kpy = kp.pt.y;
+                const float ex = u - kpx;
+                const float ey = v - kpy;
+                const float e2 = ex * ex + ey * ey;
 
-                // if (e2 * pKF->mvInvLevelSigma2[kpLevel] > 5.99)
-                //     continue;
-                continue;
+                if (e2 * pKF->mvInvLevelSigma2[kpLevel] > 5.99)
+                    continue;
             }
 
             const cv::Mat &dKF = pKF->mDescriptors.row(idx);
@@ -260,6 +259,7 @@ int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, 
     }
 
     return nFused;
+    std::cout << nFused << " Points fused together." << std::endl;
 }
 
 int ORBMatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12,

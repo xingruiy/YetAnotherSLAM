@@ -4,27 +4,28 @@ namespace SLAM
 {
 
 System::System(const std::string &strSettingFile, const std::string &strVocFile)
-    : viewer(nullptr)
+    : mpViewer(nullptr)
 {
     readSettings(strSettingFile);
     loadORBVocabulary(strVocFile);
 
     mpMap = new Map();
+    mpMapDrawer = new MapDrawer(mpMap);
     mpKeyFrameDB = new KeyFrameDatabase(*mpORBVocabulary);
 
     if (g_bEnableViewer)
     {
-        viewer = new Viewer(this, mpMap);
-        viewerThread = new std::thread(&Viewer::Run, viewer);
+        mpViewer = new Viewer(this, mpMapDrawer);
+        mpViewerThread = new std::thread(&Viewer::Run, mpViewer);
     }
 
-    loopClosing = new LoopClosing(mpMap, mpKeyFrameDB, mpORBVocabulary);
-    loopThread = new std::thread(&LoopClosing::Run, loopClosing);
+    mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, mpORBVocabulary);
+    mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
 
-    mapping = new Mapping(mpORBVocabulary, mpMap, viewer);
-    mapping->setLoopCloser(loopClosing);
-    mappingThread = new std::thread(&Mapping::Run, mapping);
-    tracker = new Tracking(this, mpMap, viewer, mapping);
+    mpLocalMapping = new LocalMapping(mpORBVocabulary, mpMap, mpViewer);
+    mpLocalMapping->setLoopCloser(mpLoopClosing);
+    mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapping);
+    mpTracker = new Tracking(this, mpMap, mpViewer, mpLocalMapping);
 
     std::cout << "Main Thread Started." << std::endl;
 }
@@ -41,20 +42,20 @@ void System::trackImage(cv::Mat img, cv::Mat depth, const double timeStamp)
 
     if (g_bEnableViewer)
     {
-        viewer->setLiveImage(img);
-        viewer->setLiveDepth(depthFloat);
+        mpViewer->setLiveImage(img);
+        mpViewer->setLiveDepth(depthFloat);
     }
 
     if (!g_bSystemRunning)
         return;
 
     // Invoke the main tracking thread
-    tracker->trackImage(grayScale, depthFloat, timeStamp);
+    mpTracker->trackImage(grayScale, depthFloat, timeStamp);
 }
 
 void System::reset()
 {
-    tracker->reset();
+    mpTracker->reset();
     mpMap->reset();
 }
 
@@ -66,18 +67,18 @@ void System::kill()
 System::~System()
 {
     std::cout << "System Waits for Other Threads." << std::endl;
-    loopThread->join();
-    mappingThread->join();
-    viewerThread->join();
+    mpLoopThread->join();
+    mpLocalMappingThread->join();
+    mpViewerThread->join();
 
     delete mpMap;
-    delete viewer;
-    delete tracker;
-    delete mapping;
-    delete loopClosing;
-    delete mappingThread;
-    delete viewerThread;
-    delete loopThread;
+    delete mpViewer;
+    delete mpTracker;
+    delete mpLocalMapping;
+    delete mpLoopClosing;
+    delete mpLocalMappingThread;
+    delete mpViewerThread;
+    delete mpLoopThread;
     std::cout << "System Killed." << std::endl;
 }
 
@@ -151,7 +152,7 @@ void System::readSettings(const std::string &strSettingFile)
     }
     std::cout << "camera baseline - " << g_bf / fx << "\n"
               << "close point th - " << g_thDepth << "\n"
-              << "enable viewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
+              << "enable mpViewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
               << "===================================================" << std::endl;
 }
 

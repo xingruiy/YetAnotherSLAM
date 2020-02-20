@@ -16,10 +16,10 @@ namespace SLAM
 class Viewer;
 class LoopClosing;
 
-class Mapping
+class LocalMapping
 {
 public:
-    Mapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer);
+    LocalMapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer);
     void AddKeyFrameCandidate(const Frame &F);
     void setLoopCloser(LoopClosing *pLoopCloser);
     void reset();

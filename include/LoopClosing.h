@@ -1,7 +1,7 @@
 #pragma once
 #include "Map.h"
 #include "Tracking.h"
-#include "Mapping.h"
+#include "LocalMapping.h"
 #include "KeyFrameDatabase.h"
 
 namespace SLAM
@@ -9,7 +9,7 @@ namespace SLAM
 
 class Map;
 class Tracking;
-class Mapping;
+class LocalMapping;
 
 class LoopClosing
 {
@@ -28,7 +28,7 @@ private:
 
     Map *mpMap;
     Tracking *mpTracker;
-    Mapping *mpLocalMapper;
+    LocalMapping *mpLocalMapper;
 
     std::mutex mMutexLoopQueue;
     std::list<KeyFrame *> mlpLoopKeyFrameQueue;

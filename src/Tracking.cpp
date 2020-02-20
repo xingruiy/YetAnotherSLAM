@@ -3,15 +3,15 @@
 namespace SLAM
 {
 
-Tracking::Tracking(System *system, Map *map, Viewer *viewer, Mapping *mapping)
-    : mpSystem(system), mpMap(map), viewer(viewer), mapping(mapping), trackingState(Null)
+Tracking::Tracking(System *system, Map *map, Viewer *mpViewer, LocalMapping *mpLocalMapping)
+    : mpSystem(system), mpMap(map), mpViewer(mpViewer), mpLocalMapping(mpLocalMapping), trackingState(Null)
 {
     int w = g_width[0];
     int h = g_height[0];
     Eigen::Matrix3f calib = g_calib[0];
 
-    tracker = new DenseTracking(w, h, calib.cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
-    mpLocalMapper = new DenseMapping(w, h, calib);
+    mpTracker = new DenseTracking(w, h, calib.cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
+    // mpLocalMapper = new DenseMapping(w, h, calib);
 }
 
 void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
@@ -23,7 +23,7 @@ void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeSt
     {
     case Null:
     {
-        initialisation();
+        Initialisation();
         break;
     }
 
@@ -46,7 +46,7 @@ void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeSt
 
     case Lost:
     {
-        bool bOK = relocalisation();
+        bool bOK = Relocalisation();
 
         if (bOK)
         {
@@ -61,27 +61,27 @@ void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeSt
     lastFrame = Frame(NextFrame);
 }
 
-void Tracking::initialisation()
+void Tracking::Initialisation()
 {
-    tracker->SetReferenceImage(NextFrame.mImGray);
-    tracker->SetReferenceDepth(NextFrame.mImDepth);
-    mpLocalMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
+    mpTracker->SetReferenceImage(NextFrame.mImGray);
+    mpTracker->SetReferenceDepth(NextFrame.mImDepth);
+    // mpLocalMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
 
     T_ref2World = NextFrame.mTcw;
     NextFrame.mTcw = Sophus::SE3d(Eigen::Matrix4d::Identity());
     NextFrame.T_frame2Ref = Sophus::SE3d(Eigen::Matrix4d::Identity());
 
-    mapping->AddKeyFrameCandidate(NextFrame);
+    mpLocalMapping->AddKeyFrameCandidate(NextFrame);
 
     trackingState = OK;
 }
 
 bool Tracking::trackLastFrame()
 {
-    tracker->SetTrackingImage(NextFrame.mImGray);
-    tracker->SetTrackingDepth(NextFrame.mImDepth);
+    mpTracker->SetTrackingImage(NextFrame.mImGray);
+    mpTracker->SetTrackingDepth(NextFrame.mImDepth);
 
-    Sophus::SE3d Tpc = tracker->GetTransform(lastFrame.T_frame2Ref.inverse(), false);
+    Sophus::SE3d Tpc = mpTracker->GetTransform(lastFrame.T_frame2Ref.inverse(), false);
 
     // NextFrame.mTcw = lastFrame.mTcw * Tpc.inverse();
     // NextFrame.T_frame2Ref = lastFrame.T_frame2Ref * Tpc.inverse();
@@ -89,19 +89,19 @@ bool Tracking::trackLastFrame()
     NextFrame.T_frame2Ref = Tpc.inverse();
 
     if (g_bEnableViewer)
-        viewer->setLivePose(NextFrame.T_frame2Ref.matrix());
+        mpViewer->setLivePose(NextFrame.mTcw.matrix());
 
-    cv::cuda::GpuMat vmap(480, 640, CV_32FC4);
-    mpLocalMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
-    mpLocalMapper->raytrace(vmap, NextFrame.mTcw);
-    cv::imshow("vmap", cv::Mat(vmap));
-    cv::waitKey(1);
+    // cv::cuda::GpuMat vmap(480, 640, CV_32FC4);
+    // mpLocalMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
+    // mpLocalMapper->raytrace(vmap, NextFrame.mTcw);
+    // cv::imshow("vmap", cv::Mat(vmap));
+    // cv::waitKey(1);
 
     g_nTrackedFrame++;
     return true;
 }
 
-bool Tracking::relocalisation()
+bool Tracking::Relocalisation()
 {
     return false;
 }
@@ -126,8 +126,8 @@ void Tracking::MakeNewKeyFrame()
     // Update keyframe pose
     T_ref2World = NextFrame.mTcw;
 
-    mapping->AddKeyFrameCandidate(NextFrame);
-    tracker->SwapFrameBuffer();
+    mpLocalMapping->AddKeyFrameCandidate(NextFrame);
+    mpTracker->SwapFrameBuffer();
 
     // Set to the reference frame
     NextFrame.T_frame2Ref = Sophus::SE3d();

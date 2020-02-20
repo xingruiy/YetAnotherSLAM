@@ -26,6 +26,7 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos,
       mbBad(false)
 {
     mAvgViewingDir = Eigen::Vector3d::Zero();
+    // mPointNormal = Eigen::Vector3d::Zero();
     mnId = nNextId++;
 }
 
@@ -53,7 +54,7 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos,
     mAvgViewingDir = mWorldPos - Ow;
     mAvgViewingDir.normalize();
 
-    mPointNormal = pRefKF->mvNormal[idxF].cast<double>();
+    // mPointNormal = pRefKF->mvNormal[idxF].cast<double>();
 
     Eigen::Vector3d PC = pos - Ow;
     const float dist = PC.norm();
@@ -256,7 +257,7 @@ void MapPoint::UpdateDepthAndViewingDir()
         mfMaxDistance = dist * levelScaleFactor;
         mfMinDistance = mfMaxDistance / pRefKF->mvScaleFactors[nLevels - 1];
         mAvgViewingDir = viewingDir / n;
-        mPointNormal = normal / n;
+        // mPointNormal = normal / n;
     }
 }
 

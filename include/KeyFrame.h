@@ -127,12 +127,7 @@ public:
     std::mutex mMutexFeatures;
     KeyFrame *mReferenceKeyFrame;
 
-    static bool weightComp(int a, int b)
-    {
-        return a > b;
-    }
-
-    // Variables used by the local mapping
+    // Variables used by the local mpLocalMapping
     unsigned long mnBALocalForKF;
     unsigned long mnBAFixedForKF;
     unsigned long mnFuseTargetForKF;

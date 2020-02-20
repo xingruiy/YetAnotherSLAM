@@ -9,16 +9,17 @@
 #include "Viewer.h"
 #include "KeyFrame.h"
 #include "Tracking.h"
-#include "Mapping.h"
+#include "LocalMapping.h"
 #include "GlobalDef.h"
 #include "LoopClosing.h"
+#include "MapDrawer.h"
 #include "KeyFrameDatabase.h"
 
 namespace SLAM
 {
 
 class Viewer;
-class Mapping;
+class LocalMapping;
 class Tracking;
 class MapViewer;
 class LoopClosing;
@@ -36,15 +37,16 @@ private:
     void readSettings(const std::string &strSettingFile);
     void loadORBVocabulary(const std::string &strVocFile);
 
-    std::thread *mappingThread;
-    std::thread *viewerThread;
-    std::thread *loopThread;
+    std::thread *mpLocalMappingThread;
+    std::thread *mpViewerThread;
+    std::thread *mpLoopThread;
 
     Map *mpMap;
-    Tracking *tracker;
-    Viewer *viewer;
-    Mapping *mapping;
-    LoopClosing *loopClosing;
+    Tracking *mpTracker;
+    Viewer *mpViewer;
+    LocalMapping *mpLocalMapping;
+    LoopClosing *mpLoopClosing;
+    MapDrawer *mpMapDrawer;
 
     KeyFrameDatabase *mpKeyFrameDB;
     ORB_SLAM2::ORBVocabulary *mpORBVocabulary;

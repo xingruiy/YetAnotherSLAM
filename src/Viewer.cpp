@@ -3,8 +3,8 @@
 namespace SLAM
 {
 
-Viewer::Viewer(System *pSys, Map *pMap)
-    : mpSystem(pSys), mpMap(pMap),
+Viewer::Viewer(System *pSystem, MapDrawer *pMapDrawer)
+    : mpSystem(pSystem), mpMapDrawer(pMapDrawer),
       mTcw(Eigen::Matrix4d::Identity()),
       needUpdateImage(false),
       needUpdateDepth(false)
@@ -26,7 +26,7 @@ void Viewer::Run()
         pangolin::ProjectionMatrix(640, 480, g_fx[0], g_fy[0], g_cx[0], g_cy[0], 0.1, 1000),
         pangolin::ModelViewLookAtRDF(0, 0, 0, 0, 0, -1, 0, 1, 0));
 
-    auto MenuDividerLeft = pangolin::Attach::Pix(200);
+    auto MenuDividerLeft = pangolin::Attach::Pix(300);
     float RightSideBarDividerLeft = 0.75f;
 
     mapViewer = &pangolin::Display("Map");
@@ -52,8 +52,11 @@ void Viewer::Run()
     pangolin::Var<bool> varReset = pangolin::Var<bool>("menu.reset", false, false);
     pangolin::Var<bool> varRunning = pangolin::Var<bool>("menu.Running", g_bSystemRunning, true);
     pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Running"));
+    pangolin::Var<bool> varShowKeyFrames = pangolin::Var<bool>("menu.Display KeyFrames", true, true);
+    pangolin::Var<bool> varShowKFGraph = pangolin::Var<bool>("menu.Display Covisibility Graph", true, true);
+    pangolin::Var<bool> varShowMapPoints = pangolin::Var<bool>("menu.Display MapPoints", true, true);
     pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
-    pangolin::Var<bool> varDrawImmaturePoint = pangolin::Var<bool>("menu. Draw Immature Point", true, true);
+    pangolin::Var<int> varCovEdgeWeight = pangolin::Var<int>("menu.Covisibility Graph Edge Weight", 100, 1, 200);
 
     while (!pangolin::ShouldQuit())
     {
@@ -64,13 +67,13 @@ void Viewer::Run()
             mpSystem->reset();
 
         g_bSystemRunning = varRunning;
-
         renderImagesToScreen();
 
         mapViewer->Activate(RenderState);
         renderLiveCameraFrustum();
-        renderMapPoints(varPointSize, varDrawImmaturePoint);
-        renderKeyframes();
+        mpMapDrawer->DrawKeyFrames(varShowKeyFrames, varShowKFGraph, varCovEdgeWeight);
+        if (varShowMapPoints)
+            mpMapDrawer->DrawMapPoints(varPointSize);
 
         pangolin::FinishFrame();
     }
@@ -105,47 +108,11 @@ void Viewer::renderLiveCameraFrustum()
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void Viewer::renderMapPoints(const int &PointSize, const bool &drawImmature)
-{
-    std::vector<MapPoint *> vpMPs = mpMap->GetAllMapPoints();
-    glPointSize(PointSize);
-    glBegin(GL_POINTS);
-    glColor3f(1.0, 0.0, 0.0);
-
-    for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
-    {
-        if (!vpMPs[i] || vpMPs[i]->isBad())
-            continue;
-        if (!drawImmature && vpMPs[i]->mObservations.size() <= 1)
-            continue;
-
-        Eigen::Vector3d &pos = vpMPs[i]->mWorldPos;
-        glVertex3f(pos(0), pos(1), pos(2));
-    }
-
-    glEnd();
-    glPointSize(1);
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-}
-
-void Viewer::renderKeyframes()
-{
-    std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
-    glColor3f(0.0, 1.0, 0.0);
-    for (size_t i = 0, iend = vpKFs.size(); i < iend; i++)
-    {
-        if (!vpKFs[i])
-            continue;
-        KeyFrame *pKF = vpKFs[i];
-        pangolin::glDrawFrustum<double>(mCalib.inverse(), width, height, pKF->mTcw.matrix(), 0.1);
-    }
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-}
-
 void Viewer::setLivePose(const Eigen::Matrix4d &TFrameRef)
 {
-    std::unique_lock<std::mutex> lock(mPoseMutex);
-    T_frame_world = T_ref_world * TFrameRef.cast<float>();
+    // std::unique_lock<std::mutex> lock(mPoseMutex);
+    // T_frame_world = T_ref_world * TFrameRef.cast<float>();
+    T_frame_world = TFrameRef.cast<float>();
 }
 
 void Viewer::setReferenceFramePose(const Eigen::Matrix4d &TRefWorld)

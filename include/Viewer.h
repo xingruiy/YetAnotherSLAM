@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include "System.h"
+#include "MapDrawer.h"
 #include "GlobalDef.h"
 
 namespace SLAM
@@ -15,7 +16,7 @@ class System;
 class Viewer
 {
 public:
-    Viewer(System *pSys, Map *pMap);
+    Viewer(System *pSystem, MapDrawer *pMapDrawer);
 
     void Run();
     void reset();
@@ -26,7 +27,7 @@ public:
     void setReferenceFramePose(const Eigen::Matrix4d &Tcw);
 
 private:
-    Map *mpMap;
+    MapDrawer *mpMapDrawer;
     System *mpSystem;
     Eigen::Matrix3f calibInv;
 

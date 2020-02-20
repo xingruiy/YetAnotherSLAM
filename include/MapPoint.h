@@ -66,7 +66,7 @@ public:
     Eigen::Vector3d mAvgViewingDir;
 
     // The point's normal direction
-    Eigen::Vector3d mPointNormal;
+    // Eigen::Vector3d mPointNormal;
 
     // Best descriptor to fast matching
     cv::Mat mDescriptor;

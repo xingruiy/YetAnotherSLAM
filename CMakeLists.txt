@@ -12,9 +12,10 @@ target_sources(${PROJECT_NAME}
 PRIVATE
     src/Map.cpp
     src/Frame.cpp
+    src/MapDrawer.cpp
     src/MapPoint.cpp
     src/KeyFrame.cpp
-    src/Mapping.cpp
+    src/LocalMapping.cpp
     src/System.cpp
     src/Viewer.cpp
     src/Tracking.cpp
