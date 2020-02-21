@@ -10,7 +10,7 @@ MapDrawer::MapDrawer(Map *pMap) : mpMap(pMap)
     height = g_height[0];
 }
 
-void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int iEdgeWeight)
+void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 {
     const auto vpKFs = mpMap->GetAllKeyFrames();
 
@@ -22,7 +22,7 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int iEdgeWeight)
             Eigen::Matrix4f Tcw = pKF->mTcw.matrix().cast<float>();
 
             glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
-            pangolin::glDrawFrustum(calibInv, width, height, Tcw, 0.1f);
+            pangolin::glDrawFrustum(calibInv, width, height, Tcw, 0.05f);
             glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         }
     }
@@ -36,7 +36,7 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int iEdgeWeight)
         for (size_t i = 0; i < vpKFs.size(); i++)
         {
             // Covisibility Graph
-            const auto vCovKFs = vpKFs[i]->GetCovisiblesByWeight(iEdgeWeight);
+            const auto vCovKFs = vpKFs[i]->GetBestCovisibilityKeyFrames(N);
             Eigen::Vector3f Ow = vpKFs[i]->mTcw.translation().cast<float>();
             if (!vCovKFs.empty())
             {

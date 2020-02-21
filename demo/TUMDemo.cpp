@@ -48,7 +48,22 @@ int main(int argc, char **argv)
             imRGB = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesRGB[i], CV_LOAD_IMAGE_UNCHANGED);
             imDepth = cv::imread(std::string(argv[3]) + "/" + vstrImageFilenamesD[i], CV_LOAD_IMAGE_UNCHANGED);
             double tframe = vTimestamps[i];
+
+            std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
             sys.trackImage(imRGB, imDepth, tframe);
+            std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+
+            double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+
+            // Wait to load the next frame
+            double T = 0;
+            if (i < nImages - 1)
+                T = vTimestamps[i + 1] - tframe;
+            else if (i > 0)
+                T = tframe - vTimestamps[i - 1];
+
+            if (ttrack < T)
+                usleep((T - ttrack) * 1e6);
         }
         else
         {

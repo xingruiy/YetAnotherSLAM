@@ -44,7 +44,7 @@ void LocalMapping::Run()
                 Bundler::LocalBundleAdjustment(NextKeyFrame, &bStopFlag, mpMap);
             }
 
-            UpdateConnections();
+            UpdateLocalMap();
             MapPointCulling();
 
             if (!HasFrameToProcess())
@@ -124,14 +124,13 @@ void LocalMapping::MakeNewKeyFrame()
         }
     }
 
-    mpMap->SetReferenceMapPoints(localMapPoints);
     // Insert the keyframe in the map
     mpMap->AddKeyFrame(NextKeyFrame);
 }
 
 int LocalMapping::MatchLocalPoints()
 {
-    if (localMapPoints.size() == 0)
+    if (localKeyFrames.size() == 0)
         return 0;
 
     int nToMatch = 0;
@@ -612,7 +611,7 @@ void LocalMapping::CreateNewMapPoints()
     std::cout << "points created in the keyframe: " << nCreated << std::endl;
 }
 
-void LocalMapping::UpdateConnections()
+void LocalMapping::UpdateLocalMap()
 {
     // Each map point vote for the keyframes
     // in which it has been observed
@@ -679,6 +678,7 @@ void LocalMapping::UpdateConnections()
         }
     }
 
+    mpMap->SetReferenceMapPoints(localMapPoints);
     std::cout << "local frame: " << localKeyFrames.size() << std::endl;
     std::cout << "local points: " << localMapPoints.size() << std::endl;
 }

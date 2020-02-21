@@ -26,7 +26,7 @@ void Viewer::Run()
         pangolin::ProjectionMatrix(640, 480, g_fx[0], g_fy[0], g_cx[0], g_cy[0], 0.1, 1000),
         pangolin::ModelViewLookAtRDF(0, 0, 0, 0, 0, -1, 0, 1, 0));
 
-    auto MenuDividerLeft = pangolin::Attach::Pix(300);
+    auto MenuDividerLeft = pangolin::Attach::Pix(250);
     float RightSideBarDividerLeft = 0.75f;
 
     mapViewer = &pangolin::Display("Map");
@@ -56,6 +56,7 @@ void Viewer::Run()
     pangolin::Var<bool> varShowKFGraph = pangolin::Var<bool>("menu.Display Covisibility Graph", true, true);
     pangolin::Var<bool> varShowMapPoints = pangolin::Var<bool>("menu.Display MapPoints", true, true);
     pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
+    pangolin::Var<int> varCovMapDensity = pangolin::Var<int>("menu.Covisibility Map Density", 10, 1, 50);
 
     while (!pangolin::ShouldQuit())
     {
@@ -70,7 +71,7 @@ void Viewer::Run()
 
         mapViewer->Activate(RenderState);
         renderLiveCameraFrustum();
-        mpMapDrawer->DrawKeyFrames(varShowKeyFrames, varShowKFGraph, 100);
+        mpMapDrawer->DrawKeyFrames(varShowKeyFrames, varShowKFGraph, varCovMapDensity);
         if (varShowMapPoints)
             mpMapDrawer->DrawMapPoints(varPointSize);
 

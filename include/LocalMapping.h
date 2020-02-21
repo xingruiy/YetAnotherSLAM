@@ -33,7 +33,7 @@ private:
     void SearchInNeighbors();
     void TriangulatePoints();
     void CreateNewMapPoints();
-    void UpdateConnections();
+    void UpdateLocalMap();
     void UpdateKeyFrame();
     void MapPointCulling();
 

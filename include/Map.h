@@ -24,12 +24,12 @@ public:
     void EraseKeyFrame(KeyFrame *pKF);
     void EraseMapPoint(MapPoint *pMP);
     void SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs);
-    std::vector<MapPoint *> GetReferenceMapPoints();
-
-    std::vector<KeyFrame *> GetAllKeyFrames();
-    std::vector<MapPoint *> GetAllMapPoints();
 
     std::mutex mMutexMapUpdate;
+
+    std::vector<MapPoint *> GetReferenceMapPoints();
+    std::vector<KeyFrame *> GetAllKeyFrames();
+    std::vector<MapPoint *> GetAllMapPoints();
 
 private:
     std::mutex mMutexMap;
