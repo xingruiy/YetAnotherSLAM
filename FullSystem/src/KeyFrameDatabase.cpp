@@ -1,8 +1,7 @@
+#include <mutex>
+#include <DBoW2/DBoW2/BowVector.h>
 #include "KeyFrameDatabase.h"
 #include "KeyFrame.h"
-#include <ORB_SLAM2/Thirdparty/DBoW2/DBoW2/BowVector.h>
-
-#include <mutex>
 
 namespace SLAM
 {

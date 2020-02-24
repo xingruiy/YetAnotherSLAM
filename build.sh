@@ -11,45 +11,30 @@ if [ -n "$1" ]; then
 fi
 
 echo -e "CMAKE_BUILD_TYPE is set to: ${RED}$BuildType${NC}"
-echo "Configuring and building tools/CameraOpenNI ..."
+echo "Configuring and building Thirdparty/CameraOpenNI ..."
 
-cd ./tools/CameraOpenNI
+cd ./Thirdparty/CameraOpenNI
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building tools/DatasetLoader ..."
+echo "Configuring and building Thirdparty/RGBDSLAM ..."
 
-cd ../../DatasetLoader/
+cd ../../RGBDSLAM/
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building tools/RGBD_SLAM ..."
+echo "Configuring and building Thirdparty/ORB_SLAM2/Thirdparty/DBoW2 ..."
 
-cd ../../RGBD_SLAM/
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=RELEASE
-make -j
-
-cd ../../ORB_SLAM2
-echo "Configuring and building tools/ORB_SLAM2/Thirdparty/DBoW2 ..."
-
-cd ./Thirdparty/DBoW2
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=RELEASE
-make -j
-
-echo "Configuring and building tools/ORB_SLAM2 ..."
-
-cd ../../../
+cd ../../DBoW2
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
 echo "Uncompress vocabulary ..."
 
-cd ../../../vocabulary
+cd ../../../Vocabulary
 tar -xf ORBvoc.txt.tar.gz
 cd ..
 

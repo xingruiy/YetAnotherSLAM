@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
-project(athena CXX)
+project(YetAnotherSLAM CXX)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/lib)
 
 find_package(OpenCV 3.4 REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
@@ -10,20 +13,22 @@ add_library(${PROJECT_NAME} SHARED "")
 
 target_sources(${PROJECT_NAME}
 PRIVATE
-    src/Map.cpp
-    src/Frame.cpp
-    src/MapDrawer.cpp
-    src/MapPoint.cpp
-    src/KeyFrame.cpp
-    src/LocalMapping.cpp
-    src/System.cpp
-    src/Viewer.cpp
-    src/Tracking.cpp
-    src/Bundler.cpp
-    src/ORBMatcher.cpp
-    src/GlobalDef.cpp
-    src/LoopClosing.cpp
-    src/KeyFrameDatabase.cpp
+    FullSystem/src/Map.cpp
+    FullSystem/src/Frame.cpp
+    FullSystem/src/MapDrawer.cpp
+    FullSystem/src/MapPoint.cpp
+    FullSystem/src/KeyFrame.cpp
+    FullSystem/src/LocalMapping.cpp
+    FullSystem/src/System.cpp
+    FullSystem/src/Viewer.cpp
+    FullSystem/src/Tracking.cpp
+    FullSystem/src/Bundler.cpp
+    FullSystem/src/ORBMatcher.cpp
+    FullSystem/src/GlobalDef.cpp
+    FullSystem/src/LoopClosing.cpp
+    FullSystem/src/KeyFrameDatabase.cpp
+    FullSystem/src/ORBextractor.cc
+    FullSystem/src/Converter.cc
 )
 
 target_compile_features(${PROJECT_NAME}
@@ -36,13 +41,11 @@ PUBLIC
     ${OpenCV_INCLUDE_DIRS}
     ${CUDA_INCLUDE_DIRS}
     ${Pangolin_INCLUDE_DIRS}  
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/tools/
-    ${PROJECT_SOURCE_DIR}/tools/DatasetLoader/include
-    ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/include
-    ${PROJECT_SOURCE_DIR}/tools/RGBD_SLAM/include
-    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/
-    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/include
+    ${PROJECT_SOURCE_DIR}/FullSystem/include
+    ${PROJECT_SOURCE_DIR}/Thirdparty/
+    ${PROJECT_SOURCE_DIR}/Thirdparty/DatasetLoader/include
+    ${PROJECT_SOURCE_DIR}/Thirdparty/CameraOpenNI/include
+    ${PROJECT_SOURCE_DIR}/Thirdparty/RGBDSLAM/include
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -53,24 +56,20 @@ PUBLIC
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
-    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/lib/libORB_SLAM2.so
-    ${PROJECT_SOURCE_DIR}/tools/RGBD_SLAM/lib/libRGBD_SLAM.so
-    ${PROJECT_SOURCE_DIR}/tools/ORB_SLAM2/Thirdparty/DBoW2/lib/libDBoW2.so
+    ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
+    ${PROJECT_SOURCE_DIR}/Thirdparty/RGBDSLAM/lib/libRGBDSLAM.so
 )
 
 # Build Examples
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
-add_executable(liveDemo ${PROJECT_SOURCE_DIR}/demo/LiveDemo.cpp)
+add_executable(liveDemo ${PROJECT_SOURCE_DIR}/Examples/LiveDemo.cpp)
 target_link_libraries(liveDemo 
 PRIVATE 
-    athena 
-    ${PROJECT_SOURCE_DIR}/tools/CameraOpenNI/lib/libCameraOpenNI.so
+    ${PROJECT_NAME} 
+    ${PROJECT_SOURCE_DIR}/Thirdparty/CameraOpenNI/lib/libCameraOpenNI.so
 )
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
-add_executable(tumDemo ${PROJECT_SOURCE_DIR}/demo/TUMDemo.cpp)
+add_executable(tumDemo ${PROJECT_SOURCE_DIR}/Examples/TUMDemo.cpp)
 target_link_libraries(tumDemo 
 PRIVATE 
-    athena 
-    ${PROJECT_SOURCE_DIR}/tools/DatasetLoader/lib/libDatasetLoader.so
+    ${PROJECT_NAME} 
 )

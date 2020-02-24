@@ -1,6 +1,6 @@
+#include <DBoW2/DBoW2/FeatureVector.h>
 #include "Converter.h"
 #include "ORBMatcher.h"
-#include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 
 namespace SLAM
 {

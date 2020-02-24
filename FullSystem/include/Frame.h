@@ -2,9 +2,10 @@
 #include <sophus/se3.hpp>
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
+#include <DBoW2/DBoW2/BowVector.h>
+
 #include "KeyFrame.h"
 #include "GlobalDef.h"
-#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
 
 namespace SLAM
 {
