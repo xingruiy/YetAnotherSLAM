@@ -58,6 +58,8 @@ private:
 
     cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
     cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
+
+    cv::Mat mImg;
 };
 
 } // namespace SLAM

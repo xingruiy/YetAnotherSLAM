@@ -25,7 +25,7 @@ private:
     std::mutex mPoseMutex;
     Eigen::Matrix4f mCameraPose;
 
-    Eigen::Matrix3f calibInv;
+    Eigen::Matrix3f mCalibInv;
     int width, height;
 };
 

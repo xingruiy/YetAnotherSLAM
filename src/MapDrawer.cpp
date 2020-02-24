@@ -5,7 +5,7 @@ namespace SLAM
 
 MapDrawer::MapDrawer(Map *pMap) : mpMap(pMap)
 {
-    calibInv = g_calibInv[0];
+    mCalibInv = g_calibInv[0];
     width = g_width[0];
     height = g_height[0];
 }
@@ -22,7 +22,7 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
             Eigen::Matrix4f Tcw = pKF->mTcw.matrix().cast<float>();
 
             glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
-            pangolin::glDrawFrustum(calibInv, width, height, Tcw, 0.05f);
+            pangolin::glDrawFrustum(mCalibInv, width, height, Tcw, 0.05f);
             glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         }
     }

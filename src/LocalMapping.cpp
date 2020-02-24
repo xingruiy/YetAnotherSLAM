@@ -126,6 +126,9 @@ void LocalMapping::MakeNewKeyFrame()
 
     // Insert the keyframe in the map
     mpMap->AddKeyFrame(NextKeyFrame);
+
+    if (g_bEnableViewer)
+        mpViewer->setKeyFrameImage(NextFrame.mImGray, NextKeyFrame->mvKeys);
 }
 
 int LocalMapping::MatchLocalPoints()
