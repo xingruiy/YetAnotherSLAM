@@ -109,10 +109,10 @@ void DenseTracking::SetReferenceDepth(const cv::Mat &imDepth)
         if (lvl == 0)
         {
             mGpuBufferRawDepth.upload(imDepth);
-            convertDepthToInvDepth(mGpuBufferRawDepth, mvReferenceInvDepth[lvl]);
+            DepthToInvDepth(mGpuBufferRawDepth, mvReferenceInvDepth[lvl]);
         }
         else
-            pyrdownInvDepth(mvReferenceInvDepth[lvl - 1], mvReferenceInvDepth[lvl]);
+            PyrDownDepth(mvReferenceInvDepth[lvl - 1], mvReferenceInvDepth[lvl]);
     }
 }
 
@@ -128,7 +128,7 @@ void DenseTracking::SetTrackingImage(const cv::Mat &imGray)
         else
             cv::cuda::pyrDown(mvCurrentIntensity[lvl - 1], mvCurrentIntensity[lvl]);
 
-        computeImageGradientCentralDiff(mvCurrentIntensity[lvl], mvIntensityGradientX[lvl], mvIntensityGradientY[lvl]);
+        ComputeImageGradientCentralDifference(mvCurrentIntensity[lvl], mvIntensityGradientX[lvl], mvIntensityGradientY[lvl]);
     }
 }
 
@@ -139,28 +139,41 @@ void DenseTracking::SetTrackingDepth(const cv::Mat &imDepth)
         if (lvl == 0)
         {
             mGpuBufferRawDepth.upload(imDepth);
-            convertDepthToInvDepth(mGpuBufferRawDepth, mvCurrentInvDepth[lvl]);
+            DepthToInvDepth(mGpuBufferRawDepth, mvCurrentInvDepth[lvl]);
         }
         else
-            pyrdownInvDepth(mvCurrentInvDepth[lvl - 1], mvCurrentInvDepth[lvl]);
+            PyrDownDepth(mvCurrentInvDepth[lvl - 1], mvCurrentInvDepth[lvl]);
 
-        computeImageGradientCentralDiff(mvCurrentInvDepth[lvl], mvInvDepthGradientX[lvl], mvInvDepthGradientY[lvl]);
+        ComputeImageGradientCentralDifference(mvCurrentInvDepth[lvl], mvInvDepthGradientX[lvl], mvInvDepthGradientY[lvl]);
     }
 }
 
 void DenseTracking::SetReferenceInvD(cv::cuda::GpuMat vmap)
 {
-    for (int lvl = 0; lvl < mnNumPyr; ++lvl)
+}
+
+template <typename T, int cols>
+Eigen::Matrix<T, cols, 1> ClampEigenVector(const Eigen::Matrix<T, cols, 1> &in, T maxVal, T minVal)
+{
+    Eigen::Matrix<T, cols, 1> out;
+    for (int i = 0; i < cols; ++i)
     {
-        if (lvl == 0)
-            convertVMapToInvDepth(vmap, mvReferenceInvDepth[lvl]);
+        if (in(i, 0) > maxVal)
+            out(i, 0) = maxVal;
+        else if (in(i, 0) < minVal)
+            out(i, 0) = minVal;
         else
-            cv::cuda::pyrDown(mvReferenceInvDepth[lvl - 1], mvReferenceInvDepth[lvl]);
+            out(i, 0) = in(i, 0);
     }
+
+    return out;
 }
 
 Sophus::SE3d DenseTracking::GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer)
 {
+    int nIteration = 0;
+    int nSuccessfulIteration = 0;
+
     Sophus::SE3d estimate = init;
     Sophus::SE3d lastSuccessEstimate = estimate;
     for (int lvl = mnNumPyr - 1; lvl >= 0; --lvl)
@@ -200,12 +213,18 @@ Sophus::SE3d DenseTracking::GetTransform(const Sophus::SE3d &init, const bool bS
                 return Sophus::SE3d();
             }
 
+            std::cout << update.transpose() << std::endl;
+            update = ClampEigenVector(update, 0.05, -0.05);
+
             estimate = Sophus::SE3d::exp(update) * estimate;
             if (error < lastError)
             {
                 lastSuccessEstimate = estimate;
                 lastError = error;
+                nSuccessfulIteration++;
             }
+
+            nIteration++;
         }
     }
 
@@ -217,6 +236,8 @@ Sophus::SE3d DenseTracking::GetTransform(const Sophus::SE3d &init, const bool bS
             std::swap(mvReferenceIntensity[lvl], mvCurrentIntensity[lvl]);
         }
     }
+
+    printf("Tracking finished with %d / %d\n", nSuccessfulIteration, nIteration);
 
     mbTrackingGood = true;
     return lastSuccessEstimate;
