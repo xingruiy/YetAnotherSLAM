@@ -32,7 +32,7 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Uncompress vocabulary ..."
+echo "Uncompress Vocabulary ..."
 
 cd ../../../Vocabulary
 tar -xf ORBvoc.txt.tar.gz

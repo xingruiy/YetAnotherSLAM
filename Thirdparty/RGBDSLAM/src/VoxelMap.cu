@@ -26,10 +26,10 @@ __global__ void resetHeapKernel(int *heap, int *heapPtr, int numBlock)
 void MapStruct::reset()
 {
     dim3 block(1024);
-    dim3 grid(div_up(hashTableSize, block.x));
+    dim3 grid(cv::divUp(hashTableSize, block.x));
     resetHashKernel<<<grid, block>>>(hashTable, hashTableSize);
 
-    grid = dim3(div_up(voxelBlockSize, block.x));
+    grid = dim3(cv::divUp(voxelBlockSize, block.x));
     resetHeapKernel<<<grid, block>>>(heap, heapPtr, voxelBlockSize);
 
     cudaMemset(excessPtr, 0, sizeof(int));

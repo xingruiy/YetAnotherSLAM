@@ -1,8 +1,8 @@
-#include "prefixSum.h"
-#include "cudaUtils.h"
-#include "triangleTable.h"
+#include "PrefixSum.h"
+#include "CudaUtils.h"
+#include "TriangleTable.h"
 #include "DenseMapping.h"
-#include "mapFunctors.h"
+#include "MappingUtils.h"
 
 #define MAX_NUM_MESH_TRIANGLES 20000000
 
@@ -275,7 +275,7 @@ void create_mesh_with_normal(
     bva.bufferSize = MAX_NUM_MESH_TRIANGLES;
 
     dim3 thread(1024);
-    dim3 block = dim3(div_up(map_struct.hashTableSize, thread.x));
+    dim3 block = dim3(cv::divUp(map_struct.hashTableSize, thread.x));
 
     selectBlockKernel<<<block, thread>>>(bva);
 
@@ -284,7 +284,7 @@ void create_mesh_with_normal(
         return;
 
     thread = dim3(8, 8);
-    block = dim3(div_up(block_count, 16), 16);
+    block = dim3(cv::divUp((size_t)block_count, 16U), 16U);
 
     callDeviceFunctor<<<block, thread>>>(bva);
 

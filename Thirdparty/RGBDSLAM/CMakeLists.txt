@@ -14,9 +14,9 @@ PRIVATE
     src/VoxelMap.cu
     src/DenseTracking.cu
     src/DenseMapping.cu
-    src/depthFusion.cu
-    src/meshScene.cu
-    src/raytracing.cu
+    src/DepthFusion.cu
+    src/MeshScene.cu
+    src/RayTracing.cu
 )
 
 set_target_properties(${PROJECT_NAME}

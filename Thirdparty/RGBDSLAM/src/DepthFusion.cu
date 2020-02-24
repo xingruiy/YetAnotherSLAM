@@ -1,6 +1,6 @@
-#include "prefixSum.h"
-#include "cudaUtils.h"
-#include "mapFunctors.h"
+#include "PrefixSum.h"
+#include "CudaUtils.h"
+#include "MappingUtils.h"
 
 struct CreateBlockLineTracingFunctor
 {
@@ -291,7 +291,7 @@ void fuseDepth(
     const int rows = depth.rows;
 
     dim3 thread(8, 8);
-    dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
+    dim3 block(cv::divUp(cols, thread.x), cv::divUp(rows, thread.y));
 
     CreateBlockLineTracingFunctor bfunctor;
     bfunctor.heap = map_struct.heap;
@@ -337,7 +337,7 @@ void fuseDepth(
     cfunctor.hashTableSize = map_struct.hashTableSize;
 
     thread = dim3(1024);
-    block = dim3(div_up(map_struct.hashTableSize, thread.x));
+    block = dim3(cv::divUp(map_struct.hashTableSize, thread.x));
 
     callDeviceFunctor<<<block, thread>>>(cfunctor);
 

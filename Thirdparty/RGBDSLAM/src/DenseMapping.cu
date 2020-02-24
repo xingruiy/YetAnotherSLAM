@@ -1,4 +1,4 @@
-#include "mapFunctors.h"
+#include "MappingUtils.h"
 #include "DenseMapping.h"
 
 DenseMapping::DenseMapping(const int w, const int h, const Eigen::Matrix3f &K)

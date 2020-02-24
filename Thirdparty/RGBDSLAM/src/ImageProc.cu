@@ -1,5 +1,5 @@
 #include "ImageProc.h"
-#include "cudaUtils.h"
+#include "CudaUtils.h"
 
 __global__ void computeImageGradientCentralDiffKernel(
     cv::cuda::PtrStepSz<float> src,
@@ -20,7 +20,7 @@ __global__ void computeImageGradientCentralDiffKernel(
     gradientY.ptr(y)[x] = (src.ptr(yp1)[x] - src.ptr(ym1)[x]) * 0.5f;
 }
 
-void ImageProc::computeImageGradientCentralDiff(cv::cuda::GpuMat image, cv::cuda::GpuMat &gx, cv::cuda::GpuMat &gy)
+void computeImageGradientCentralDiff(cv::cuda::GpuMat image, cv::cuda::GpuMat &gx, cv::cuda::GpuMat &gy)
 {
     if (gx.empty())
         gx.create(image.size(), CV_32FC1);
@@ -28,7 +28,8 @@ void ImageProc::computeImageGradientCentralDiff(cv::cuda::GpuMat image, cv::cuda
         gy.create(image.size(), CV_32FC1);
 
     dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, image.cols, image.rows);
+    dim3 grid(cv::divUp(image.cols, block.x), cv::divUp(image.rows, block.y));
+
     computeImageGradientCentralDiffKernel<<<grid, block>>>(image, gx, gy);
     // cudaCheckError();
 }
@@ -54,13 +55,13 @@ __global__ void TransformReferencePointKernel(
         ptTransformed.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1.0f);
 }
 
-void ImageProc::TransformReferencePoint(cv::cuda::GpuMat depth, cv::cuda::GpuMat &vmap, const Eigen::Matrix3d &K, const Sophus::SE3d &T)
+void TransformReferencePoint(cv::cuda::GpuMat depth, cv::cuda::GpuMat &vmap, const Eigen::Matrix3d &K, const Sophus::SE3d &T)
 {
     if (vmap.empty())
         vmap.create(depth.size(), CV_32FC4);
 
     dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, depth.cols, depth.rows);
+    dim3 grid(cv::divUp(depth.cols, block.x), cv::divUp(depth.rows, block.y));
 
     Eigen::Matrix3d RKinv = T.matrix().topLeftCorner(3, 3) * K.inverse();
     Eigen::Vector3d t = T.matrix().topRightCorner(3, 1);
@@ -127,13 +128,13 @@ __global__ void renderSceneKernel(
     dst.ptr(y)[x] = renderPoint(point, normal, pixel, lightPos);
 }
 
-void ImageProc::renderScene(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat nmap, cv::cuda::GpuMat &image)
+void renderScene(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat nmap, cv::cuda::GpuMat &image)
 {
     if (image.empty())
         image.create(vmap.size(), CV_8UC4);
 
     dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
+    dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
 
     renderSceneKernel<<<grid, block>>>(vmap, nmap, Eigen::Vector3f(5, 5, 5), image);
 }
@@ -159,13 +160,13 @@ __global__ void computeNormalKernel(cv::cuda::PtrStepSz<Eigen::Vector4f> vmap, c
     nmap.ptr(y)[x](3) = 1.f;
 }
 
-void ImageProc::computeNormal(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &nmap)
+void computeNormal(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &nmap)
 {
     if (nmap.empty())
         nmap.create(vmap.size(), vmap.type());
 
     dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
+    dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
 
     computeNormalKernel<<<grid, block>>>(vmap, nmap);
     // cudaCheckError();
@@ -191,16 +192,15 @@ __global__ void convertDepthToInvDepthKernel(
     }
 }
 
-void ImageProc::convertDepthToInvDepth(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &invDepth)
+void convertDepthToInvDepth(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &invDepth)
 {
     if (invDepth.empty())
         invDepth.create(depth.size(), depth.type());
 
     dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, depth.cols, depth.rows);
+    dim3 grid(cv::divUp(depth.cols, block.x), cv::divUp(depth.rows, block.y));
 
     convertDepthToInvDepthKernel<<<grid, block>>>(depth, invDepth);
-    // cudaCheckError();
 }
 
 __global__ void convertVMapToInvDepthKernel(
@@ -223,13 +223,13 @@ __global__ void convertVMapToInvDepthKernel(
     // }
 }
 
-void ImageProc::convertVMapToInvDepth(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &invDepth)
+void convertVMapToInvDepth(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &invDepth)
 {
     if (invDepth.empty())
         invDepth.create(vmap.size(), CV_32FC1);
 
     dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, vmap.cols, vmap.rows);
+    dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
 
     convertVMapToInvDepthKernel<<<grid, block>>>(vmap, invDepth);
     // cudaCheckError();
@@ -247,13 +247,13 @@ __global__ void pyrdownInvDepthKernel(
     dst.ptr(y)[x] = src.ptr(2 * y)[2 * x];
 }
 
-void ImageProc::pyrdownInvDepth(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst)
+void pyrdownInvDepth(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst)
 {
     if (dst.empty())
         dst.create(src.size(), CV_32FC1);
 
     dim3 block(8, 8);
-    dim3 grid = getGridConfiguration2D(block, src.cols, src.rows);
+    dim3 grid(cv::divUp(src.cols, block.x), cv::divUp(src.rows, block.y));
 
     pyrdownInvDepthKernel<<<grid, block>>>(src, dst);
     // cudaCheckError();
@@ -287,7 +287,7 @@ __global__ void computeVMapKernel(
     vmap.ptr(y)[x] = v;
 }
 
-void ImageProc::computeVMap(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &vmap, const Eigen::Matrix3d &K)
+void computeVMap(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &vmap, const Eigen::Matrix3d &K)
 {
     if (vmap.empty())
         vmap.create(depth.rows, depth.cols, CV_32FC4);
@@ -298,6 +298,6 @@ void ImageProc::computeVMap(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &vmap
     const float cy = K(1, 2);
 
     dim3 block(8, 8);
-    dim3 grid(div_up(vmap.cols, block.x), div_up(vmap.rows, block.y));
+    dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
     computeVMapKernel<<<grid, block>>>(depth, vmap, invfx, invfy, cx, cy);
 }

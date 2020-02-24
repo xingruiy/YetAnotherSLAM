@@ -1,7 +1,7 @@
 #include "VoxelMap.h"
-#include "cudaUtils.h"
-#include "prefixSum.h"
-#include "mapFunctors.h"
+#include "CudaUtils.h"
+#include "PrefixSum.h"
+#include "MappingUtils.h"
 
 #define RenderingBlockSizeX 16
 #define RenderingBlockSizeY 16
@@ -210,7 +210,7 @@ void create_rendering_blocks(
     delegate.voxelSize = map.voxelSize;
 
     dim3 thread = dim3(1024);
-    dim3 block = dim3(div_up(count_visible_block, thread.x));
+    dim3 block = dim3(cv::divUp((size_t)count_visible_block, thread.x));
 
     callDeviceFunctor<<<block, thread>>>(delegate);
 
@@ -405,7 +405,7 @@ void raycast(MapStruct map,
     delegate.raytraceStep = map.truncationDist / map.voxelSize;
 
     dim3 thread(4, 8);
-    dim3 block(div_up(cols, thread.x), div_up(rows, thread.y));
+    dim3 block(cv::divUp(cols, thread.x), cv::divUp(rows, thread.y));
 
     callDeviceFunctor<<<block, thread>>>(delegate);
 }

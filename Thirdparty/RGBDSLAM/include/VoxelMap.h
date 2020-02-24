@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cudaUtils.h"
+#include "CudaUtils.h"
 #include <Eigen/Core>
 #include <sophus/se3.hpp>
 

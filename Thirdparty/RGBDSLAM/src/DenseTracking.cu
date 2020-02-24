@@ -1,7 +1,6 @@
 #include "DenseTracking.h"
-#include "se3StepFunctor.h"
+#include "TrackingUtils.h"
 #include "ImageProc.h"
-#include "statisticsFunctor.h"
 
 DenseTracking::DenseTracking(const int &imgWidth, const int &imgHeight,
                              const Eigen::Matrix3d &K, const int &nPyrLvl,
@@ -110,10 +109,10 @@ void DenseTracking::SetReferenceDepth(const cv::Mat &imDepth)
         if (lvl == 0)
         {
             mGpuBufferRawDepth.upload(imDepth);
-            ImageProc::convertDepthToInvDepth(mGpuBufferRawDepth, mvReferenceInvDepth[lvl]);
+            convertDepthToInvDepth(mGpuBufferRawDepth, mvReferenceInvDepth[lvl]);
         }
         else
-            ImageProc::pyrdownInvDepth(mvReferenceInvDepth[lvl - 1], mvReferenceInvDepth[lvl]);
+            pyrdownInvDepth(mvReferenceInvDepth[lvl - 1], mvReferenceInvDepth[lvl]);
     }
 }
 
@@ -129,7 +128,7 @@ void DenseTracking::SetTrackingImage(const cv::Mat &imGray)
         else
             cv::cuda::pyrDown(mvCurrentIntensity[lvl - 1], mvCurrentIntensity[lvl]);
 
-        ImageProc::computeImageGradientCentralDiff(mvCurrentIntensity[lvl], mvIntensityGradientX[lvl], mvIntensityGradientY[lvl]);
+        computeImageGradientCentralDiff(mvCurrentIntensity[lvl], mvIntensityGradientX[lvl], mvIntensityGradientY[lvl]);
     }
 }
 
@@ -140,12 +139,12 @@ void DenseTracking::SetTrackingDepth(const cv::Mat &imDepth)
         if (lvl == 0)
         {
             mGpuBufferRawDepth.upload(imDepth);
-            ImageProc::convertDepthToInvDepth(mGpuBufferRawDepth, mvCurrentInvDepth[lvl]);
+            convertDepthToInvDepth(mGpuBufferRawDepth, mvCurrentInvDepth[lvl]);
         }
         else
-            ImageProc::pyrdownInvDepth(mvCurrentInvDepth[lvl - 1], mvCurrentInvDepth[lvl]);
+            pyrdownInvDepth(mvCurrentInvDepth[lvl - 1], mvCurrentInvDepth[lvl]);
 
-        ImageProc::computeImageGradientCentralDiff(mvCurrentInvDepth[lvl], mvInvDepthGradientX[lvl], mvInvDepthGradientY[lvl]);
+        computeImageGradientCentralDiff(mvCurrentInvDepth[lvl], mvInvDepthGradientX[lvl], mvInvDepthGradientY[lvl]);
     }
 }
 
@@ -154,7 +153,7 @@ void DenseTracking::SetReferenceInvD(cv::cuda::GpuMat vmap)
     for (int lvl = 0; lvl < mnNumPyr; ++lvl)
     {
         if (lvl == 0)
-            ImageProc::convertVMapToInvDepth(vmap, mvReferenceInvDepth[lvl]);
+            convertVMapToInvDepth(vmap, mvReferenceInvDepth[lvl]);
         else
             cv::cuda::pyrDown(mvReferenceInvDepth[lvl - 1], mvReferenceInvDepth[lvl]);
     }
@@ -229,7 +228,7 @@ void DenseTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T
     auto refPtTransformedLvl = mvReferencePointTransformed[lvl];
     auto KLvl = mK[lvl];
 
-    ImageProc::TransformReferencePoint(refInvDepth, refPtTransformedLvl, KLvl, T);
+    ::TransformReferencePoint(refInvDepth, refPtTransformedLvl, KLvl, T);
 }
 
 void DenseTracking::ComputeSingleStepRGB(
