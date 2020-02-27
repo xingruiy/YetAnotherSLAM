@@ -9,7 +9,7 @@ namespace SLAM
 LocalMapping::LocalMapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer)
     : mpMap(map), ORBvocabulary(pVoc), mpViewer(pViewer), lastKeyFrame(NULL)
 {
-    ORBExtractor = new ORB_SLAM2::ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
+    ORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
     localKeyFrames = std::vector<KeyFrame *>();
     localMapPoints = std::vector<MapPoint *>();
 }

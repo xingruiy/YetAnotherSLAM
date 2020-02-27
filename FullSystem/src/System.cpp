@@ -79,6 +79,7 @@ System::~System()
     delete mpLocalMappingThread;
     delete mpViewerThread;
     delete mpLoopThread;
+
     std::cout << "System Killed." << std::endl;
 }
 
@@ -102,6 +103,7 @@ void System::readSettings(const std::string &strSettingFile)
     g_ORBNLevels = settingsFile["ORB_SLAM2.nLevels"];
     g_ORBIniThFAST = settingsFile["ORB_SLAM2.iniThFAST"];
     g_ORBMinThFAST = settingsFile["ORB_SLAM2.minThFAST"];
+    g_pORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
 
     // read calibration parameters
     int width = settingsFile["Calibration.width"];

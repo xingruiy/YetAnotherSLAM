@@ -53,12 +53,17 @@ private:
     Map *mpMap;
     Viewer *mpViewer;
 
-    DenseMapping *mpLocalMapper;
+    DenseMapping *mpMapper;
     DenseTracking *mpTracker;
     LocalMapping *mpLocalMapping;
 
     TrackingState trackingState;
     TrackingModal trackingModal;
+
+    cv::Mat mDescriptors;
+    cv::cuda::GpuMat mCurrentMapPrediction;
+    std::vector<cv::KeyPoint> mvKeys;
+    std::vector<cv::KeyPoint> mvKeysUn;
 };
 
 } // namespace SLAM

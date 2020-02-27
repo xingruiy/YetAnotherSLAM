@@ -27,7 +27,7 @@ PRIVATE
     FullSystem/src/GlobalDef.cpp
     FullSystem/src/LoopClosing.cpp
     FullSystem/src/KeyFrameDatabase.cpp
-    FullSystem/src/ORBextractor.cc
+    FullSystem/src/ORBextractor.cpp
     FullSystem/src/Converter.cc
 )
 

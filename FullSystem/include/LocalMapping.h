@@ -45,7 +45,7 @@ private:
     KeyFrame *lastKeyFrame;
     KeyFrame *referenceKeyframe;
 
-    ORB_SLAM2::ORBextractor *ORBExtractor;
+    ORBextractor *ORBExtractor;
     ORB_SLAM2::ORBVocabulary *ORBvocabulary;
 
     std::vector<KeyFrame *> localKeyFrames;

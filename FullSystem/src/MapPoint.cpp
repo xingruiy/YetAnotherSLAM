@@ -8,53 +8,23 @@ namespace SLAM
 std::mutex MapPoint::mGlobalMutex;
 unsigned long MapPoint::nNextId = 0;
 
-MapPoint::MapPoint(const Eigen::Vector3d &pos,
-                   KeyFrame *pRefKF,
-                   Map *pMap)
-    : mpMap(pMap),
-      mpRefKF(pRefKF),
-      mWorldPos(pos),
-      nObs(0),
-      mnVisible(1),
-      mnFound(1),
-      mnTrackReferenceForFrame(-1),
-      mpReplaced(NULL),
-      mfMinDistance(0),
-      mfMaxDistance(0),
-      mnFuseCandidateForKF(0),
-      mnFirstKFid(pRefKF->mnId),
-      mbBad(false)
+MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
+    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1), mnTrackReferenceForFrame(-1),
+      mpReplaced(NULL), mfMinDistance(0), mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
 {
     mAvgViewingDir = Eigen::Vector3d::Zero();
-    // mPointNormal = Eigen::Vector3d::Zero();
     mnId = nNextId++;
 }
 
-MapPoint::MapPoint(const Eigen::Vector3d &pos,
-                   Map *pMap,
-                   KeyFrame *pRefKF,
-                   const int &idxF)
-    : mpMap(pMap),
-      mpRefKF(pRefKF),
-      mWorldPos(pos),
-      nObs(0),
-      mnVisible(1),
-      mnFound(1),
-      mnTrackReferenceForFrame(-1),
-      mpReplaced(NULL),
-      mfMinDistance(0),
-      mfMaxDistance(0),
-      mnFuseCandidateForKF(0),
-      mnFirstKFid(pRefKF->mnId),
-      mbBad(false)
+MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF)
+    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1), mnTrackReferenceForFrame(-1),
+      mpReplaced(NULL), mfMinDistance(0), mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
 {
     mnId = nNextId++;
 
     Eigen::Vector3d Ow = pRefKF->mTcw.matrix().topRightCorner(3, 1);
     mAvgViewingDir = mWorldPos - Ow;
     mAvgViewingDir.normalize();
-
-    // mPointNormal = pRefKF->mvNormal[idxF].cast<double>();
 
     Eigen::Vector3d PC = pos - Ow;
     const float dist = PC.norm();
@@ -129,8 +99,7 @@ void MapPoint::EraseObservation(KeyFrame *pKF)
             if (mpRefKF == pKF)
                 mpRefKF = mObservations.begin()->first;
 
-            // If only 2 observations or less, discard point
-            if (nObs <= 2)
+            if (nObs <= 2) // If only 2 observations or less, discard point
                 bBad = true;
         }
     }

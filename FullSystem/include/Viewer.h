@@ -24,8 +24,7 @@ public:
     void setLiveImage(const cv::Mat &ImgRGB);
     void setLiveDepth(const cv::Mat &ImgDepth);
     void setLivePose(const Eigen::Matrix4d &Tcw);
-    void setKeyFrameImage(const cv::Mat &im,
-                          std::vector<cv::KeyPoint> vKeys);
+    void setKeyFrameImage(const cv::Mat &im, std::vector<cv::KeyPoint> vKeys);
 
 private:
     MapDrawer *mpMapDrawer;

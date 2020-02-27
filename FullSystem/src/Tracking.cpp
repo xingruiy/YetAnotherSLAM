@@ -1,4 +1,5 @@
 #include "Tracking.h"
+#include <future>
 
 namespace SLAM
 {
@@ -11,11 +12,14 @@ Tracking::Tracking(System *system, Map *map, Viewer *mpViewer, LocalMapping *mpL
     Eigen::Matrix3f calib = g_calib[0];
 
     mpTracker = new DenseTracking(w, h, calib.cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
+    mpMapper = new DenseMapping(w, h, g_calib[0]);
+    mCurrentMapPrediction.create(h, w, CV_32FC4);
 }
 
 void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
 {
-    NextFrame = Frame(ImgGray, ImgDepth, TimeStamp);
+    NextFrame = Frame(ImgGray, ImgDepth, TimeStamp, g_pORBExtractor);
+    std::future<void> result = std::async(std::launch::async, &Frame::ExtractORBFeatures, &NextFrame);
 
     bool bOK = false;
     switch (trackingState)
@@ -28,7 +32,15 @@ void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeSt
 
     case OK:
     {
+        auto t1 = std::chrono::high_resolution_clock::now();
         bool bOK = trackLastFrame();
+        auto t2 = std::chrono::high_resolution_clock::now();
+        std::cout << "tracking: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << std::endl;
+
+        t1 = std::chrono::high_resolution_clock::now();
+        result.get();
+        t2 = std::chrono::high_resolution_clock::now();
+        std::cout << "waited: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << std::endl;
 
         if (bOK)
         {
@@ -64,6 +76,7 @@ void Tracking::Initialisation()
 {
     mpTracker->SetReferenceImage(NextFrame.mImGray);
     mpTracker->SetReferenceDepth(NextFrame.mImDepth);
+    mpMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
     mpLocalMapping->AddKeyFrameCandidate(NextFrame);
     trackingState = OK;
 }
@@ -72,6 +85,7 @@ bool Tracking::trackLastFrame()
 {
     mpTracker->SetTrackingImage(NextFrame.mImGray);
     mpTracker->SetTrackingDepth(NextFrame.mImDepth);
+    mpMapper->raytrace(mCurrentMapPrediction, lastFrame.mTcw);
 
     Sophus::SE3d Tpc = mpTracker->GetTransform(lastFrame.T_frame2Ref.inverse(), false);
 
@@ -81,6 +95,7 @@ bool Tracking::trackLastFrame()
     if (g_bEnableViewer)
         mpViewer->setLivePose(NextFrame.mTcw.matrix());
 
+    mpMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
     g_nTrackedFrame++;
     return true;
 }

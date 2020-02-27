@@ -7,7 +7,7 @@ namespace SLAM
 
 unsigned long KeyFrame::nNextId = 0;
 
-KeyFrame::KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor)
+KeyFrame::KeyFrame(Frame *F, Map *map, ORBextractor *pExtractor)
     : mpMap(map), mTcw(F->mTcw),
       mbBad(false), mbToBeErased(false), mbNotErase(false), mbFirstConnection(true),
       mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),

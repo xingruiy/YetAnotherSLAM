@@ -213,7 +213,6 @@ Sophus::SE3d DenseTracking::GetTransform(const Sophus::SE3d &init, const bool bS
                 return Sophus::SE3d();
             }
 
-            std::cout << update.transpose() << std::endl;
             update = ClampEigenVector(update, 0.05, -0.05);
 
             estimate = Sophus::SE3d::exp(update) * estimate;
@@ -236,8 +235,6 @@ Sophus::SE3d DenseTracking::GetTransform(const Sophus::SE3d &init, const bool bS
             std::swap(mvReferenceIntensity[lvl], mvCurrentIntensity[lvl]);
         }
     }
-
-    printf("Tracking finished with %d / %d\n", nSuccessfulIteration, nIteration);
 
     mbTrackingGood = true;
     return lastSuccessEstimate;

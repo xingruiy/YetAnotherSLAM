@@ -82,23 +82,14 @@ __device__ __forceinline__ Eigen::Matrix<uchar, 4, 1> RenderPoint(const Eigen::V
     Eigen::Vector3f colour(4.f / 255.f, 2.f / 255.f, 2.f / 255.f);
     if (!isnan(point(0)))
     {
-        // ambient coeff
-        const float Ka = 0.3f;
-        // diffuse coeff
-        const float Kd = 0.5f;
-        // specular coeff
-        const float Ks = 0.2f;
-        // specular power
-        const float n = 20.f;
-
-        // ambient color
-        const float Ax = image(0);
-        // diffuse color
-        const float Dx = image(1);
-        // specular color
-        const float Sx = image(2);
-        // light color
-        const float Lx = 1.f;
+        const float Ka = 0.3f;     // ambient coeff
+        const float Kd = 0.5f;     // diffuse coeff
+        const float Ks = 0.2f;     // specular coeff
+        const float n = 20.f;      // specular power
+        const float Ax = image(0); // ambient color
+        const float Dx = image(1); // diffuse color
+        const float Sx = image(2); // specular color
+        const float Lx = 1.f;      // light color
 
         Eigen::Vector3f L = (lightPos - point).normalized();
         Eigen::Vector3f V = (Eigen::Vector3f(0.f, 0.f, 0.f) - point).normalized();
@@ -108,11 +99,10 @@ __device__ __forceinline__ Eigen::Matrix<uchar, 4, 1> RenderPoint(const Eigen::V
         colour = Eigen::Vector3f(Ix, Ix, Ix);
     }
 
-    return Eigen::Matrix<uchar, 4, 1>(
-        static_cast<uchar>(__saturatef(colour(0)) * 255.f),
-        static_cast<uchar>(__saturatef(colour(1)) * 255.f),
-        static_cast<uchar>(__saturatef(colour(2)) * 255.f),
-        255);
+    return Eigen::Matrix<uchar, 4, 1>(static_cast<uchar>(__saturatef(colour(0)) * 255.f),
+                                      static_cast<uchar>(__saturatef(colour(1)) * 255.f),
+                                      static_cast<uchar>(__saturatef(colour(2)) * 255.f),
+                                      255);
 }
 
 __global__ void RenderScene_kernel(const cv::cuda::PtrStep<Eigen::Vector4f> vmap,
@@ -154,7 +144,7 @@ __global__ void DepthToInvDepth_kernel(const cv::cuda::PtrStep<float> depth,
         return;
 
     const float z = depth.ptr(y)[x];
-    if (z == z && z > 0)
+    if (z == z && z > 0.25f && z < 10.f)
         invDepth.ptr(y)[x] = 1.0 / z;
     else
         invDepth.ptr(y)[x] = 0;

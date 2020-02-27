@@ -20,7 +20,7 @@ class KeyFrame
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    KeyFrame(Frame *F, Map *map, ORB_SLAM2::ORBextractor *pExtractor);
+    KeyFrame(Frame *F, Map *map, ORBextractor *pExtractor);
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
     void AddMapPoint(MapPoint *pMP, const size_t &idx);
 

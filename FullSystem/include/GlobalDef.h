@@ -61,4 +61,6 @@ extern size_t g_nFailedFrame;
 extern size_t g_nTrackedFrame;
 extern size_t g_nTrackedKeyframe;
 
+extern ORBextractor *g_pORBExtractor;
+
 } // namespace SLAM

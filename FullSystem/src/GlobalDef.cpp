@@ -127,5 +127,6 @@ int g_pointSize = 1;
 size_t g_nFailedFrame = 0;
 size_t g_nTrackedFrame = 0;
 size_t g_nTrackedKeyframe = 0;
+ORBextractor *g_pORBExtractor = NULL;
 
 } // namespace SLAM
