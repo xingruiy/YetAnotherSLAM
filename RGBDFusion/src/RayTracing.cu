@@ -1,7 +1,8 @@
 #include "VoxelMap.h"
 #include "CudaUtils.h"
-#include "PrefixSum.h"
+#include "ParallelScan.h"
 #include "MappingUtils.h"
+#include "VoxelStructUtils.h"
 
 #define RenderingBlockSizeX 16
 #define RenderingBlockSizeY 16
@@ -128,7 +129,7 @@ struct RenderingBlockDelegate
             }
         }
 
-        int offset = computeOffset<1024>(requiredNoBlocks, rendering_block_count);
+        int offset = ParallelScan<1024>(requiredNoBlocks, rendering_block_count);
         if (valid && offset != -1 && (offset + requiredNoBlocks) < MaxNumRenderingBlock)
             splitRenderingBlock(offset, block, nx, ny);
     }
@@ -240,7 +241,7 @@ struct MapRenderingDelegate
     float invfx, invfy, cx, cy;
     Sophus::SE3f pose, Tinv;
 
-    HashEntry *hashTable;
+    HashEntry *mplHashTable;
     Voxel *listBlock;
     int bucketSize;
     float voxelSizeInv;
@@ -249,11 +250,11 @@ struct MapRenderingDelegate
     __device__ __forceinline__ float read_sdf(const Eigen::Vector3f &pt3d, bool &valid) const
     {
         Voxel *voxel = NULL;
-        findVoxel(floor(pt3d), voxel, hashTable, listBlock, bucketSize);
+        findVoxel(floor(pt3d), voxel, mplHashTable, listBlock, bucketSize);
         if (voxel && voxel->wt != 0)
         {
             valid = true;
-            return unpackFloat(voxel->sdf);
+            return UnPackFloat(voxel->sdf);
         }
         else
         {
@@ -318,11 +319,11 @@ struct MapRenderingDelegate
         float sdf = 1.0f;
         float lastReadSDF;
 
-        Eigen::Vector3f pt = unproject(x, y, zNear, invfx, invfy, cx, cy);
+        Eigen::Vector3f pt = UnProject(x, y, zNear, invfx, invfy, cx, cy);
         float dist_s = pt.norm() * voxelSizeInv;
         Eigen::Vector3f blockStart = pose * (pt)*voxelSizeInv;
 
-        pt = unproject(x, y, zFar, invfx, invfy, cx, cy);
+        pt = UnProject(x, y, zFar, invfx, invfy, cx, cy);
         float distEnd = pt.norm() * voxelSizeInv;
         Eigen::Vector3f blockEnd = pose * (pt)*voxelSizeInv;
 
@@ -398,8 +399,8 @@ void raycast(MapStruct map,
     delegate.cy = K(1, 2);
     delegate.pose = T.cast<float>();
     delegate.Tinv = T.inverse().cast<float>();
-    delegate.hashTable = map.hashTable;
-    delegate.listBlock = map.voxelBlock;
+    delegate.mplHashTable = map.mplHashTable;
+    delegate.listBlock = map.mplVoxelBlocks;
     delegate.bucketSize = map.bucketSize;
     delegate.voxelSizeInv = 1.0 / map.voxelSize;
     delegate.raytraceStep = map.truncationDist / map.voxelSize;

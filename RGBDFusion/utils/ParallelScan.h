@@ -1,8 +1,8 @@
 #pragma once
-#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
 
 template <int threadBlock>
-__device__ __forceinline__ int computeOffset(uint element, uint *sum)
+__device__ __forceinline__ int ParallelScan(uint element, uint *sum)
 {
 
     __shared__ uint buffer[threadBlock];

@@ -1,27 +1,30 @@
-#include "PrefixSum.h"
+#include "ParallelScan.h"
 #include "CudaUtils.h"
 #include "TriangleTable.h"
-#include "DenseMapping.h"
+#include "VoxelMapping.h"
 #include "MappingUtils.h"
+#include "VoxelStructUtils.h"
 
 #define MAX_NUM_MESH_TRIANGLES 20000000
 
-struct BuildVertexArray
+struct MeshSceneFunctor
 {
-    Eigen::Vector3f *triangles;
-    HashEntry *block_array;
-    uint *block_count;
-    uint *triangle_count;
-    Eigen::Vector3f *surfaceNormal;
-
-    HashEntry *hashTable;
-    Voxel *listBlocks;
     int hashTableSize;
     int bucketSize;
     float voxelSize;
     size_t bufferSize;
 
-    __device__ __forceinline__ void select_blocks() const
+    HashEntry *mplEntry;
+    HashEntry *mplHashTable;
+    Voxel *mplVoxelBlocks;
+
+    uint *mpNumEntry;
+    uint *mpNumTriangle;
+
+    Eigen::Vector3f *mplNormals;
+    Eigen::Vector3f *mplTriangle;
+
+    __device__ __forceinline__ void SelectBlocksToRender() const
     {
         int x = blockDim.x * blockIdx.x + threadIdx.x;
         __shared__ bool needScan;
@@ -30,32 +33,30 @@ struct BuildVertexArray
             needScan = false;
 
         __syncthreads();
-
         uint val = 0;
-        if (x < hashTableSize && hashTable[x].ptr >= 0)
+        if (x < hashTableSize && mplHashTable[x].ptr >= 0)
         {
             needScan = true;
             val = 1;
         }
 
         __syncthreads();
-
         if (needScan)
         {
-            int offset = computeOffset<1024>(val, block_count);
+            int offset = ParallelScan<1024>(val, mpNumEntry);
             if (offset != -1)
-                block_array[offset] = hashTable[x];
+                mplEntry[offset] = mplHashTable[x];
         }
     }
 
     __device__ __forceinline__ float read_sdf(Eigen::Vector3f pt, bool &valid) const
     {
         Voxel *voxel = NULL;
-        findVoxel(floor(pt), voxel, hashTable, listBlocks, bucketSize);
+        findVoxel(floor(pt), voxel, mplHashTable, mplVoxelBlocks, bucketSize);
         if (voxel && voxel->wt != 0)
         {
             valid = true;
-            return unpackFloat(voxel->sdf);
+            return UnPackFloat(voxel->sdf);
         }
         else
         {
@@ -208,11 +209,11 @@ struct BuildVertexArray
     __device__ __forceinline__ void operator()() const
     {
         int x = blockIdx.y * gridDim.x + blockIdx.x;
-        if (*triangle_count >= bufferSize || x >= *block_count)
+        if (*mpNumTriangle >= bufferSize || x >= *mpNumEntry)
             return;
 
         Eigen::Vector3f verts[12];
-        Eigen::Vector3i pos = block_array[x].pos * BlockSize;
+        Eigen::Vector3i pos = mplEntry[x].pos * BlockSize;
 
         for (int voxelIdxZ = 0; voxelIdxZ < BlockSize; ++voxelIdxZ)
         {
@@ -223,33 +224,33 @@ struct BuildVertexArray
 
             for (int i = 0; triTable[cubeIdx][i] != -1; i += 3)
             {
-                uint triangleId = atomicAdd(triangle_count, 1);
+                uint triangleId = atomicAdd(mpNumTriangle, 1);
                 if (triangleId < bufferSize)
                 {
-                    triangles[triangleId * 3] = verts[triTable[cubeIdx][i]] * voxelSize;
-                    triangles[triangleId * 3 + 1] = verts[triTable[cubeIdx][i + 1]] * voxelSize;
-                    triangles[triangleId * 3 + 2] = verts[triTable[cubeIdx][i + 2]] * voxelSize;
-                    auto v10 = triangles[triangleId * 3 + 1] - triangles[triangleId * 3];
-                    auto v20 = triangles[triangleId * 3 + 2] - triangles[triangleId * 3];
+                    mplTriangle[triangleId * 3] = verts[triTable[cubeIdx][i]] * voxelSize;
+                    mplTriangle[triangleId * 3 + 1] = verts[triTable[cubeIdx][i + 1]] * voxelSize;
+                    mplTriangle[triangleId * 3 + 2] = verts[triTable[cubeIdx][i + 2]] * voxelSize;
+                    auto v10 = mplTriangle[triangleId * 3 + 1] - mplTriangle[triangleId * 3];
+                    auto v20 = mplTriangle[triangleId * 3 + 2] - mplTriangle[triangleId * 3];
                     auto n = v10.cross(v20).normalized();
-                    surfaceNormal[triangleId * 3] = n;
-                    surfaceNormal[triangleId * 3 + 1] = n;
-                    surfaceNormal[triangleId * 3 + 2] = n;
+                    mplNormals[triangleId * 3] = n;
+                    mplNormals[triangleId * 3 + 1] = n;
+                    mplNormals[triangleId * 3 + 2] = n;
                 }
             }
         }
     }
 };
 
-__global__ void selectBlockKernel(BuildVertexArray bva)
+__global__ void selectBlockKernel(MeshSceneFunctor bva)
 {
-    bva.select_blocks();
+    bva.SelectBlocksToRender();
 }
 
 void create_mesh_with_normal(
     MapStruct map_struct,
-    uint &block_count,
-    uint &triangle_count,
+    uint &mpNumEntry,
+    uint &mpNumTriangle,
     void *vertexBuffer,
     void *normalBuffer,
     size_t bufferSize)
@@ -261,14 +262,14 @@ void create_mesh_with_normal(
     cudaMemset(cuda_block_count, 0, sizeof(uint));
     cudaMemset(cuda_triangle_count, 0, sizeof(uint));
 
-    BuildVertexArray bva;
-    bva.block_array = map_struct.visibleTable;
-    bva.block_count = cuda_block_count;
-    bva.triangle_count = cuda_triangle_count;
-    bva.triangles = static_cast<Eigen::Vector3f *>(vertexBuffer);
-    bva.surfaceNormal = static_cast<Eigen::Vector3f *>(normalBuffer);
-    bva.hashTable = map_struct.hashTable;
-    bva.listBlocks = map_struct.voxelBlock;
+    MeshSceneFunctor bva;
+    bva.mplEntry = map_struct.visibleTable;
+    bva.mpNumEntry = cuda_block_count;
+    bva.mpNumTriangle = cuda_triangle_count;
+    bva.mplTriangle = static_cast<Eigen::Vector3f *>(vertexBuffer);
+    bva.mplNormals = static_cast<Eigen::Vector3f *>(normalBuffer);
+    bva.mplHashTable = map_struct.mplHashTable;
+    bva.mplVoxelBlocks = map_struct.mplVoxelBlocks;
     bva.hashTableSize = map_struct.hashTableSize;
     bva.bucketSize = map_struct.bucketSize;
     bva.voxelSize = map_struct.voxelSize;
@@ -279,17 +280,17 @@ void create_mesh_with_normal(
 
     selectBlockKernel<<<block, thread>>>(bva);
 
-    (cudaMemcpy(&block_count, cuda_block_count, sizeof(uint), cudaMemcpyDeviceToHost));
-    if (block_count == 0)
+    (cudaMemcpy(&mpNumEntry, cuda_block_count, sizeof(uint), cudaMemcpyDeviceToHost));
+    if (mpNumEntry == 0)
         return;
 
     thread = dim3(8, 8);
-    block = dim3(cv::divUp((size_t)block_count, 16U), 16U);
+    block = dim3(cv::divUp((size_t)mpNumEntry, 16U), 16U);
 
     callDeviceFunctor<<<block, thread>>>(bva);
 
-    cudaMemcpy(&triangle_count, cuda_triangle_count, sizeof(uint), cudaMemcpyDeviceToHost);
-    triangle_count = std::min(triangle_count, (uint)MAX_NUM_MESH_TRIANGLES);
+    cudaMemcpy(&mpNumTriangle, cuda_triangle_count, sizeof(uint), cudaMemcpyDeviceToHost);
+    mpNumTriangle = std::min(mpNumTriangle, (uint)MAX_NUM_MESH_TRIANGLES);
 
     cudaFree(cuda_block_count);
     cudaFree(cuda_triangle_count);

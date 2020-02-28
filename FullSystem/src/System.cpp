@@ -20,7 +20,8 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     mpLocalMapper->setLoopCloser(mpLoopClosing);
     mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
 
-    mpTracker = new Tracking(this, mpMap, mpLocalMapper);
+    mpTracker = new Tracking(this, mpMap);
+    mpTracker->SetLocalMapper(mpLocalMapper);
 
     if (g_bEnableViewer)
     {

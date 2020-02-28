@@ -3,9 +3,9 @@
 #include <opencv2/opencv.hpp>
 
 #if defined(__GNUC__)
-#define safeCall(expr) ___SafeCall(expr, __FILE__, __LINE__, __func__)
+#define SafeCall(expr) ___SafeCall(expr, __FILE__, __LINE__, __func__)
 #else
-#define safeCall(expr) ___SafeCall(expr, __FILE__, __LINE__)
+#define SafeCall(expr) ___SafeCall(expr, __FILE__, __LINE__)
 #endif
 
 static inline void error(const char *error_string, const char *file, const int line, const char *func)

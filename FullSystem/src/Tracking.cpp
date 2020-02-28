@@ -4,16 +4,15 @@
 namespace SLAM
 {
 
-Tracking::Tracking(System *pSystem, Map *pMap, LocalMapping *pLocalMapper)
-    : mpSystem(pSystem), mpMap(pMap), mpLocalMapper(pLocalMapper),
-      mState(SYSTEM_NOT_READY)
+Tracking::Tracking(System *pSystem, Map *pMap)
+    : mpSystem(pSystem), mpMap(pMap), mState(SYSTEM_NOT_READY)
 {
     int w = g_width[0];
     int h = g_height[0];
     Eigen::Matrix3f calib = g_calib[0];
 
-    mpTracker = new DenseTracking(w, h, calib.cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
-    mpMapper = new DenseMapping(w, h, g_calib[0]);
+    mpTracker = new RGBDTracking(w, h, calib.cast<double>(), g_bUseColour, g_bUseDepth);
+    mpMapper = new VoxelMapping(w, h, g_calib[0]);
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -86,7 +85,7 @@ void Tracking::InitializeSystem()
 {
     mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
     mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);
-    mpMapper->fuseFrame(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
+    mpMapper->FuseFrame(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
     mpLocalMapper->AddKeyFrameCandidate(mCurrentFrame);
     mState = OK;
 }
@@ -103,7 +102,7 @@ bool Tracking::TrackRGBD()
     mCurrentFrame.mRelativePose = DT.inverse();
     mCurrentFrame.mTcw = mReferenceFramePose * DT.inverse();
 
-    mpMapper->fuseFrame(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
+    mpMapper->FuseFrame(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
     g_nTrackedFrame++;
 
     if (mpViewer)

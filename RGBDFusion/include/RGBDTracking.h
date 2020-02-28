@@ -4,14 +4,14 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 
-class DenseTracking
+#define NUM_PYR 5
+
+class RGBDTracking
 {
 
 public:
-    DenseTracking(const int &nImageWidth, const int &nImageHeight,
-                  const Eigen::Matrix3d &K, const int &nPyrLvl,
-                  const std::vector<int> &vIterations,
-                  const bool &bUseRGB, const bool &bUseDepth);
+    RGBDTracking(const int &w, const int &h, const Eigen::Matrix3d &K,
+                 const bool &bUseRGB, const bool &bUseDepth);
 
     bool IsTrackingGood() const;
 
@@ -63,27 +63,23 @@ private:
     // Indicator result
     bool mbTrackingGood;
 
-    // Pyramid level and iterations
-    const int mnNumPyr;
-    std::vector<int> mvIterations;
-
     // Camera parameters
-    std::vector<int> mvImageWidth;
-    std::vector<int> mvImageHeight;
-    std::vector<Eigen::Matrix3d> mK;
+    int mvWidth[NUM_PYR];
+    int mvHeight[NUM_PYR];
+    Eigen::Matrix3d mK[NUM_PYR];
 
     // Tracking images
-    std::vector<cv::cuda::GpuMat> mvCurrentDepth;
-    std::vector<cv::cuda::GpuMat> mvReferenceDepth;
-    std::vector<cv::cuda::GpuMat> mvCurrentIntensity;
-    std::vector<cv::cuda::GpuMat> mvReferenceIntensity;
-    std::vector<cv::cuda::GpuMat> mvIntensityGradientX;
-    std::vector<cv::cuda::GpuMat> mvIntensityGradientY;
-    std::vector<cv::cuda::GpuMat> mvReferencePointTransformed;
-    std::vector<cv::cuda::GpuMat> mvCurrentInvDepth;
-    std::vector<cv::cuda::GpuMat> mvReferenceInvDepth;
-    std::vector<cv::cuda::GpuMat> mvInvDepthGradientX;
-    std::vector<cv::cuda::GpuMat> mvInvDepthGradientY;
+    cv::cuda::GpuMat mvCurrentDepth[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceDepth[NUM_PYR];
+    cv::cuda::GpuMat mvCurrentIntensity[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceIntensity[NUM_PYR];
+    cv::cuda::GpuMat mvIntensityGradientX[NUM_PYR];
+    cv::cuda::GpuMat mvIntensityGradientY[NUM_PYR];
+    cv::cuda::GpuMat mvCurrentInvDepth[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceInvDepth[NUM_PYR];
+    cv::cuda::GpuMat mvInvDepthGradientX[NUM_PYR];
+    cv::cuda::GpuMat mvInvDepthGradientY[NUM_PYR];
+    cv::cuda::GpuMat mvReferencePointTransformed[NUM_PYR];
 
     float residualSum;
     float iResidualSum;

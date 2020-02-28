@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(YetAnotherSLAM CXX)
+project(YetAnotherSLAM CXX CUDA)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/lib)
@@ -29,6 +29,21 @@ PRIVATE
     FullSystem/src/KeyFrameDatabase.cpp
     FullSystem/src/ORBextractor.cpp
     FullSystem/src/Converter.cc
+
+    RGBDFusion/src/ImageProc.cu
+    RGBDFusion/src/VoxelMap.cu
+    RGBDFusion/src/RGBDTracking.cu
+    RGBDFusion/src/VoxelMapping.cu
+    RGBDFusion/src/DepthFusion.cu
+    RGBDFusion/src/MeshScene.cu
+    RGBDFusion/src/RayTracing.cu
+)
+
+set_target_properties(${PROJECT_NAME}
+PROPERTIES 
+    CUDA_SEPARABLE_COMPILATION ON
+    POSITION_INDEPENDENT_CODE ON
+    CUDA_STANDARD 11
 )
 
 target_compile_features(${PROJECT_NAME}
@@ -42,8 +57,9 @@ PUBLIC
     ${OpenCV_INCLUDE_DIRS}
     ${Pangolin_INCLUDE_DIRS}  
     ${PROJECT_SOURCE_DIR}/Thirdparty/
+    ${PROJECT_SOURCE_DIR}/RGBDFusion/utils
+    ${PROJECT_SOURCE_DIR}/RGBDFusion/include
     ${PROJECT_SOURCE_DIR}/FullSystem/include
-    ${PROJECT_SOURCE_DIR}/Thirdparty/RGBDSLAM/include
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -55,7 +71,6 @@ PUBLIC
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
-    ${PROJECT_SOURCE_DIR}/Thirdparty/RGBDSLAM/lib/libRGBDSLAM.so
 )
 
 # Build Examples

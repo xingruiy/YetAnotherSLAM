@@ -8,8 +8,8 @@
 #include "System.h"
 #include "GlobalDef.h"
 #include "LoopClosing.h"
-#include "DenseMapping.h"
-#include "DenseTracking.h"
+#include "VoxelMapping.h"
+#include "RGBDTracking.h"
 
 namespace SLAM
 {
@@ -22,7 +22,7 @@ class LocalMapping;
 class Tracking
 {
 public:
-    Tracking(System *pSystem, Map *pMap, LocalMapping *pLocalMapper);
+    Tracking(System *pSystem, Map *pMap);
 
     // Preprocess the input and call Track().
     void GrabImageRGBD(cv::Mat ImGray, cv::Mat Depth, const double TimeStamp);
@@ -82,8 +82,8 @@ protected:
     LoopClosing *mpLoopClosing;
 
     // Dense Tracking And Mapping
-    DenseMapping *mpMapper;
-    DenseTracking *mpTracker;
+    VoxelMapping *mpMapper;
+    RGBDTracking *mpTracker;
 
     // System
     System *mpSystem;

@@ -18,13 +18,6 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building Thirdparty/RGBDSLAM ..."
-
-cd ../../RGBDSLAM/
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=RELEASE
-make -j
-
 echo "Configuring and building Thirdparty/ORB_SLAM2/Thirdparty/DBoW2 ..."
 
 cd ../../DBoW2

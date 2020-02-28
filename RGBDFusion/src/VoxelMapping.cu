@@ -1,7 +1,7 @@
 #include "MappingUtils.h"
-#include "DenseMapping.h"
+#include "VoxelMapping.h"
 
-DenseMapping::DenseMapping(const int w, const int h, const Eigen::Matrix3f &K)
+VoxelMapping::VoxelMapping(const int w, const int h, const Eigen::Matrix3f &K)
     : mK(K.cast<double>())
 {
   deviceMap.create(80000, 40000, 40000, 0.006f, 0.02f);
@@ -9,43 +9,43 @@ DenseMapping::DenseMapping(const int w, const int h, const Eigen::Matrix3f &K)
   zRangeX.create(h / 8, w / 8, CV_32FC1);
   zRangeY.create(h / 8, w / 8, CV_32FC1);
 
-  cudaMalloc((void **)&listRenderingBlock, sizeof(RenderingBlock) * 100000);
+  cudaMalloc((void **)&mplRenderingBlock, sizeof(RenderingBlock) * 100000);
 }
 
-DenseMapping::~DenseMapping()
+VoxelMapping::~VoxelMapping()
 {
   deviceMap.release();
-  cudaFree((void **)&listRenderingBlock);
+  SafeCall(cudaFree((void **)&mplRenderingBlock));
 }
 
-void DenseMapping::fuseFrame(cv::cuda::GpuMat depth, const Sophus::SE3d &T)
+void VoxelMapping::FuseFrame(cv::cuda::GpuMat depth, const Sophus::SE3d &T)
 {
-  count_visible_block = 0;
+  mNumVisibleBlocks = 0;
 
   ::fuseDepth(
       deviceMap,
       depth,
       T,
       mK,
-      count_visible_block);
+      mNumVisibleBlocks);
 }
 
-void DenseMapping::raytrace(cv::cuda::GpuMat &vertex, const Sophus::SE3d &T)
+void VoxelMapping::TracingDepth(cv::cuda::GpuMat &vertex, const Sophus::SE3d &T)
 {
-  if (count_visible_block == 0)
+  if (mNumVisibleBlocks == 0)
     return;
 
   ::create_rendering_blocks(
       deviceMap,
-      count_visible_block,
-      count_rendering_block,
+      mNumVisibleBlocks,
+      mNumRenderingBlocks,
       zRangeX,
       zRangeY,
-      listRenderingBlock,
+      mplRenderingBlock,
       T,
       mK);
 
-  if (count_rendering_block != 0)
+  if (mNumRenderingBlocks != 0)
   {
 
     ::raycast(
@@ -58,18 +58,18 @@ void DenseMapping::raytrace(cv::cuda::GpuMat &vertex, const Sophus::SE3d &T)
   }
 }
 
-void DenseMapping::reset()
+void VoxelMapping::reset()
 {
   deviceMap.reset();
 }
 
-size_t DenseMapping::fetchMeshWithNormal(void *vertex, void *normal)
+size_t VoxelMapping::fetchMeshWithNormal(void *vertex, void *normal)
 {
   uint count_triangle = 0;
 
   ::create_mesh_with_normal(
       deviceMap,
-      count_visible_block,
+      mNumVisibleBlocks,
       count_triangle,
       vertex,
       normal);

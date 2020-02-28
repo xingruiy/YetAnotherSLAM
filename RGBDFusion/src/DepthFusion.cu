@@ -1,14 +1,15 @@
-#include "PrefixSum.h"
+#include "ParallelScan.h"
 #include "CudaUtils.h"
 #include "MappingUtils.h"
+#include "VoxelStructUtils.h"
 
 struct CreateBlockLineTracingFunctor
 {
-    int *heap;
-    int *heapPtr;
-    HashEntry *hashTable;
-    int *bucketMutex;
-    int *excessPtr;
+    int *mplHeap;
+    int *mplHeapPtr;
+    HashEntry *mplHashTable;
+    int *mplBucketMutex;
+    int *mpLinkedListHead;
     int hashTableSize;
     int bucketSize;
 
@@ -23,7 +24,7 @@ struct CreateBlockLineTracingFunctor
 
     __device__ __forceinline__ void allocateBlock(const Eigen::Vector3i &blockPos) const
     {
-        createBlock(blockPos, heap, heapPtr, hashTable, bucketMutex, excessPtr, hashTableSize, bucketSize);
+        CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable, mplBucketMutex, mpLinkedListHead, hashTableSize, bucketSize);
     }
 
     __device__ __forceinline__ void operator()() const
@@ -42,8 +43,8 @@ struct CreateBlockLineTracingFunctor
         if (distNear >= distFar)
             return;
 
-        Eigen::Vector3i blockStart = voxelPosToBlockPos(worldPtToVoxelPos(unprojectWorld(x, y, distNear, invfx, invfy, cx, cy, T), voxelSize));
-        Eigen::Vector3i blockEnd = voxelPosToBlockPos(worldPtToVoxelPos(unprojectWorld(x, y, distFar, invfx, invfy, cx, cy, T), voxelSize));
+        Eigen::Vector3i blockStart = VoxelPosToBlockPos(WorldPtToVoxelPos(UnProjectWorld(x, y, distNear, invfx, invfy, cx, cy, T), voxelSize));
+        Eigen::Vector3i blockEnd = VoxelPosToBlockPos(WorldPtToVoxelPos(UnProjectWorld(x, y, distFar, invfx, invfy, cx, cy, T), voxelSize));
 
         Eigen::Vector3i dir = blockEnd - blockStart;
         Eigen::Vector3i increment = Eigen::Vector3i(dir(0) < 0 ? -1 : 1, dir(1) < 0 ? -1 : 1, dir(2) < 0 ? -1 : 1);
@@ -135,14 +136,14 @@ struct CreateBlockLineTracingFunctor
 
 struct CheckEntryVisibilityFunctor
 {
-    HashEntry *hashTable;
+    HashEntry *mplHashTable;
     HashEntry *visibleEntry;
     uint *visibleEntryCount;
     Sophus::SE3f Tinv;
 
-    int *heap;
-    int *heapPtr;
-    Voxel *voxelBlock;
+    int *mplHeap;
+    int *mplHeapPtr;
+    Voxel *mplVoxelBlocks;
     int cols, rows;
     float fx, fy;
     float cx, cy;
@@ -166,10 +167,10 @@ struct CheckEntryVisibilityFunctor
         uint increment = 0;
         if (idx < hashTableSize)
         {
-            HashEntry *current = &hashTable[idx];
+            HashEntry *current = &mplHashTable[idx];
             if (current->ptr >= 0)
             {
-                bool rval = checkBlockVisible(
+                bool rval = CheckBlockVisibility(
                     current->pos,
                     Tinv,
                     voxelSize,
@@ -187,8 +188,8 @@ struct CheckEntryVisibilityFunctor
                 else
                 {
                     int voxelPtr = current->ptr;
-                    memset(&voxelBlock[voxelPtr], 0, sizeof(Voxel) * BlockSize3);
-                    deleteHashEntry(heapPtr, heap, voxelBlockSize, current);
+                    memset(&mplVoxelBlocks[voxelPtr], 0, sizeof(Voxel) * BlockSize3);
+                    RemoveHashEntry(mplHeapPtr, mplHeap, voxelBlockSize, current);
                 }
             }
         }
@@ -197,9 +198,9 @@ struct CheckEntryVisibilityFunctor
 
         if (needScan)
         {
-            auto offset = computeOffset<1024>(increment, visibleEntryCount);
+            auto offset = ParallelScan<1024>(increment, visibleEntryCount);
             if (offset >= 0 && offset < hashTableSize && idx < hashTableSize)
-                visibleEntry[offset] = hashTable[idx];
+                visibleEntry[offset] = mplHashTable[idx];
         }
     }
 };
@@ -232,13 +233,13 @@ struct DepthFusionFunctor
         if (current.ptr == -1)
             return;
 
-        Eigen::Vector3i voxelPos = blockPosToVoxelPos(current.pos);
+        Eigen::Vector3i voxelPos = BlockPosToVoxelPos(current.pos);
 
 #pragma unroll
         for (int blockIdxZ = 0; blockIdxZ < 8; ++blockIdxZ)
         {
             Eigen::Vector3i localPos = Eigen::Vector3i(threadIdx.x, threadIdx.y, blockIdxZ);
-            Eigen::Vector3f pt = Tinv * voxelPosToWorldPt(voxelPos + localPos, voxelSize);
+            Eigen::Vector3f pt = Tinv * VoxelPosToWorldPt(voxelPos + localPos, voxelSize);
 
             int u = __float2int_rd(fx * pt(0) / pt(2) + cx + 0.5);
             int v = __float2int_rd(fy * pt(1) / pt(2) + cy + 0.5);
@@ -254,20 +255,20 @@ struct DepthFusionFunctor
                 continue;
 
             sdf = fmin(1.0f, sdf / truncationDist);
-            const int localIdx = localPosToLocalIdx(localPos);
+            const int localIdx = LocalPosToLocalIdx(localPos);
             Voxel &voxel = listBlock[current.ptr + localIdx];
 
-            auto oldSDF = unpackFloat(voxel.sdf);
+            auto oldSDF = UnPackFloat(voxel.sdf);
             auto oldWT = voxel.wt;
 
             if (oldWT == 0)
             {
-                voxel.sdf = packFloat(sdf);
+                voxel.sdf = PackFloat(sdf);
                 voxel.wt = 1;
                 continue;
             }
 
-            voxel.sdf = packFloat((oldSDF * oldWT + sdf * 1) / (oldWT + 1));
+            voxel.sdf = PackFloat((oldSDF * oldWT + sdf * 1) / (oldWT + 1));
             voxel.wt = min(255, oldWT + 1);
         }
     }
@@ -294,11 +295,11 @@ void fuseDepth(
     dim3 block(cv::divUp(cols, thread.x), cv::divUp(rows, thread.y));
 
     CreateBlockLineTracingFunctor bfunctor;
-    bfunctor.heap = map_struct.heap;
-    bfunctor.heapPtr = map_struct.heapPtr;
-    bfunctor.hashTable = map_struct.hashTable;
-    bfunctor.bucketMutex = map_struct.bucketMutex;
-    bfunctor.excessPtr = map_struct.excessPtr;
+    bfunctor.mplHeap = map_struct.mplHeap;
+    bfunctor.mplHeapPtr = map_struct.mplHeapPtr;
+    bfunctor.mplHashTable = map_struct.mplHashTable;
+    bfunctor.mplBucketMutex = map_struct.mplBucketMutex;
+    bfunctor.mpLinkedListHead = map_struct.mpLinkedListHead;
     bfunctor.hashTableSize = map_struct.hashTableSize;
     bfunctor.bucketSize = map_struct.bucketSize;
     bfunctor.voxelSize = map_struct.voxelSize;
@@ -317,12 +318,12 @@ void fuseDepth(
     map_struct.resetVisibleBlockCount();
 
     CheckEntryVisibilityFunctor cfunctor;
-    cfunctor.hashTable = map_struct.hashTable;
-    cfunctor.voxelBlock = map_struct.voxelBlock;
+    cfunctor.mplHashTable = map_struct.mplHashTable;
+    cfunctor.mplVoxelBlocks = map_struct.mplVoxelBlocks;
     cfunctor.visibleEntry = map_struct.visibleTable;
     cfunctor.visibleEntryCount = map_struct.visibleBlockNum;
-    cfunctor.heap = map_struct.heap;
-    cfunctor.heapPtr = map_struct.heapPtr;
+    cfunctor.mplHeap = map_struct.mplHeap;
+    cfunctor.mplHeapPtr = map_struct.mplHeapPtr;
     cfunctor.voxelBlockSize = map_struct.voxelBlockSize;
     cfunctor.Tinv = T.inverse().cast<float>();
     cfunctor.cols = cols;
@@ -346,7 +347,7 @@ void fuseDepth(
         return;
 
     DepthFusionFunctor functor;
-    functor.listBlock = map_struct.voxelBlock;
+    functor.listBlock = map_struct.mplVoxelBlocks;
     functor.visible_blocks = map_struct.visibleTable;
     functor.Tinv = T.inverse().cast<float>();
     functor.fx = fx;

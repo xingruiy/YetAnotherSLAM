@@ -1,40 +1,40 @@
 #include "VoxelMap.h"
 #include <fstream>
 
-__global__ void resetHashKernel(HashEntry *hashTable, int numEntry)
+__global__ void resetHashKernel(HashEntry *mplHashTable, int numEntry)
 {
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     if (index >= numEntry)
         return;
 
-    hashTable[index].ptr = -1;
-    hashTable[index].offset = -1;
+    mplHashTable[index].ptr = -1;
+    mplHashTable[index].offset = -1;
 }
 
-__global__ void resetHeapKernel(int *heap, int *heapPtr, int numBlock)
+__global__ void resetHeapKernel(int *mplHeap, int *mplHeapPtr, int numBlock)
 {
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     if (index >= numBlock)
         return;
 
     if (index == 0)
-        heapPtr[0] = numBlock - 1;
+        mplHeapPtr[0] = numBlock - 1;
 
-    heap[index] = numBlock - index - 1;
+    mplHeap[index] = numBlock - index - 1;
 }
 
 void MapStruct::reset()
 {
     dim3 block(1024);
     dim3 grid(cv::divUp(hashTableSize, block.x));
-    resetHashKernel<<<grid, block>>>(hashTable, hashTableSize);
+    resetHashKernel<<<grid, block>>>(mplHashTable, hashTableSize);
 
     grid = dim3(cv::divUp(voxelBlockSize, block.x));
-    resetHeapKernel<<<grid, block>>>(heap, heapPtr, voxelBlockSize);
+    resetHeapKernel<<<grid, block>>>(mplHeap, mplHeapPtr, voxelBlockSize);
 
-    cudaMemset(excessPtr, 0, sizeof(int));
-    cudaMemset(bucketMutex, 0, sizeof(int) * bucketSize);
-    cudaMemset(voxelBlock, 0, sizeof(Voxel) * BlockSize3 * voxelBlockSize);
+    cudaMemset(mpLinkedListHead, 0, sizeof(int));
+    cudaMemset(mplBucketMutex, 0, sizeof(int) * bucketSize);
+    cudaMemset(mplVoxelBlocks, 0, sizeof(Voxel) * BlockSize3 * voxelBlockSize);
 }
 
 void MapStruct::create(
@@ -44,14 +44,14 @@ void MapStruct::create(
     float voxelSize,
     float truncationDist)
 {
-    cudaMalloc((void **)&excessPtr, sizeof(int));
-    cudaMalloc((void **)&heapPtr, sizeof(int));
+    cudaMalloc((void **)&mpLinkedListHead, sizeof(int));
+    cudaMalloc((void **)&mplHeapPtr, sizeof(int));
     cudaMalloc((void **)&visibleBlockNum, sizeof(uint));
-    cudaMalloc((void **)&bucketMutex, sizeof(int) * bucketSize);
-    cudaMalloc((void **)&heap, sizeof(int) * voxelBlockSize);
-    cudaMalloc((void **)&hashTable, sizeof(HashEntry) * hashTableSize);
+    cudaMalloc((void **)&mplBucketMutex, sizeof(int) * bucketSize);
+    cudaMalloc((void **)&mplHeap, sizeof(int) * voxelBlockSize);
+    cudaMalloc((void **)&mplHashTable, sizeof(HashEntry) * hashTableSize);
     cudaMalloc((void **)&visibleTable, sizeof(HashEntry) * hashTableSize);
-    cudaMalloc((void **)&voxelBlock, sizeof(Voxel) * voxelBlockSize * BlockSize3);
+    cudaMalloc((void **)&mplVoxelBlocks, sizeof(Voxel) * voxelBlockSize * BlockSize3);
 
     this->hashTableSize = hashTableSize;
     this->bucketSize = bucketSize;
@@ -62,12 +62,12 @@ void MapStruct::create(
 
 void MapStruct::release()
 {
-    cudaFree((void *)heap);
-    cudaFree((void *)heapPtr);
-    cudaFree((void *)hashTable);
-    cudaFree((void *)bucketMutex);
-    cudaFree((void *)excessPtr);
-    cudaFree((void *)voxelBlock);
+    cudaFree((void *)mplHeap);
+    cudaFree((void *)mplHeapPtr);
+    cudaFree((void *)mplHashTable);
+    cudaFree((void *)mplBucketMutex);
+    cudaFree((void *)mpLinkedListHead);
+    cudaFree((void *)mplVoxelBlocks);
     cudaFree((void *)visibleBlockNum);
     cudaFree((void *)visibleTable);
 }
