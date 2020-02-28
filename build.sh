@@ -11,9 +11,9 @@ if [ -n "$1" ]; then
 fi
 
 echo -e "CMAKE_BUILD_TYPE is set to: ${RED}$BuildType${NC}"
-echo "Configuring and building Thirdparty/CameraOpenNI ..."
+echo "Configuring and building Thirdparty/OpenNI2 ..."
 
-cd ./Thirdparty/CameraOpenNI
+cd ./Thirdparty/OpenNI2
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j

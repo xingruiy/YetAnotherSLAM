@@ -127,7 +127,7 @@ public:
     std::mutex mMutexFeatures;
     KeyFrame *mReferenceKeyFrame;
 
-    // Variables used by the local mpLocalMapping
+    // Variables used by the local mpLocalMapper
     unsigned long mnBALocalForKF;
     unsigned long mnBAFixedForKF;
     unsigned long mnFuseTargetForKF;

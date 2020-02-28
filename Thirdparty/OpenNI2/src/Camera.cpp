@@ -1,6 +1,6 @@
-#include "CameraOpenNI.h"
+#include "Camera.h"
 
-namespace ONI
+namespace OpenNI2
 {
 
 Camera::Camera() : Camera(640, 480, 30)
@@ -120,4 +120,4 @@ bool Camera::TryFetchingImages(Mat &imDepth, Mat &imRGB)
     return true;
 }
 
-} // namespace ONI
+} // namespace OpenNI

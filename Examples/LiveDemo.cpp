@@ -1,5 +1,5 @@
 #include "System.h"
-#include "CameraOpenNI.h"
+#include "Camera.h"
 
 int main(int argc, char **argv)
 {
@@ -9,7 +9,7 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    ONI::Camera cam;
+    OpenNI2::Camera cam;
     SLAM::System sys(argv[1], argv[2]);
 
     cv::Mat imDepth, imRGB;
@@ -17,6 +17,6 @@ int main(int argc, char **argv)
     while (!SLAM::g_bSystemKilled)
     {
         if (cam.TryFetchingImages(imDepth, imRGB))
-            sys.trackImage(imRGB, imDepth, 0);
+            sys.TrackRGBD(imRGB, imDepth, 0);
     }
 }

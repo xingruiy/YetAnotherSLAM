@@ -4,8 +4,9 @@
 namespace SLAM
 {
 
-Tracking::Tracking(System *system, Map *map, Viewer *mpViewer, LocalMapping *mpLocalMapping)
-    : mpSystem(system), mpMap(map), mpViewer(mpViewer), mpLocalMapping(mpLocalMapping), trackingState(Null)
+Tracking::Tracking(System *pSystem, Map *pMap, LocalMapping *pLocalMapper)
+    : mpSystem(pSystem), mpMap(pMap), mpLocalMapper(pLocalMapper),
+      mState(SYSTEM_NOT_READY)
 {
     int w = g_width[0];
     int h = g_height[0];
@@ -13,101 +14,114 @@ Tracking::Tracking(System *system, Map *map, Viewer *mpViewer, LocalMapping *mpL
 
     mpTracker = new DenseTracking(w, h, calib.cast<double>(), NUM_PYR, {10, 5, 3, 3, 3}, g_bUseColour, g_bUseDepth);
     mpMapper = new DenseMapping(w, h, g_calib[0]);
-    mCurrentMapPrediction.create(h, w, CV_32FC4);
 }
 
-void Tracking::trackImage(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
+void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 {
-    NextFrame = Frame(ImgGray, ImgDepth, TimeStamp, g_pORBExtractor);
-    std::future<void> result = std::async(std::launch::async, &Frame::ExtractORBFeatures, &NextFrame);
+    mpLocalMapper = pLocalMapper;
+}
 
+void Tracking::SetLoopClosing(LoopClosing *pLoopClosing)
+{
+    mpLoopClosing = pLoopClosing;
+}
+
+void Tracking::SetViewer(Viewer *pViewer)
+{
+    mpViewer = pViewer;
+}
+
+void Tracking::GrabImageRGBD(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
+{
+    mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, g_pORBExtractor);
+
+    Track();
+}
+
+void Tracking::Track()
+{
     bool bOK = false;
-    switch (trackingState)
+    switch (mState)
     {
-    case Null:
-    {
-        Initialisation();
+    case SYSTEM_NOT_READY:
+        InitializeSystem();
+        if (mState != OK)
+            return;
         break;
-    }
 
     case OK:
-    {
-        auto t1 = std::chrono::high_resolution_clock::now();
-        bool bOK = trackLastFrame();
-        auto t2 = std::chrono::high_resolution_clock::now();
-        std::cout << "tracking: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << std::endl;
-
-        t1 = std::chrono::high_resolution_clock::now();
-        result.get();
-        t2 = std::chrono::high_resolution_clock::now();
-        std::cout << "waited: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << std::endl;
+        bOK = TrackRGBD();
 
         if (bOK)
         {
             if (NeedNewKeyFrame())
-                MakeNewKeyFrame();
+                CreateNewKeyFrame();
         }
         else
         {
-            trackingState = Lost;
+            bOK = Relocalization();
+            if (!bOK)
+            {
+                mState = LOST;
+            }
         }
-
         break;
-    }
 
-    case Lost:
-    {
-        bool bOK = Relocalisation();
+    case LOST:
+        bOK = Relocalization();
 
         if (bOK)
         {
-            trackingState = OK;
+            mState = OK;
             break;
         }
         else
             return;
     }
+
+    mLastFrame = Frame(mCurrentFrame);
+}
+
+void Tracking::InitializeSystem()
+{
+    mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
+    mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);
+    mpMapper->fuseFrame(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
+    mpLocalMapper->AddKeyFrameCandidate(mCurrentFrame);
+    mState = OK;
+}
+
+bool Tracking::TrackRGBD()
+{
+    // Set tracking frames
+    mpTracker->SetTrackingImage(mCurrentFrame.mImGray);
+    mpTracker->SetTrackingDepth(mCurrentFrame.mImDepth);
+
+    // Calculate the relateive transformation
+    Sophus::SE3d DT = mpTracker->GetTransform(mLastFrame.mRelativePose.inverse(), false);
+
+    mCurrentFrame.mRelativePose = DT.inverse();
+    mCurrentFrame.mTcw = mReferenceFramePose * DT.inverse();
+
+    mpMapper->fuseFrame(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
+    g_nTrackedFrame++;
+
+    if (mpViewer)
+    {
+        mpViewer->setLivePose(mCurrentFrame.mTcw.matrix());
     }
 
-    lastFrame = Frame(NextFrame);
-}
-
-void Tracking::Initialisation()
-{
-    mpTracker->SetReferenceImage(NextFrame.mImGray);
-    mpTracker->SetReferenceDepth(NextFrame.mImDepth);
-    mpMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
-    mpLocalMapping->AddKeyFrameCandidate(NextFrame);
-    trackingState = OK;
-}
-
-bool Tracking::trackLastFrame()
-{
-    mpTracker->SetTrackingImage(NextFrame.mImGray);
-    mpTracker->SetTrackingDepth(NextFrame.mImDepth);
-    mpMapper->raytrace(mCurrentMapPrediction, lastFrame.mTcw);
-
-    Sophus::SE3d Tpc = mpTracker->GetTransform(lastFrame.T_frame2Ref.inverse(), false);
-
-    NextFrame.mTcw = T_ref2World * Tpc.inverse();
-    NextFrame.T_frame2Ref = Tpc.inverse();
-
-    if (g_bEnableViewer)
-        mpViewer->setLivePose(NextFrame.mTcw.matrix());
-
-    mpMapper->fuseFrame(cv::cuda::GpuMat(NextFrame.mImDepth), NextFrame.mTcw);
-    g_nTrackedFrame++;
     return true;
 }
 
-bool Tracking::Relocalisation()
+bool Tracking::Relocalization()
 {
     return false;
 }
 
 bool Tracking::NeedNewKeyFrame()
 {
-    Sophus::SE3d DT = NextFrame.T_frame2Ref;
+    Sophus::SE3d DT = mCurrentFrame.mRelativePose;
 
     if (DT.log().topRows<3>().norm() > 0.15)
         return true;
@@ -118,21 +132,22 @@ bool Tracking::NeedNewKeyFrame()
     return false;
 }
 
-void Tracking::MakeNewKeyFrame()
+void Tracking::CreateNewKeyFrame()
 {
-    // Update keyframe pose
-    T_ref2World = NextFrame.mTcw;
+    // Update the reference pose
+    mReferenceFramePose = mCurrentFrame.mTcw;
 
-    mpLocalMapping->AddKeyFrameCandidate(NextFrame);
+    // Create a new keyframe
+    mpLocalMapper->AddKeyFrameCandidate(mCurrentFrame);
+
+    // Swap the dense tracking buffer
     mpTracker->SwapFrameBuffer();
-
-    // Set to the reference frame
-    NextFrame.T_frame2Ref = Sophus::SE3d();
+    mCurrentFrame.mRelativePose = Sophus::SE3d();
 }
 
 void Tracking::reset()
 {
-    trackingState = Null;
+    mState = SYSTEM_NOT_READY;
 }
 
 } // namespace SLAM

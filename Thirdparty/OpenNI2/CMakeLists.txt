@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(CameraOpenNI)
+project(OpenNI2)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
@@ -9,7 +9,7 @@ add_library(${PROJECT_NAME} SHARED "")
 
 target_sources(${PROJECT_NAME}
 PRIVATE
-    src/CameraOpenNI.cpp
+    src/Camera.cpp
 )
 
 target_compile_features(${PROJECT_NAME}

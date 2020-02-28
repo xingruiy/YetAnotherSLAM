@@ -13,25 +13,27 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     mpMapDrawer = new MapDrawer(mpMap);
     mpKeyFrameDB = new KeyFrameDatabase(*mpORBVocabulary);
 
+    mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, mpORBVocabulary);
+    mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
+
+    mpLocalMapper = new LocalMapping(mpORBVocabulary, mpMap);
+    mpLocalMapper->setLoopCloser(mpLoopClosing);
+    mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
+
+    mpTracker = new Tracking(this, mpMap, mpLocalMapper);
+
     if (g_bEnableViewer)
     {
         mpViewer = new Viewer(this, mpMapDrawer);
         mpViewerThread = new std::thread(&Viewer::Run, mpViewer);
+        mpTracker->SetViewer(mpViewer);
+        mpLocalMapper->setViewer(mpViewer);
     }
-
-    mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, mpORBVocabulary);
-    mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
-
-    mpLocalMapping = new LocalMapping(mpORBVocabulary, mpMap, mpViewer);
-    mpLocalMapping->setLoopCloser(mpLoopClosing);
-    mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapping);
-    mpTracker = new Tracking(this, mpMap, mpViewer, mpLocalMapping);
-
-    std::cout << "Main Thread Started." << std::endl;
 }
 
-void System::trackImage(cv::Mat img, cv::Mat depth, const double timeStamp)
+void System::TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp)
 {
+    // Covert colour images to grayscale
     if (!g_bReverseRGB)
         cv::cvtColor(img, grayScale, cv::COLOR_RGB2GRAY);
     else
@@ -40,17 +42,17 @@ void System::trackImage(cv::Mat img, cv::Mat depth, const double timeStamp)
     // Convert depth to floating point
     depth.convertTo(depthFloat, CV_32FC1, g_DepthScaleInv);
 
-    if (g_bEnableViewer)
-    {
-        mpViewer->setLiveImage(img);
-        mpViewer->setLiveDepth(depthFloat);
-    }
-
     if (!g_bSystemRunning)
         return;
 
     // Invoke the main tracking thread
-    mpTracker->trackImage(grayScale, depthFloat, timeStamp);
+    mpTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
+
+    if (mpViewer)
+    {
+        mpViewer->setLiveImage(img);
+        mpViewer->setLiveDepth(depthFloat);
+    }
 }
 
 void System::reset()
@@ -59,28 +61,25 @@ void System::reset()
     mpMap->reset();
 }
 
-void System::kill()
+void System::Kill()
 {
     g_bSystemKilled = true;
 }
 
 System::~System()
 {
-    std::cout << "System Waits for Other Threads." << std::endl;
     mpLoopThread->join();
-    mpLocalMappingThread->join();
     mpViewerThread->join();
+    mpLocalMappingThread->join();
 
     delete mpMap;
     delete mpViewer;
     delete mpTracker;
-    delete mpLocalMapping;
-    delete mpLoopClosing;
-    delete mpLocalMappingThread;
-    delete mpViewerThread;
     delete mpLoopThread;
-
-    std::cout << "System Killed." << std::endl;
+    delete mpLocalMapper;
+    delete mpLoopClosing;
+    delete mpViewerThread;
+    delete mpLocalMappingThread;
 }
 
 void System::readSettings(const std::string &strSettingFile)

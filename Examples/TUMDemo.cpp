@@ -54,7 +54,7 @@ int main(int argc, char **argv)
             double tframe = vTimestamps[i];
 
             std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-            sys.trackImage(imRGB, imDepth, tframe);
+            sys.TrackRGBD(imRGB, imDepth, tframe);
             std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
 
             double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();

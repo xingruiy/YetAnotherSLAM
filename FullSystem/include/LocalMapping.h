@@ -19,19 +19,19 @@ class LoopClosing;
 class LocalMapping
 {
 public:
-    LocalMapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *map, Viewer *pViewer);
+    LocalMapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *pMap);
     void AddKeyFrameCandidate(const Frame &F);
     void setLoopCloser(LoopClosing *pLoopCloser);
+    void setViewer(Viewer *pViewer);
     void reset();
     void Run();
 
 private:
-    void MakeNewKeyFrame();
+    void CreateNewKeyFrame();
     bool HasFrameToProcess();
     int MatchLocalPoints();
     void KeyFrameCulling();
     void SearchInNeighbors();
-    void TriangulatePoints();
     void CreateNewMapPoints();
     void UpdateLocalMap();
     void UpdateKeyFrame();
@@ -39,17 +39,17 @@ private:
 
     // keyframe candidate
     std::mutex frameMutex;
-    Frame NextFrame;
+    Frame mCurrentFrame;
     std::list<Frame> mlFrameQueue;
     KeyFrame *NextKeyFrame;
-    KeyFrame *lastKeyFrame;
+    KeyFrame *mLastKeyFrame;
     KeyFrame *referenceKeyframe;
 
-    ORBextractor *ORBExtractor;
+    ORBextractor *mpExtractor;
     ORB_SLAM2::ORBVocabulary *ORBvocabulary;
 
-    std::vector<KeyFrame *> localKeyFrames;
-    std::vector<MapPoint *> localMapPoints;
+    std::vector<KeyFrame *> mvpLocalKeyFrames;
+    std::vector<MapPoint *> mvpLocalMapPoints;
 
     Map *mpMap;
     Viewer *mpViewer;

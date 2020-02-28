@@ -11,7 +11,7 @@ Frame::~Frame()
 }
 
 Frame::Frame(const Frame &F) : mTimeStamp(F.mTimeStamp), mImGray(F.mImGray), mImDepth(F.mImDepth),
-                               T_frame2Ref(F.T_frame2Ref), mTcw(F.mTcw)
+                               mRelativePose(F.mRelativePose), mTcw(F.mTcw)
 {
   mnId = mnNextId++;
 }

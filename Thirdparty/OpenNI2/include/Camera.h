@@ -2,7 +2,7 @@
 #include <OpenNI2/OpenNI.h>
 #include <opencv2/opencv.hpp>
 
-namespace ONI
+namespace OpenNI2
 {
 
 using namespace cv;
@@ -29,4 +29,4 @@ private:
     VideoFrameRef mColourFrameRef;
 };
 
-} // namespace ONI
+} // namespace OpenNI

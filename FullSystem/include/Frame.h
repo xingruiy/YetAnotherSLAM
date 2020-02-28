@@ -31,7 +31,7 @@ struct Frame
 
     // Pose
     Sophus::SE3d mTcw;
-    Sophus::SE3d T_frame2Ref;
+    Sophus::SE3d mRelativePose;
 
     // A copy of the input frame
     cv::Mat mImGray;

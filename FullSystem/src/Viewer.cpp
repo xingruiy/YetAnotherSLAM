@@ -84,7 +84,7 @@ void Viewer::Run()
         pangolin::FinishFrame();
     }
 
-    mpSystem->kill();
+    mpSystem->Kill();
 }
 
 void Viewer::RenderImagesToScreen()

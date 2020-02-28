@@ -38,13 +38,11 @@ PUBLIC
 
 target_include_directories(${PROJECT_NAME}
 PUBLIC
-    ${OpenCV_INCLUDE_DIRS}
     ${CUDA_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
     ${Pangolin_INCLUDE_DIRS}  
-    ${PROJECT_SOURCE_DIR}/FullSystem/include
     ${PROJECT_SOURCE_DIR}/Thirdparty/
-    ${PROJECT_SOURCE_DIR}/Thirdparty/DatasetLoader/include
-    ${PROJECT_SOURCE_DIR}/Thirdparty/CameraOpenNI/include
+    ${PROJECT_SOURCE_DIR}/FullSystem/include
     ${PROJECT_SOURCE_DIR}/Thirdparty/RGBDSLAM/include
 )
 
@@ -61,14 +59,24 @@ PUBLIC
 )
 
 # Build Examples
-add_executable(liveDemo ${PROJECT_SOURCE_DIR}/Examples/LiveDemo.cpp)
+# Build Live Viewer
+add_executable(liveDemo 
+    ${PROJECT_SOURCE_DIR}/Examples/LiveDemo.cpp
+)
+target_include_directories(liveDemo 
+PRIVATE
+    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/include
+)
 target_link_libraries(liveDemo 
 PRIVATE 
     ${PROJECT_NAME} 
-    ${PROJECT_SOURCE_DIR}/Thirdparty/CameraOpenNI/lib/libCameraOpenNI.so
+    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/lib/libOpenNI2.so
 )
 
-add_executable(tumDemo ${PROJECT_SOURCE_DIR}/Examples/TUMDemo.cpp)
+# Build TUM Viewer
+add_executable(tumDemo 
+    ${PROJECT_SOURCE_DIR}/Examples/TUMDemo.cpp
+)
 target_link_libraries(tumDemo 
 PRIVATE 
     ${PROJECT_NAME} 
