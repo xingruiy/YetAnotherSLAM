@@ -26,7 +26,7 @@ public:
 
 private:
   Eigen::Matrix3d mK;
-  MapStruct deviceMap;
+  MapStruct *mpMapStruct;
 
   // for map udate
   uint mNumVisibleBlocks;

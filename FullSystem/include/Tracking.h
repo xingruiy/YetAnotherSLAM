@@ -8,7 +8,7 @@
 #include "System.h"
 #include "GlobalDef.h"
 #include "LoopClosing.h"
-#include "VoxelMapping.h"
+#include "MeshEngine.h"
 #include "RGBDTracking.h"
 
 namespace SLAM
@@ -82,7 +82,7 @@ protected:
     LoopClosing *mpLoopClosing;
 
     // Dense Tracking And Mapping
-    VoxelMapping *mpMapper;
+    MeshEngine *mpMeshEngine;
     RGBDTracking *mpTracker;
 
     // System

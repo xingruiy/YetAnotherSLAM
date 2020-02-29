@@ -38,7 +38,6 @@ struct RenderingBlock
 class MapStruct
 {
 public:
-    void release();
     bool empty();
     void reset();
     void create(int hashTableSize, int bucketSize, int voxelBlockSize, float voxelSize, float truncationDist);
@@ -46,17 +45,25 @@ public:
     void getVisibleBlockCount(uint &hostData);
     void resetVisibleBlockCount();
 
-    int GetPointAndNormal(float *pPoint, float *pNormal, const int &N = -1);
-    void GetTracingMap(cv::cuda::GpuMat map, const Sophus::SE3d &Tcw);
-    void IntegrateDepth(cv::cuda::GpuMat im, cv::cuda::GpuMat depthmap, const Sophus::SE3d &Tcw);
-
 public:
-    MapStruct() = default;
-    MapStruct(int SizeInMB);
+    MapStruct(const Eigen::Matrix3f &K);
     void setMeshEngine(MeshEngine *pMeshEngine);
 
+    void Release();
+
+    // TODO: create map based on the desired memory space
+    MapStruct(int SizeInMB);
     void Create(int SizeInMB);
-    void FuseDepth(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcw);
+    int mFootprintInMB;
+    // TODO: combine two maps
+    void Fuse(MapStruct *pMapStruct);
+    // TODO
+    void Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
+
+    // TODO: Save the map to RAM/HardDisk
+    void Hibernate();
+    void Reactivate();
+    bool mbInHibernation;
 
 public:
     void UpdateMesh();
@@ -98,6 +105,9 @@ public:
     int voxelBlockSize;
     float voxelSize;
     float truncationDist;
+
+    Sophus::SE3d mTcw;
+    Eigen::Matrix3f mK;
 };
 
 #endif
