@@ -50,8 +50,10 @@ public:
     MapStruct(int SizeInMB);
     void Create(int SizeInMB);
     int mFootprintInMB;
+
     // TODO: combine two maps
     void Fuse(MapStruct *pMapStruct);
+
     // TODO
     void Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
 
@@ -68,6 +70,14 @@ public:
     int N;
     bool mbActive;
     bool mbHasMesh;
+
+    // OpenGL buffer for Drawing
+    float mColourTaint;
+    uint mGlVertexBuffer;
+    uint mGlNormalBuffer;
+    bool mbVertexBufferCreated;
+
+    // Mesh Engine
     MeshEngine *mpMeshEngine;
 
 protected:

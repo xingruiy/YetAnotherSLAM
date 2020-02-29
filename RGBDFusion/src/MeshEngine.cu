@@ -12,31 +12,33 @@ struct CollectBlocksFunctor
     HashEntry *mplEntry;
     HashEntry *mplHashTable;
 
-    __device__ __forceinline__ void operator()() const
-    {
-        int x = blockDim.x * blockIdx.x + threadIdx.x;
-        __shared__ bool needScan;
-
-        if (x == 0)
-            needScan = false;
-
-        __syncthreads();
-        uint val = 0;
-        if (x < hashTableSize && mplHashTable[x].ptr >= 0)
-        {
-            needScan = true;
-            val = 1;
-        }
-
-        __syncthreads();
-        if (needScan)
-        {
-            int offset = ParallelScan<1024>(val, mpNumEntry);
-            if (offset != -1)
-                mplEntry[offset] = mplHashTable[x];
-        }
-    }
+    __device__ __forceinline__ void operator()() const;
 };
+
+__device__ __forceinline__ void CollectBlocksFunctor::operator()() const
+{
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    __shared__ bool needScan;
+
+    if (x == 0)
+        needScan = false;
+
+    __syncthreads();
+    uint val = 0;
+    if (x < hashTableSize && mplHashTable[x].ptr >= 0)
+    {
+        needScan = true;
+        val = 1;
+    }
+
+    __syncthreads();
+    if (needScan)
+    {
+        int offset = ParallelScan<1024>(val, mpNumEntry);
+        if (offset != -1)
+            mplEntry[offset] = mplHashTable[x];
+    }
+}
 
 struct MeshificationFunctor
 {
@@ -323,9 +325,6 @@ void MeshEngine::Meshify(MapStruct *pMapStruct)
     block = dim3(8, 8);
     grid = dim3(cv::divUp((size_t)nHashEntry, 16U), 16U);
     callDeviceFunctor<<<grid, block>>>(functor2);
-
-    SafeCall(cudaDeviceSynchronize());
-    SafeCall(cudaGetLastError());
 
     uint nTriangles = 0;
     SafeCall(cudaMemcpy(&nTriangles, cuda_triangle_count, sizeof(uint), cudaMemcpyDeviceToHost));

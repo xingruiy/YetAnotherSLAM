@@ -10,6 +10,52 @@ MapDrawer::MapDrawer(Map *pMap) : mpMap(pMap)
     height = g_height[0];
 }
 
+void MapDrawer::LinkGlSlProgram()
+{
+    const char vertexShader[] =
+        "#version 330\n"
+        "\n"
+        "layout(location = 0) in vec3 position;\n"
+        "layout(location = 1) in vec3 a_normal;\n"
+        "uniform mat4 mvpMat;\n"
+        "uniform float colourTaint;\n"
+        "out vec3 shaded_colour;\n"
+        "\n"
+        "void main(void) {\n"
+        "    gl_Position = mvpMat * vec4(position, 1.0);\n"
+        "    vec3 lightpos = vec3(5, 5, 5);\n"
+        "    const float ka = 0.3;\n"
+        "    const float kd = 0.5;\n"
+        "    const float ks = 0.2;\n"
+        "    const float n = 20.0;\n"
+        "    float ax = 1.0;\n"
+        "    float dx = 1.0;\n"
+        "    float sx = 1.0;\n"
+        "    const float lx = 1.0;\n"
+        "    vec3 L = normalize(lightpos - position);\n"
+        "    vec3 V = normalize(vec3(0.0) - position);\n"
+        "    vec3 R = normalize(2 * a_normal * dot(a_normal, L) - L);\n"
+        "    float i1 = ax * ka * dx;\n"
+        "    float i2 = lx * kd * dx * max(0.0, dot(a_normal, L));\n"
+        "    float i3 = lx * ks * sx * pow(max(0.0, dot(R, V)), n);\n"
+        "    float Ix = max(0.0, min(255.0, i1 + i2 + i3));\n"
+        "    shaded_colour = vec3(Ix, Ix, colourTaint);\n"
+        "}\n";
+
+    const char fragShader[] =
+        "#version 330\n"
+        "\n"
+        "in vec3 shaded_colour;\n"
+        "out vec4 colour_out;\n"
+        "void main(void) {\n"
+        "    colour_out = vec4(shaded_colour, 1);\n"
+        "}\n";
+
+    mShader.AddShader(pangolin::GlSlVertexShader, vertexShader);
+    mShader.AddShader(pangolin::GlSlFragmentShader, fragShader);
+    mShader.Link();
+}
+
 void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 {
     const auto vpKFs = mpMap->GetAllKeyFrames();
@@ -109,12 +155,13 @@ void MapDrawer::DrawMapPoints(int iPointSize)
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void MapDrawer::DrawMesh(int N)
+void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
 {
     std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
     if (N <= 0 || vpMapStruct.size() < N)
         N = vpMapStruct.size();
     std::vector<MapStruct *> vpMSToDraw = std::vector<MapStruct *>(vpMapStruct.end() - N, vpMapStruct.end());
+
     for (auto vit = vpMSToDraw.begin(), vend = vpMSToDraw.end(); vit != vend; ++vit)
     {
         MapStruct *pMS = *vit;
@@ -126,13 +173,43 @@ void MapDrawer::DrawMesh(int N)
             if (!pMS->mplPoint)
                 return;
 
-            glBegin(GL_TRIANGLES);
-            glColor3f(0.0f, 0.0f, 1.0f);
-            for (int i = 0; i < pMS->N / 3 - 1; ++i)
-                glVertex3f(pMS->mplPoint[i * 3], pMS->mplPoint[i * 3 + 1], pMS->mplPoint[i * 3 + 2]);
+            if (!pMS->mbVertexBufferCreated)
+            {
+                glGenBuffers(1, &pMS->mGlVertexBuffer);
+                glBindBuffer(GL_ARRAY_BUFFER, pMS->mGlVertexBuffer);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(float) * pMS->N, pMS->mplPoint, GL_STATIC_DRAW);
+                glGenBuffers(1, &pMS->mGlNormalBuffer);
+                glBindBuffer(GL_ARRAY_BUFFER, pMS->mGlNormalBuffer);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(float) * pMS->N, pMS->mplNormal, GL_STATIC_DRAW);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+                pMS->mbVertexBufferCreated = true;
+            }
 
-            glEnd();
-            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            mShader.Bind();
+            mShader.SetUniform("mvpMat", mvpMat);
+            mShader.SetUniform("colourTaint", pMS->mColourTaint);
+
+            glEnableVertexAttribArray(0);
+            glBindBuffer(GL_ARRAY_BUFFER, pMS->mGlVertexBuffer);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+
+            glEnableVertexAttribArray(1);
+            glBindBuffer(GL_ARRAY_BUFFER, pMS->mGlNormalBuffer);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+
+            glDrawArrays(GL_TRIANGLES, 0, pMS->N);
+            glDisableVertexAttribArray(0);
+            glDisableVertexAttribArray(1);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            mShader.Unbind();
+
+            // glBegin(GL_TRIANGLES);
+            // glColor3f(pMS->mColour(0), pMS->mColour(1), pMS->mColour(2));
+            // for (int i = 0; i < pMS->N / 3 - 1; ++i)
+            //     glVertex3f(pMS->mplPoint[i * 3], pMS->mplPoint[i * 3 + 1], pMS->mplPoint[i * 3 + 2]);
+
+            // glEnd();
+            // glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         }
     }
 }

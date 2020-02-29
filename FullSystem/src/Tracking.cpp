@@ -154,6 +154,9 @@ void Tracking::CreateNewKeyFrame()
 
     // Create a new keyframe
     KeyFrame *pNewKF = new KeyFrame(mCurrentFrame, mpMap);
+    pNewKF->mpVoxelStruct = mpCurrentMapStruct;
+    pNewKF->mbVoxelStructMarginalized = false;
+    mpCurrentMapStruct->mTcw = pNewKF->mTcw;
     mpLocalMapper->AddKeyFrameCandidate(pNewKF);
 
     // Swap the dense tracking buffer
@@ -161,6 +164,11 @@ void Tracking::CreateNewKeyFrame()
     mCurrentFrame.mRelativePose = Sophus::SE3d();
 
     mpMap->AddMapStruct(mpCurrentMapStruct);
+
+    mpCurrentMapStruct = new MapStruct(g_calib[0]);
+    mpCurrentMapStruct->setMeshEngine(mpMeshEngine);
+    mpCurrentMapStruct->create(20000, 10000, 15000, 0.01, 0.05);
+    mpCurrentMapStruct->Reset();
 }
 
 void Tracking::reset()

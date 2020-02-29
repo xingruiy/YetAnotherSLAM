@@ -21,7 +21,8 @@ public:
     void DrawMapPoints(int iPointSize);
     void DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int iEdgeWeight);
 
-    void DrawMesh(int N = -1);
+    void DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat);
+    void LinkGlSlProgram();
 
 private:
     Map *mpMap;
@@ -30,6 +31,8 @@ private:
 
     Eigen::Matrix3f mCalibInv;
     int width, height;
+
+    pangolin::GlSlProgram mShader;
 };
 
 } // namespace SLAM

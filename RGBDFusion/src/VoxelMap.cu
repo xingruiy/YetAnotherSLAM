@@ -66,8 +66,10 @@ MapStruct::MapStruct(const Eigen::Matrix3f &K)
     : mFootprintInMB(0), mbInHibernation(false), mbActive(false),
       mbHasMesh(false), mpMeshEngine(NULL), mplHeap(NULL),
       mplHeapPtr(NULL), mplBucketMutex(NULL), mplHashTable(NULL),
-      mplVoxelBlocks(NULL), mpLinkedListHead(NULL), mK(K)
+      mplVoxelBlocks(NULL), mpLinkedListHead(NULL), mK(K),
+      mbVertexBufferCreated(false)
 {
+    mColourTaint = 255 * rand() / (double)RAND_MAX;
 }
 
 MapStruct::MapStruct(int SizeInMB)

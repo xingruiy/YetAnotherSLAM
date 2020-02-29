@@ -61,6 +61,8 @@ void Viewer::Run()
     pangolin::Var<int> varCovMapDensity = pangolin::Var<int>("menu.Covisibility Map Density", 10, 1, 50);
     pangolin::Var<int> varDisplayMeshNum = pangolin::Var<int>("menu.Display Mesh Number", -1, -1, 10);
 
+    mpMapDrawer->LinkGlSlProgram();
+
     while (!pangolin::ShouldQuit())
     {
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -81,7 +83,7 @@ void Viewer::Run()
             mpMapDrawer->DrawMapPoints(varPointSize);
 
         if (varShowMapStructs)
-            mpMapDrawer->DrawMesh(varDisplayMeshNum);
+            mpMapDrawer->DrawMesh(varDisplayMeshNum, RenderState.GetProjectionModelViewMatrix());
 
         pangolin::FinishFrame();
     }

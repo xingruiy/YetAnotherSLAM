@@ -33,7 +33,6 @@ PRIVATE
     RGBDFusion/src/ImageProc.cu
     RGBDFusion/src/VoxelMap.cu
     RGBDFusion/src/RGBDTracking.cu
-    RGBDFusion/src/RayTracing.cu
     RGBDFusion/src/MeshEngine.cu
 )
 
