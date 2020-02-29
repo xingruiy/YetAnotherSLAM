@@ -6,6 +6,7 @@
 #include <DBoW2/DBoW2/FeatureVector.h>
 #include "Map.h"
 #include "Frame.h"
+#include "VoxelMap.h"
 #include "MapPoint.h"
 
 namespace SLAM
@@ -20,7 +21,7 @@ class KeyFrame
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    KeyFrame(Frame *F, Map *map, ORBextractor *pExtractor);
+    KeyFrame(const Frame &F, Map *pMap);
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
     void AddMapPoint(MapPoint *pMP, const size_t &idx);
 
@@ -73,7 +74,7 @@ public:
 
 public:
     Map *mpMap;
-
+    cv::Mat mImg;
     bool mbBad;
     bool mbNotErase;
     bool mbToBeErased;
@@ -92,7 +93,6 @@ public:
     int N; // Number of KeyPoints
     std::vector<float> mvDepth;
     std::vector<float> mvuRight;
-    std::vector<Eigen::Vector3f> mvNormal;
     std::vector<cv::KeyPoint> mvKeys;
     std::vector<cv::KeyPoint> mvKeysUn;
     cv::Mat mDescriptors;
@@ -122,6 +122,7 @@ public:
 
     // Keyframe in World coord
     Sophus::SE3d mTcw;
+    Sophus::SE3d mRelativePose;
     std::mutex poseMutex;
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
@@ -142,7 +143,7 @@ public:
     void UndistortKeys();
     void AssignFeaturesToGrid();
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
-    void ComputeDepth(const cv::Mat depth);
+    void ComputeStereoRGBD(const cv::Mat depth);
 
     // Variables used by the keyframe database
     long unsigned int mnLoopQuery;
@@ -151,6 +152,11 @@ public:
     long unsigned int mnRelocQuery;
     int mnRelocWords;
     float mRelocScore;
+
+    MapStruct *mpVoxelStruct;
+    bool mbVoxelStructMarginalized;
+
+    ORBextractor *mpExtractor;
 };
 
 } // namespace SLAM

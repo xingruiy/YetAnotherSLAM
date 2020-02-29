@@ -96,10 +96,15 @@ protected:
     Map *mpMap;
 
     //Last Frame, KeyFrame and Relocalisation Info
+    KeyFrame *mpCurrentKeyFrame;
     KeyFrame *mpLastKeyFrame;
     Frame mLastFrame;
+    ORBextractor *mpExtractor;
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
+
+    // Voxel Map Structure
+    MapStruct *mpCurrentVoxelStruct;
 };
 
 } // namespace SLAM

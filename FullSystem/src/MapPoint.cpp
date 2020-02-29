@@ -208,16 +208,13 @@ void MapPoint::UpdateDepthAndViewingDir()
         return;
 
     Eigen::Vector3d viewingDir = Eigen::Vector3d::Zero();
-    Eigen::Vector3d normal = Eigen::Vector3d::Zero();
     int n = 0;
     for (auto mit = Obs.begin(), mend = Obs.end(); mit != mend; mit++)
     {
         KeyFrame *pKF = mit->first;
         Eigen::Vector3d Owi = pKF->mTcw.translation();
         Eigen::Vector3d viewingDiri = mWorldPos - Owi;
-        Eigen::Vector3d normali = pKF->mvNormal[mit->second].cast<double>();
         viewingDir += viewingDiri.normalized();
-        normal += normali;
         n++;
     }
 
@@ -232,7 +229,6 @@ void MapPoint::UpdateDepthAndViewingDir()
         mfMaxDistance = dist * levelScaleFactor;
         mfMinDistance = mfMaxDistance / pRefKF->mvScaleFactors[nLevels - 1];
         mAvgViewingDir = viewingDir / n;
-        // mPointNormal = normal / n;
     }
 }
 

@@ -5,7 +5,8 @@ namespace SLAM
 {
 
 Tracking::Tracking(System *pSystem, Map *pMap)
-    : mpSystem(pSystem), mpMap(pMap), mState(SYSTEM_NOT_READY)
+    : mpSystem(pSystem), mpMap(pMap), mState(SYSTEM_NOT_READY),
+      mpCurrentKeyFrame(NULL), mpLastKeyFrame(NULL)
 {
     int w = g_width[0];
     int h = g_height[0];
@@ -13,6 +14,7 @@ Tracking::Tracking(System *pSystem, Map *pMap)
 
     mpTracker = new RGBDTracking(w, h, calib.cast<double>(), g_bUseColour, g_bUseDepth);
     mpMapper = new VoxelMapping(w, h, g_calib[0]);
+    mpExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -32,7 +34,7 @@ void Tracking::SetViewer(Viewer *pViewer)
 
 void Tracking::GrabImageRGBD(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
 {
-    mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, g_pORBExtractor);
+    mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, mpExtractor);
 
     Track();
 }
@@ -83,10 +85,19 @@ void Tracking::Track()
 
 void Tracking::InitializeSystem()
 {
+    KeyFrame *KFinit = new KeyFrame(mCurrentFrame, mpMap);
+    if (KFinit->N == 0)
+    {
+        delete KFinit;
+        return;
+    }
+
     mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
     mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);
     mpMapper->FuseFrame(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
-    mpLocalMapper->AddKeyFrameCandidate(mCurrentFrame);
+
+    mpCurrentKeyFrame = KFinit;
+    mpLocalMapper->AddKeyFrameCandidate(mpCurrentKeyFrame);
     mState = OK;
 }
 
@@ -137,7 +148,8 @@ void Tracking::CreateNewKeyFrame()
     mReferenceFramePose = mCurrentFrame.mTcw;
 
     // Create a new keyframe
-    mpLocalMapper->AddKeyFrameCandidate(mCurrentFrame);
+    KeyFrame *pNewKF = new KeyFrame(mCurrentFrame, mpMap);
+    mpLocalMapper->AddKeyFrameCandidate(pNewKF);
 
     // Swap the dense tracking buffer
     mpTracker->SwapFrameBuffer();

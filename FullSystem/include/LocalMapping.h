@@ -20,14 +20,14 @@ class LocalMapping
 {
 public:
     LocalMapping(ORB_SLAM2::ORBVocabulary *pVoc, Map *pMap);
-    void AddKeyFrameCandidate(const Frame &F);
+    void AddKeyFrameCandidate(KeyFrame *pKF);
     void setLoopCloser(LoopClosing *pLoopCloser);
     void setViewer(Viewer *pViewer);
     void reset();
     void Run();
 
 private:
-    void CreateNewKeyFrame();
+    void ProcessNewKeyFrame();
     bool HasFrameToProcess();
     int MatchLocalPoints();
     void KeyFrameCulling();
@@ -38,14 +38,12 @@ private:
     void MapPointCulling();
 
     // keyframe candidate
-    std::mutex frameMutex;
-    Frame mCurrentFrame;
-    std::list<Frame> mlFrameQueue;
-    KeyFrame *NextKeyFrame;
-    KeyFrame *mLastKeyFrame;
-    KeyFrame *referenceKeyframe;
+    std::mutex mMutexKeyFrameQueue;
+    std::list<KeyFrame *> mlpKeyFrameQueue;
+    KeyFrame *mpCurrentKeyFrame;
+    KeyFrame *mpLastKeyFrame;
+    KeyFrame *mpReferenceKeyframe;
 
-    ORBextractor *mpExtractor;
     ORB_SLAM2::ORBVocabulary *ORBvocabulary;
 
     std::vector<KeyFrame *> mvpLocalKeyFrames;
@@ -55,9 +53,6 @@ private:
     Viewer *mpViewer;
     LoopClosing *mpLoopCloser;
     std::list<MapPoint *> mlpRecentAddedMapPoints;
-
-    cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
-    cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 
     cv::Mat mImg;
 };

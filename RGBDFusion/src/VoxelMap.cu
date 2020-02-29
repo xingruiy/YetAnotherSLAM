@@ -60,6 +60,15 @@ void MapStruct::create(
     this->truncationDist = truncationDist;
 }
 
+MapStruct::MapStruct(int SizeInMB)
+{
+    int nHashEntry = 0;  // 160kb
+    int nVoxelBlock = 0; // 3072kb
+    int nBucket = 0;
+    float voxelSize = 0.005;
+    float TruncationDist = 0.02;
+}
+
 void MapStruct::release()
 {
     cudaFree((void *)mplHeap);

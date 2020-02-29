@@ -52,9 +52,10 @@ public:
 
 public:
     MapStruct() = default;
-    MapStruct(int MemInBytes);
-    void Create(int MemInBytes);
+    MapStruct(int SizeInMB);
     void setMeshEngine(MeshEngine *pMeshEngine);
+
+    void Create(int SizeInMB);
     void FuseDepth(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcw);
 
 public:
