@@ -143,6 +143,8 @@ int Bundler::PoseOptimization(KeyFrame *pKF)
     R = SE3quat_recov.rotation().matrix();
     t = SE3quat_recov.translation();
     pKF->mTcw = Sophus::SE3d(R, t).inverse();
+    if (pKF->mpVoxelStruct)
+        pKF->mpVoxelStruct->mTcw = pKF->mTcw;
 
     return nInitialCorrespondences - nBad;
 }

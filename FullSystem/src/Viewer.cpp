@@ -83,7 +83,10 @@ void Viewer::Run()
             mpMapDrawer->DrawMapPoints(varPointSize);
 
         if (varShowMapStructs)
-            mpMapDrawer->DrawMesh(varDisplayMeshNum, RenderState.GetProjectionModelViewMatrix());
+        {
+            pangolin::OpenGlMatrix modelViewMatrix = RenderState.GetProjectionModelViewMatrix();
+            mpMapDrawer->DrawMesh(varDisplayMeshNum, modelViewMatrix);
+        }
 
         pangolin::FinishFrame();
     }

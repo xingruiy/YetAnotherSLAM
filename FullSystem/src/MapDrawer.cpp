@@ -18,11 +18,12 @@ void MapDrawer::LinkGlSlProgram()
         "layout(location = 0) in vec3 position;\n"
         "layout(location = 1) in vec3 a_normal;\n"
         "uniform mat4 mvpMat;\n"
+        "uniform mat4 Tmw;\n"
         "uniform float colourTaint;\n"
         "out vec3 shaded_colour;\n"
         "\n"
         "void main(void) {\n"
-        "    gl_Position = mvpMat * vec4(position, 1.0);\n"
+        "    gl_Position = mvpMat * Tmw * vec4(position, 1.0);\n"
         "    vec3 lightpos = vec3(5, 5, 5);\n"
         "    const float ka = 0.3;\n"
         "    const float kd = 0.5;\n"
@@ -185,7 +186,10 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
                 pMS->mbVertexBufferCreated = true;
             }
 
+            Eigen::Matrix4f Tmw = pMS->mTcw.matrix().cast<float>();
+
             mShader.Bind();
+            mShader.SetUniform("Tmw", pangolin::OpenGlMatrix(Tmw));
             mShader.SetUniform("mvpMat", mvpMat);
             mShader.SetUniform("colourTaint", pMS->mColourTaint);
 
