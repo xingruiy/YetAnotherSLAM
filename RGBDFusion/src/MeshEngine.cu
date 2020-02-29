@@ -337,6 +337,4 @@ void MeshEngine::Meshify(MapStruct *pMapStruct)
 
     SafeCall(cudaMemcpy(pMapStruct->mplPoint, mplVertexBuffer, sizeof(float) * 9 * nTriangles, cudaMemcpyDeviceToHost));
     SafeCall(cudaMemcpy(pMapStruct->mplNormal, mplNormalBuffer, sizeof(float) * 9 * nTriangles, cudaMemcpyDeviceToHost));
-
-    std::cout << nTriangles << std::endl;
 }

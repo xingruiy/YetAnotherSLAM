@@ -1,4 +1,5 @@
 #include "VoxelMap.h"
+#include "CudaUtils.h"
 #include "ParallelScan.h"
 #include "VoxelStructUtils.h"
 
@@ -24,7 +25,7 @@ __global__ void resetHeapKernel(int *mplHeap, int *mplHeapPtr, int numBlock)
     mplHeap[index] = numBlock - index - 1;
 }
 
-void MapStruct::reset()
+void MapStruct::Reset()
 {
     dim3 block(1024);
     dim3 grid(cv::divUp(hashTableSize, block.x));
@@ -106,15 +107,6 @@ void MapStruct::Release()
     mpLinkedListHead = NULL;
     mbInHibernation = false;
     mFootprintInMB = 0;
-}
-
-void MapStruct::getVisibleBlockCount(uint &hostData)
-{
-    cudaMemcpy(&hostData, visibleBlockNum, sizeof(uint), cudaMemcpyDeviceToHost);
-}
-
-void MapStruct::resetVisibleBlockCount()
-{
 }
 
 bool MapStruct::empty()
@@ -324,12 +316,6 @@ struct CheckEntryVisibilityFunctor
                 {
                     needScan = true;
                     increment = 1;
-                }
-                else
-                {
-                    int voxelPtr = current->ptr;
-                    memset(&mplVoxelBlocks[voxelPtr], 0, sizeof(Voxel) * BlockSize3);
-                    RemoveHashEntry(mplHeapPtr, mplHeap, voxelBlockSize, current);
                 }
             }
         }

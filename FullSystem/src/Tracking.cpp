@@ -92,14 +92,14 @@ void Tracking::InitializeSystem()
         return;
     }
 
-    mpCurrentVoxelStruct = new MapStruct(g_calib[0]);
-    mpCurrentVoxelStruct->setMeshEngine(mpMeshEngine);
-    mpCurrentVoxelStruct->create(20000, 10000, 15000, 0.01, 0.05);
-    mpCurrentVoxelStruct->reset();
+    mpCurrentMapStruct = new MapStruct(g_calib[0]);
+    mpCurrentMapStruct->setMeshEngine(mpMeshEngine);
+    mpCurrentMapStruct->create(20000, 10000, 15000, 0.01, 0.05);
+    mpCurrentMapStruct->Reset();
 
     mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
     mpTracker->SetReferenceDepth(mCurrentFrame.mImDepth);
-    mpCurrentVoxelStruct->Fuse(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
+    mpCurrentMapStruct->Fuse(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
 
     mpCurrentKeyFrame = KFinit;
     mpLocalMapper->AddKeyFrameCandidate(mpCurrentKeyFrame);
@@ -118,7 +118,7 @@ bool Tracking::TrackRGBD()
     mCurrentFrame.mRelativePose = DT.inverse();
     mCurrentFrame.mTcw = mReferenceFramePose * DT.inverse();
 
-    mpCurrentVoxelStruct->Fuse(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
+    mpCurrentMapStruct->Fuse(cv::cuda::GpuMat(mCurrentFrame.mImDepth), mCurrentFrame.mTcw);
     g_nTrackedFrame++;
 
     if (mpViewer)
@@ -160,7 +160,7 @@ void Tracking::CreateNewKeyFrame()
     mpTracker->SwapFrameBuffer();
     mCurrentFrame.mRelativePose = Sophus::SE3d();
 
-    mpMap->AddMapStruct(mpCurrentVoxelStruct);
+    mpMap->AddMapStruct(mpCurrentMapStruct);
 }
 
 void Tracking::reset()

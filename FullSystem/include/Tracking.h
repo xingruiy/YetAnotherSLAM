@@ -104,7 +104,7 @@ protected:
     unsigned int mnLastRelocFrameId;
 
     // Voxel Map Structure
-    MapStruct *mpCurrentVoxelStruct;
+    MapStruct *mpCurrentMapStruct;
 };
 
 } // namespace SLAM

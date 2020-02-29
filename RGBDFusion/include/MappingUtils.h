@@ -5,13 +5,6 @@
 #include <Eigen/Core>
 #include <sophus/se3.hpp>
 
-void fuseDepth(
-    MapStruct map,
-    const cv::cuda::GpuMat depth,
-    const Sophus::SE3d &T,
-    const Eigen::Matrix3d &K,
-    uint &visible_block_count);
-
 void create_rendering_blocks(
     MapStruct map_struct,
     uint count_visible_block,

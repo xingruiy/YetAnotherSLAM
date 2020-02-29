@@ -6,7 +6,6 @@
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 #include <sophus/se3.hpp>
-#include "CudaUtils.h"
 #include "MeshEngine.h"
 
 #define BlockSize 8
@@ -39,16 +38,12 @@ class MapStruct
 {
 public:
     bool empty();
-    void reset();
     void create(int hashTableSize, int bucketSize, int voxelBlockSize, float voxelSize, float truncationDist);
-
-    void getVisibleBlockCount(uint &hostData);
-    void resetVisibleBlockCount();
 
 public:
     MapStruct(const Eigen::Matrix3f &K);
     void setMeshEngine(MeshEngine *pMeshEngine);
-
+    void Reset();
     void Release();
 
     // TODO: create map based on the desired memory space

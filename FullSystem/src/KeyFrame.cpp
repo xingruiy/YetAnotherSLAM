@@ -7,12 +7,13 @@ namespace SLAM
 
 unsigned long KeyFrame::nNextId = 0;
 
-KeyFrame::KeyFrame(const Frame &F, Map *pMap) : mpMap(pMap), mTcw(F.mTcw), mpExtractor(F.mpORBExtractor), mRelativePose(F.mRelativePose),
-                                                mbBad(false), mbToBeErased(false), mbNotErase(false), mbFirstConnection(true),
-                                                mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0), mImg(F.mImGray.clone()),
-                                                mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0),
-                                                fx(g_fx[0]), fy(g_fy[0]), cx(g_cx[0]), cy(g_cy[0]), mK(g_cvCalib),
-                                                invfx(g_invfx[0]), invfy(g_invfy[0]), mbf(g_bf), mThDepth(g_thDepth)
+KeyFrame::KeyFrame(const Frame &F, Map *pMap)
+    : mpMap(pMap), mTcw(F.mTcw), mpExtractor(F.mpORBExtractor), mRelativePose(F.mRelativePose),
+      mbBad(false), mbToBeErased(false), mbNotErase(false), mbFirstConnection(true),
+      mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0), mImg(F.mImGray.clone()),
+      mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0),
+      fx(g_fx[0]), fy(g_fy[0]), cx(g_cx[0]), cy(g_cy[0]), mK(g_cvCalib),
+      invfx(g_invfx[0]), invfy(g_invfy[0]), mbf(g_bf), mThDepth(g_thDepth)
 {
   mnId = nNextId++;
 
