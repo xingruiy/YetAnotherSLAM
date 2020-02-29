@@ -39,20 +39,23 @@ private:
 
     int width, height;
     Eigen::Matrix3f mCalibInv;
+
+    // Textures and Images
+    cv::Mat mCvImageRGB;   // Colour image
+    cv::Mat mCvImageKF;    // KF image
+    cv::Mat mCvImageDepth; // Depth image
     pangolin::GlTexture mTextureKF;
     pangolin::GlTexture mTextureColour;
     pangolin::GlTexture mTextureDepth;
 
+    // Pangolin layout needed
     pangolin::View *mpMapView;
     pangolin::View *mpRightImageBar;
     pangolin::View *mpCurrentKFView;
     pangolin::View *mpCurrentImageView;
     pangolin::View *mpCurrentDepthView;
 
-    cv::Mat mCvImageRGB;   // Colour image
-    cv::Mat mCvImageKF;    // KF image
-    cv::Mat mCvImageDepth; // Depth image
-
+    // To view key points
     std::mutex mPoseMutex;
     std::mutex mImageMutex;
     std::vector<bool> mvMatches;

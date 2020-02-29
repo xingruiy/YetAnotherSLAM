@@ -109,17 +109,15 @@ __device__ __forceinline__ Eigen::Vector3f UnProjectWorld(const int &x, const in
     return T * UnProject(x, y, z, invfx, invfy, cx, cy);
 }
 
-__device__ __forceinline__ bool checkVertexVisible(Eigen::Vector3f pt, const Sophus::SE3f &Tinv,
-                                                   const int &cols, const int &rows,
-                                                   const float &fx, const float &fy,
-                                                   const float &cx, const float &cy,
-                                                   const float &depthMin, const float &depthMax)
+__device__ __forceinline__ bool CheckPointVisibility(Eigen::Vector3f pt, const Sophus::SE3f &Tinv,
+                                                     const int &cols, const int &rows,
+                                                     const float &fx, const float &fy,
+                                                     const float &cx, const float &cy,
+                                                     const float &depthMin, const float &depthMax)
 {
     pt = Tinv * pt;
     Eigen::Vector2f pt2d = project(pt, fx, fy, cx, cy);
-    return !(pt2d(0) < 0 || pt2d(1) < 0 ||
-             pt2d(0) > cols - 1 || pt2d(1) > rows - 1 ||
-             pt(2) < depthMin || pt(2) > depthMax);
+    return !(pt2d(0) < 0 || pt2d(1) < 0 || pt2d(0) > cols - 1 || pt2d(1) > rows - 1 || pt(2) < depthMin || pt(2) > depthMax);
 }
 
 __device__ __forceinline__ bool CheckBlockVisibility(const Eigen::Vector3i &blockPos,
@@ -139,15 +137,9 @@ __device__ __forceinline__ bool CheckBlockVisibility(const Eigen::Vector3i &bloc
         tmp(1) += (corner & 2) ? 1 : 0;
         tmp(2) += (corner & 4) ? 1 : 0;
 
-        if (checkVertexVisible(
-                tmp.cast<float>() * scale,
-                Tinv,
-                cols, rows,
-                fx, fy,
-                cx, cy,
-                depthMin,
-                depthMax))
-
+        if (CheckPointVisibility(tmp.cast<float>() * scale, Tinv,
+                                 cols, rows, fx, fy, cx, cy,
+                                 depthMin, depthMax))
             return true;
     }
 

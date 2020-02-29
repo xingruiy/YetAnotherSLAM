@@ -103,7 +103,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectLoopCandidates(KeyFrame *pKF, fl
 
             pKFi->mLoopScore = si;
             if (si >= minScore)
-                lScoreAndMatch.push_back(make_pair(si, pKFi));
+                lScoreAndMatch.push_back(std::make_pair(si, pKFi));
         }
     }
 
@@ -136,7 +136,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectLoopCandidates(KeyFrame *pKF, fl
             }
         }
 
-        lAccScoreAndMatch.push_back(make_pair(accScore, pBestKF));
+        lAccScoreAndMatch.push_back(std::make_pair(accScore, pBestKF));
         if (accScore > bestAccScore)
             bestAccScore = accScore;
     }
@@ -144,7 +144,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectLoopCandidates(KeyFrame *pKF, fl
     // Return all those keyframes with a score higher than 0.75*bestScore
     float minScoreToRetain = 0.75f * bestAccScore;
 
-    set<KeyFrame *> spAlreadyAddedKF;
+    std::set<KeyFrame *> spAlreadyAddedKF;
     std::vector<KeyFrame *> vpLoopCandidates;
     vpLoopCandidates.reserve(lAccScoreAndMatch.size());
 
@@ -170,7 +170,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
 
     // Search all keyframes that share a word with current frame
     {
-        unique_lock<mutex> lock(mMutex);
+        std::unique_lock<std::mutex> lock(mMutex);
 
         for (auto vit = F->mBowVec.begin(), vend = F->mBowVec.end(); vit != vend; vit++)
         {
@@ -216,7 +216,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
             nscores++;
             float si = mpVoc->score(F->mBowVec, pKFi->mBowVec);
             pKFi->mRelocScore = si;
-            lScoreAndMatch.push_back(make_pair(si, pKFi));
+            lScoreAndMatch.push_back(std::make_pair(si, pKFi));
         }
     }
 
@@ -235,7 +235,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
         float bestScore = it->first;
         float accScore = bestScore;
         KeyFrame *pBestKF = pKFi;
-        for (std::vector<KeyFrame *>::iterator vit = vpNeighs.begin(), vend = vpNeighs.end(); vit != vend; vit++)
+        for (auto vit = vpNeighs.begin(), vend = vpNeighs.end(); vit != vend; vit++)
         {
             KeyFrame *pKF2 = *vit;
             if (pKF2->mnRelocQuery != F->mnId)
@@ -255,7 +255,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
 
     // Return all those keyframes with a score higher than 0.75*bestScore
     float minScoreToRetain = 0.75f * bestAccScore;
-    set<KeyFrame *> spAlreadyAddedKF;
+    std::set<KeyFrame *> spAlreadyAddedKF;
     std::vector<KeyFrame *> vpRelocCandidates;
     vpRelocCandidates.reserve(lAccScoreAndMatch.size());
     for (auto it = lAccScoreAndMatch.begin(), itend = lAccScoreAndMatch.end(); it != itend; it++)

@@ -142,6 +142,8 @@ void Tracking::CreateNewKeyFrame()
     // Swap the dense tracking buffer
     mpTracker->SwapFrameBuffer();
     mCurrentFrame.mRelativePose = Sophus::SE3d();
+
+    mpMap->AddMapStruct(mpMapper->GetMapStruct());
 }
 
 void Tracking::reset()

@@ -44,12 +44,9 @@ void Viewer::Run()
     mpRightImageBar->AddDisplay(*mpCurrentKFView);
 
     // Create textures
-    mTextureKF.Reinitialise(width, height, GL_RGB, true, 0,
-                            GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mTextureColour.Reinitialise(width, height, GL_RGB, true, 0,
-                                GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0,
-                               GL_LUMINANCE, GL_FLOAT, NULL);
+    mTextureKF.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    mTextureColour.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, NULL);
 
     // Create menus
     pangolin::CreatePanel("menu").SetBounds(0, 1, 0, MenuDividerLeft);
@@ -59,8 +56,10 @@ void Viewer::Run()
     pangolin::Var<bool> varShowKeyFrames = pangolin::Var<bool>("menu.Display KeyFrames", true, true);
     pangolin::Var<bool> varShowKFGraph = pangolin::Var<bool>("menu.Display Covisibility Graph", true, true);
     pangolin::Var<bool> varShowMapPoints = pangolin::Var<bool>("menu.Display MapPoints", true, true);
+    pangolin::Var<bool> varShowMapStructs = pangolin::Var<bool>("menu.Display MapStructs", true, true);
     pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
     pangolin::Var<int> varCovMapDensity = pangolin::Var<int>("menu.Covisibility Map Density", 10, 1, 50);
+    pangolin::Var<int> varDisplayMeshNum = pangolin::Var<int>("menu.Display Mesh Number", -1, -1, 10);
 
     while (!pangolin::ShouldQuit())
     {
@@ -80,6 +79,9 @@ void Viewer::Run()
 
         if (varShowMapPoints)
             mpMapDrawer->DrawMapPoints(varPointSize);
+
+        if (varShowMapStructs)
+            mpMapDrawer->DrawMesh(varDisplayMeshNum);
 
         pangolin::FinishFrame();
     }

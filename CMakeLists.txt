@@ -35,8 +35,8 @@ PRIVATE
     RGBDFusion/src/RGBDTracking.cu
     RGBDFusion/src/VoxelMapping.cu
     RGBDFusion/src/DepthFusion.cu
-    RGBDFusion/src/MeshScene.cu
     RGBDFusion/src/RayTracing.cu
+    RGBDFusion/src/MeshEngine.cu
 )
 
 set_target_properties(${PROJECT_NAME}

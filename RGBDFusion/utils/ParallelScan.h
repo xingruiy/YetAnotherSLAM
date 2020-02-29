@@ -1,4 +1,6 @@
-#pragma once
+#ifndef PARALLEL_SCAN_H
+#define PARALLEL_SCAN_H
+
 #include <cuda_runtime_api.h>
 
 template <int threadBlock>
@@ -54,3 +56,5 @@ __device__ __forceinline__ int ParallelScan(uint element, uint *sum)
 
     return offset;
 }
+
+#endif

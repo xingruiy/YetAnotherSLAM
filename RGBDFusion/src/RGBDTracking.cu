@@ -2,7 +2,8 @@
 #include "TrackingUtils.h"
 #include "ImageProc.h"
 
-RGBDTracking::RGBDTracking(const int &w, const int &h, const Eigen::Matrix3d &K,
+RGBDTracking::RGBDTracking(const int &w, const int &h,
+                           const Eigen::Matrix3d &K,
                            const bool &bRGB, const bool &bDepth)
 {
     if (bRGB && bDepth)

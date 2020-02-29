@@ -5,6 +5,7 @@
 #include <pangolin/pangolin.h>
 #include "KeyFrame.h"
 #include "MapPoint.h"
+#include "VoxelMap.h"
 #include "Map.h"
 
 namespace SLAM
@@ -19,6 +20,8 @@ public:
 
     void DrawMapPoints(int iPointSize);
     void DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int iEdgeWeight);
+
+    void DrawMesh(int N = -1);
 
 private:
     Map *mpMap;

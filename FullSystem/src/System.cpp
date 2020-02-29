@@ -43,17 +43,17 @@ void System::TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp)
     // Convert depth to floating point
     depth.convertTo(depthFloat, CV_32FC1, g_DepthScaleInv);
 
-    if (!g_bSystemRunning)
-        return;
-
-    // Invoke the main tracking thread
-    mpTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
-
     if (mpViewer)
     {
         mpViewer->setLiveImage(img);
         mpViewer->setLiveDepth(depthFloat);
     }
+
+    if (!g_bSystemRunning)
+        return;
+
+    // Invoke the main tracking thread
+    mpTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
 }
 
 void System::reset()

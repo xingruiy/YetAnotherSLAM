@@ -26,7 +26,7 @@ struct RenderingBlockDelegate
     mutable cv::cuda::PtrStepSz<float> zRangeX;
     mutable cv::cuda::PtrStep<float> zRangeY;
 
-    __device__ __forceinline__ bool createRenderingBlock(const Eigen::Vector3i &blockPos, RenderingBlock &block) const
+    __device__ __forceinline__ bool CreateRenderingBlockList(const Eigen::Vector3i &blockPos, RenderingBlock &block) const
     {
         block.upper_left = Eigen::Matrix<short, 2, 1>(zRangeX.cols, zRangeX.rows);
         block.lower_right = Eigen::Matrix<short, 2, 1>(-1, -1);
@@ -78,7 +78,7 @@ struct RenderingBlockDelegate
         return true;
     }
 
-    __device__ __forceinline__ void splitRenderingBlock(int offset, const RenderingBlock &block, int &nx, int &ny) const
+    __device__ __forceinline__ void SplitRenderingBlocks(int offset, const RenderingBlock &block, int &nx, int &ny) const
     {
         for (int y = 0; y < ny; ++y)
         {
@@ -112,7 +112,7 @@ struct RenderingBlockDelegate
 
         if (x < visible_block_count && visibleEntry[x].ptr != -1)
         {
-            valid = createRenderingBlock(visibleEntry[x].pos, block);
+            valid = CreateRenderingBlockList(visibleEntry[x].pos, block);
             float dx = (float)block.lower_right(0) - block.upper_left(0) + 1;
             float dy = (float)block.lower_right(1) - block.upper_left(1) + 1;
             nx = __float2int_ru(dx / RenderingBlockSizeX);
@@ -131,7 +131,7 @@ struct RenderingBlockDelegate
 
         int offset = ParallelScan<1024>(requiredNoBlocks, rendering_block_count);
         if (valid && offset != -1 && (offset + requiredNoBlocks) < MaxNumRenderingBlock)
-            splitRenderingBlock(offset, block, nx, ny);
+            SplitRenderingBlocks(offset, block, nx, ny);
     }
 };
 

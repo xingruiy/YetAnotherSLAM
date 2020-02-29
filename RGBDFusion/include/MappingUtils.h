@@ -3,6 +3,7 @@
 #include "VoxelMap.h"
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
+#include <sophus/se3.hpp>
 
 void fuseDepth(
     MapStruct map,
@@ -28,11 +29,3 @@ void raycast(
     cv::cuda::GpuMat zRangeY,
     const Sophus::SE3d &T,
     const Eigen::Matrix3d &K);
-
-void create_mesh_with_normal(
-    MapStruct map_struct,
-    uint &block_count,
-    uint &triangle_count,
-    void *vertexBuffer,
-    void *normalBuffer,
-    size_t bufferSize = 0);

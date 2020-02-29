@@ -7,6 +7,7 @@
 #include "Frame.h"
 #include "KeyFrame.h"
 #include "MapPoint.h"
+#include "VoxelMap.h"
 
 namespace SLAM
 {
@@ -19,10 +20,16 @@ class Map
 {
 public:
     void reset();
+
     void AddKeyFrame(KeyFrame *pKF);
-    void AddMapPoint(MapPoint *pMP);
     void EraseKeyFrame(KeyFrame *pKF);
+
+    void AddMapPoint(MapPoint *pMP);
     void EraseMapPoint(MapPoint *pMP);
+
+    void AddMapStruct(MapStruct *pMS);
+    void EraseMapStruct(MapStruct *pMS);
+
     void SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs);
 
     std::mutex mMutexMapUpdate;
@@ -30,11 +37,14 @@ public:
     std::vector<MapPoint *> GetReferenceMapPoints();
     std::vector<KeyFrame *> GetAllKeyFrames();
     std::vector<MapPoint *> GetAllMapPoints();
+    std::vector<MapStruct *> GetAllVoxelMaps();
 
 private:
-    std::mutex mMutexMap;
+    std::mutex mMapMutex;
+    std::mutex mFractualMutex;
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
+    std::set<MapStruct *> mspMapStructs;
     std::vector<MapPoint *> mvpReferenceMapPoints;
 };
 

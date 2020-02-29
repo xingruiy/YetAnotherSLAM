@@ -23,13 +23,13 @@ int main(int argc, char **argv)
     size_t nImages = vstrImageFilenamesRGB.size();
     if (vstrImageFilenamesRGB.empty())
     {
-        std::cerr << endl
+        std::cerr << std::endl
                   << "No images found in provided path." << std::endl;
         return 1;
     }
     else if (vstrImageFilenamesD.size() != vstrImageFilenamesRGB.size())
     {
-        std::cerr << endl
+        std::cerr << std::endl
                   << "Different number of images for rgb and depth." << std::endl;
         return 1;
     }

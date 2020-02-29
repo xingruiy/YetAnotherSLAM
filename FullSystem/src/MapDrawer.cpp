@@ -51,15 +51,6 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
                 }
             }
 
-            // Spanning tree
-            // KeyFrame *pParent = vpKFs[i]->GetParent();
-            // if (pParent)
-            // {
-            //     Eigen::Vector3f Owp = pParent->mTcw.translation().cast<float>();
-            //     glVertex3f(Ow(0), Ow(1), Ow(2));
-            //     glVertex3f(Owp(0), Owp(1), Owp(2));
-            // }
-
             // Loops
             // set<KeyFrame *> sLoopKFs = vpKFs[i]->GetLoopEdges();
             // for (set<KeyFrame *>::iterator sit = sLoopKFs.begin(), send = sLoopKFs.end(); sit != send; sit++)
@@ -105,7 +96,7 @@ void MapDrawer::DrawMapPoints(int iPointSize)
     glBegin(GL_POINTS);
     glColor3f(1.0, 0.0, 0.0);
 
-    for (set<MapPoint *>::iterator sit = spRefMPs.begin(), send = spRefMPs.end(); sit != send; sit++)
+    for (std::set<MapPoint *>::iterator sit = spRefMPs.begin(), send = spRefMPs.end(); sit != send; sit++)
     {
         if ((*sit)->isBad())
             continue;
@@ -116,6 +107,34 @@ void MapDrawer::DrawMapPoints(int iPointSize)
 
     glEnd();
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+void MapDrawer::DrawMesh(int N)
+{
+    std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
+    if (N <= 0 || vpMapStruct.size() < N)
+        N = vpMapStruct.size();
+    std::vector<MapStruct *> vpMSToDraw = std::vector<MapStruct *>(vpMapStruct.end() - N, vpMapStruct.end());
+    for (auto vit = vpMSToDraw.begin(), vend = vpMSToDraw.end(); vit != vend; ++vit)
+    {
+        MapStruct *pMS = *vit;
+        if (pMS && !pMS->mbActive)
+        {
+            if (!pMS->mbHasMesh)
+                pMS->UpdateMesh();
+
+            if (!pMS->mplPoint)
+                return;
+
+            glBegin(GL_TRIANGLES);
+            glColor3f(0.0f, 0.0f, 1.0f);
+            for (int i = 0; i < pMS->N / 3 - 1; ++i)
+                glVertex3f(pMS->mplPoint[i * 3], pMS->mplPoint[i * 3 + 1], pMS->mplPoint[i * 3 + 2]);
+
+            glEnd();
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        }
+    }
 }
 
 } // namespace SLAM

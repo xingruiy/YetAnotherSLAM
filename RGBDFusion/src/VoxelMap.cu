@@ -86,3 +86,20 @@ bool MapStruct::empty()
 {
     return bucketSize == 0;
 }
+
+void MapStruct::UpdateMesh()
+{
+    if (!mbHasMesh && mpMeshEngine)
+    {
+        mpMeshEngine->Meshify(this);
+        SafeCall(cudaDeviceSynchronize());
+        SafeCall(cudaGetLastError());
+
+        mbHasMesh = true;
+    }
+}
+
+void MapStruct::setMeshEngine(MeshEngine *pMeshEngine)
+{
+    mpMeshEngine = pMeshEngine;
+}
