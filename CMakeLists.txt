@@ -22,13 +22,14 @@ PRIVATE
     FullSystem/src/System.cpp
     FullSystem/src/Viewer.cpp
     FullSystem/src/Tracking.cpp
-    FullSystem/src/Bundler.cpp
+    FullSystem/src/Optimizer.cpp
     FullSystem/src/ORBMatcher.cpp
     FullSystem/src/GlobalDef.cpp
     FullSystem/src/LoopClosing.cpp
     FullSystem/src/KeyFrameDatabase.cpp
     FullSystem/src/ORBextractor.cpp
-    FullSystem/src/Converter.cc
+    FullSystem/src/Converter.cpp
+    FullSystem/src/Sim3Solver.cpp
 
     RGBDFusion/src/ImageProc.cu
     RGBDFusion/src/VoxelMap.cu
@@ -64,6 +65,7 @@ PUBLIC
     Eigen3::Eigen
     g2o_core 
     g2o_types_sba
+    g2o_types_sim3
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}

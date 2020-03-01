@@ -20,7 +20,7 @@
 
 #include "Converter.h"
 
-namespace ORB_SLAM2
+namespace SLAM
 {
 
 std::vector<cv::Mat> Converter::toDescriptorVector(const cv::Mat &Descriptors)
@@ -152,4 +152,4 @@ std::vector<float> Converter::toQuaternion(const cv::Mat &M)
     return v;
 }
 
-} // namespace ORB_SLAM2
+} // namespace SLAM

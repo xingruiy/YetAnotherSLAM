@@ -9,16 +9,19 @@ std::mutex MapPoint::mGlobalMutex;
 unsigned long MapPoint::nNextId = 0;
 
 MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
-    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1), mnTrackReferenceForFrame(-1),
-      mpReplaced(NULL), mfMinDistance(0), mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
+    : mnFirstKFid(pRefKF->mnId), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
+      mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
+      mpReplaced(nullptr), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), mWorldPos(pos),
+      mAvgViewingDir(Eigen::Vector3d::Zero()), mnTrackReferenceForFrame(0)
 {
-    mAvgViewingDir = Eigen::Vector3d::Zero();
     mnId = nNextId++;
 }
 
 MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF)
-    : mpMap(pMap), mpRefKF(pRefKF), mWorldPos(pos), nObs(0), mnVisible(1), mnFound(1), mnTrackReferenceForFrame(-1),
-      mpReplaced(NULL), mfMinDistance(0), mfMaxDistance(0), mnFuseCandidateForKF(0), mnFirstKFid(pRefKF->mnId), mbBad(false)
+    : mnFirstKFid(pRefKF->mnId), mpRefKF(pRefKF), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0),
+      mnLoopPointForKF(0), mnCorrectedByKF(0), mnCorrectedReference(0), mnBAGlobalForKF(0),
+      mnVisible(1), mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap), mWorldPos(pos),
+      mnTrackReferenceForFrame(0)
 {
     mnId = nNextId++;
 
@@ -166,10 +169,23 @@ void MapPoint::Replace(MapPoint *pMP)
     mpMap->EraseMapPoint(this);
 }
 
-Eigen::Vector3d MapPoint::GetViewingDirection()
+Eigen::Vector3d MapPoint::GetNormal()
 {
     std::unique_lock<std::mutex> lock2(mMutexPos);
     return mAvgViewingDir;
+}
+
+KeyFrame *MapPoint::GetReferenceKeyFrame()
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    return mpRefKF;
+}
+
+void MapPoint::SetWorldPos(const Eigen::Vector3d &pos)
+{
+    std::unique_lock<std::mutex> lock2(mGlobalMutex);
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    mWorldPos = pos;
 }
 
 Eigen::Vector3d MapPoint::GetWorldPos()
@@ -189,7 +205,7 @@ float MapPoint::GetFoundRatio()
     return static_cast<float>(mnFound) / mnVisible;
 }
 
-void MapPoint::UpdateDepthAndViewingDir()
+void MapPoint::UpdateNormalAndDepth()
 {
     std::map<KeyFrame *, size_t> Obs;
     KeyFrame *pRefKF;

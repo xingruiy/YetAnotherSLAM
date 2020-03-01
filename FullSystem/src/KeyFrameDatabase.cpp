@@ -6,7 +6,7 @@
 namespace SLAM
 {
 
-KeyFrameDatabase::KeyFrameDatabase(const ORB_SLAM2::ORBVocabulary &voc) : mpVoc(&voc)
+KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : mpVoc(&voc)
 {
     mvInvertedFile.resize(voc.size());
 }

@@ -97,17 +97,6 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
                     glVertex3f(Ow2(0), Ow2(1), Ow2(2));
                 }
             }
-
-            // Loops
-            // set<KeyFrame *> sLoopKFs = vpKFs[i]->GetLoopEdges();
-            // for (set<KeyFrame *>::iterator sit = sLoopKFs.begin(), send = sLoopKFs.end(); sit != send; sit++)
-            // {
-            //     if ((*sit)->mnId < vpKFs[i]->mnId)
-            //         continue;
-            //     cv::Mat Owl = (*sit)->GetCameraCenter();
-            //     glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
-            //     glVertex3f(Owl.at<float>(0), Owl.at<float>(1), Owl.at<float>(2));
-            // }
         }
 
         glEnd();

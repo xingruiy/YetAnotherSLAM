@@ -25,12 +25,13 @@ public:
 
     // Pose functions
     void SetPose(const Sophus::SE3d &Tcw);
-    cv::Mat GetRotation() const;
-    cv::Mat GetTranslation() const;
-    cv::Mat GetInvTransform() const;
+    Sophus::SE3d GetPose();
+    Sophus::SE3d GetPoseInverse();
+    Eigen::Matrix3d GetRotation();
+    Eigen::Vector3d GetTranslation();
 
     // Bag of Words Representation
-    void ComputeBoW(ORB_SLAM2::ORBVocabulary *voc);
+    void ComputeBoW(ORBVocabulary *voc);
 
     // Covisibility Graph functions
     int GetWeight(KeyFrame *pKF);
@@ -103,6 +104,11 @@ public:
 
     // Grid over the image to speed up feature matching
     std::vector<std::vector<std::vector<size_t>>> mGrid;
+
+    // Variables used by loop closing
+    Sophus::SE3d mTcwGBA;
+    Sophus::SE3d mTcwBefGBA;
+    long unsigned int mnBAGlobalForKF;
 
     // Calibration parameters
     float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;

@@ -161,7 +161,7 @@ void System::readSettings(const std::string &strSettingFile)
 void System::loadORBVocabulary(const std::string &strVocFile)
 {
     std::cout << "loading ORB vocabulary..." << std::endl;
-    mpORBVocabulary = new ORB_SLAM2::ORBVocabulary();
+    mpORBVocabulary = new ORBVocabulary();
     mpORBVocabulary->loadFromTextFile(strVocFile);
     std::cout << "ORB vocabulary loaded..." << std::endl;
 }

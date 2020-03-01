@@ -8,7 +8,7 @@ namespace SLAM
 unsigned long KeyFrame::nNextId = 0;
 
 KeyFrame::KeyFrame(const Frame &F, Map *pMap)
-    : mpMap(pMap), mTcw(F.mTcw), mpExtractor(F.mpORBExtractor), mRelativePose(F.mRelativePose),
+    : mpMap(pMap), mTcw(F.mTcw), mpExtractor(F.mpORBextractor), mRelativePose(F.mRelativePose),
       mbBad(false), mbToBeErased(false), mbNotErase(false), mbFirstConnection(true),
       mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0), mImg(F.mImGray.clone()),
       mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0),
@@ -78,13 +78,41 @@ void KeyFrame::UndistortKeys()
   }
 }
 
-void KeyFrame::ComputeBoW(ORB_SLAM2::ORBVocabulary *voc)
+void KeyFrame::ComputeBoW(ORBVocabulary *voc)
 {
   if (mBowVec.empty())
   {
-    std::vector<cv::Mat> vCurrentDesc = ORB_SLAM2::Converter::toDescriptorVector(mDescriptors);
+    std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
     voc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
   }
+}
+
+void KeyFrame::SetPose(const Sophus::SE3d &Tcw)
+{
+  mTcw = Tcw;
+
+  if (mpVoxelStruct)
+    mpVoxelStruct->mTcw = Tcw;
+}
+
+Sophus::SE3d KeyFrame::GetPose()
+{
+  return mTcw;
+}
+
+Sophus::SE3d KeyFrame::GetPoseInverse()
+{
+  return mTcw.inverse();
+}
+
+Eigen::Matrix3d KeyFrame::GetRotation()
+{
+  return mTcw.rotationMatrix();
+}
+
+Eigen::Vector3d KeyFrame::GetTranslation()
+{
+  return mTcw.translation();
 }
 
 void KeyFrame::EraseMapPointMatch(MapPoint *pMP)
@@ -319,7 +347,7 @@ bool KeyFrame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
     return false;
 
   // Check viewing angle
-  Eigen::Vector3d Pn = pMP->GetViewingDirection();
+  Eigen::Vector3d Pn = pMP->GetNormal();
 
   float viewCos = PO.dot(Pn) / dist;
 
@@ -471,6 +499,12 @@ void KeyFrame::AddChild(KeyFrame *pKF)
 {
   std::unique_lock<std::mutex> lockCon(mMutexConnections);
   mspChildrens.insert(pKF);
+}
+
+std::set<KeyFrame *> KeyFrame::GetChilds()
+{
+  std::unique_lock<std::mutex> lockCon(mMutexConnections);
+  return mspChildrens;
 }
 
 std::set<KeyFrame *> KeyFrame::GetConnectedKeyFrames()
@@ -635,6 +669,25 @@ KeyFrame *KeyFrame::GetParent()
   return mpParent;
 }
 
+bool KeyFrame::hasChild(KeyFrame *pKF)
+{
+  std::unique_lock<std::mutex> lockCon(mMutexConnections);
+  return mspChildrens.count(pKF);
+}
+
+void KeyFrame::AddLoopEdge(KeyFrame *pKF)
+{
+  std::unique_lock<std::mutex> lockCon(mMutexConnections);
+  mbNotErase = true;
+  mspLoopEdges.insert(pKF);
+}
+
+std::set<KeyFrame *> KeyFrame::GetLoopEdges()
+{
+  std::unique_lock<std::mutex> lockCon(mMutexConnections);
+  return mspLoopEdges;
+}
+
 void KeyFrame::EraseConnection(KeyFrame *pKF)
 {
   bool bUpdate = false;
@@ -649,39 +702,6 @@ void KeyFrame::EraseConnection(KeyFrame *pKF)
 
   if (bUpdate)
     UpdateBestCovisibles();
-}
-
-cv::Mat KeyFrame::GetRotation() const
-{
-  cv::Mat cvMat(3, 3, CV_32F);
-  Eigen::Matrix3d R = mTcw.rotationMatrix();
-
-  for (int i = 0; i < 3; i++)
-    for (int j = 0; j < 3; j++)
-      cvMat.at<float>(i, j) = R(i, j);
-
-  return cvMat.clone();
-}
-
-cv::Mat KeyFrame::GetTranslation() const
-{
-  cv::Mat cvMat(3, 1, CV_32F);
-  Eigen::Vector3d Ow = mTcw.translation();
-  for (int i = 0; i < 3; i++)
-    cvMat.at<float>(i) = Ow(i);
-
-  return cvMat;
-}
-
-cv::Mat KeyFrame::GetInvTransform() const
-{
-  cv::Mat cvMat(4, 4, CV_32F);
-  Eigen::Matrix4d Twc = mTcw.inverse().matrix();
-  for (int i = 0; i < 4; i++)
-    for (int j = 0; j < 4; j++)
-      cvMat.at<float>(i, j) = Twc(i, j);
-
-  return cvMat;
 }
 
 void KeyFrame::SetNotErase()

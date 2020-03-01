@@ -17,7 +17,7 @@ class Frame;
 class KeyFrameDatabase
 {
 public:
-    KeyFrameDatabase(const ORB_SLAM2::ORBVocabulary &voc);
+    KeyFrameDatabase(const ORBVocabulary &voc);
 
     void add(KeyFrame *pKF);
 
@@ -33,7 +33,7 @@ public:
 
 protected:
     // Associated vocabulary
-    const ORB_SLAM2::ORBVocabulary *mpVoc;
+    const ORBVocabulary *mpVoc;
 
     // Inverted file
     std::vector<std::list<KeyFrame *>> mvInvertedFile;

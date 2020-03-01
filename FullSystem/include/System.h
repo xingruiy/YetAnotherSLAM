@@ -50,7 +50,7 @@ private:
     MapDrawer *mpMapDrawer;
 
     KeyFrameDatabase *mpKeyFrameDB;
-    ORB_SLAM2::ORBVocabulary *mpORBVocabulary;
+    ORBVocabulary *mpORBVocabulary;
 
     cv::Mat grayScale;
     cv::Mat depthFloat;
