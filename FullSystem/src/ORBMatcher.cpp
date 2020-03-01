@@ -247,7 +247,7 @@ int ORBMatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint
     return nmatches;
 }
 
-int ORBMatcher::SearchByProjection(KeyFrame *pKF, Sophus::Sim3d Scw, const std::vector<MapPoint *> &vpPoints, std::vector<MapPoint *> &vpMatched, int th)
+int ORBMatcher::SearchByProjection(KeyFrame *pKF, Sophus::SE3d Scw, const std::vector<MapPoint *> &vpPoints, std::vector<MapPoint *> &vpMatched, int th)
 {
     // Get Calibration Parameters for later projection
     const float &fx = pKF->fx;
@@ -256,7 +256,7 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, Sophus::Sim3d Scw, const std::
     const float &cy = pKF->cy;
 
     // Decompose Scw
-    Sophus::Sim3d Swc = Scw.inverse();
+    Sophus::SE3d Swc = Scw.inverse();
     Eigen::Vector3d Ow = Scw.translation();
 
     // Set of MapPoints already found in the KeyFrame
@@ -799,8 +799,7 @@ int ORBMatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F
     return nmatches;
 }
 
-int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const float &s12,
-                             const Eigen::Matrix3d &R12, const Eigen::Vector3d &t12, const float th)
+int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th)
 {
     const float &fx = pKF1->fx;
     const float &fy = pKF1->fy;
@@ -811,15 +810,7 @@ int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoin
     auto Twc2 = pKF2->mTcw.inverse();
 
     //Transformation between cameras
-    // Eigen::Matrix3d sR12 = s12 * R12;
-    // Eigen::Matrix3d sR21 = (1.0 / s12) * R12.t();
-    // Eigen::Vector3d t21 = -sR21 * t12;
-    Eigen::Matrix3d sR12 = s12 * R12;
-    Eigen::Matrix4d sRt = Eigen::Matrix4d::Identity();
-    sRt.topLeftCorner(3, 3) = sR12;
-    sRt.topRightCorner(3, 1) = t12;
-    Sophus::Sim3d S12 = Sophus::Sim3d(sRt);
-    Sophus::Sim3d S21 = S21.inverse();
+    Sophus::SE3d S21 = S12.inverse();
 
     const std::vector<MapPoint *> vpMapPoints1 = pKF1->GetMapPointMatches();
     const int N1 = vpMapPoints1.size();
@@ -858,7 +849,7 @@ int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoin
 
         Eigen::Vector3d p3Dw = pMP->GetWorldPos();
         Eigen::Vector3d p3Dc1 = Twc1 * p3Dw;
-        Eigen::Vector3d p3Dc2 = S21 * p3Dc1;
+        Eigen::Vector3d p3Dc2 = S12 * p3Dc1;
 
         // Depth must be positive
         if (p3Dc2(2) < 0.0)
@@ -938,7 +929,7 @@ int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoin
 
         Eigen::Vector3d p3Dw = pMP->GetWorldPos();
         Eigen::Vector3d p3Dc2 = Twc2 * p3Dw;
-        Eigen::Vector3d p3Dc1 = S12 * p3Dc2;
+        Eigen::Vector3d p3Dc1 = S21 * p3Dc2;
 
         // Depth must be positive
         if (p3Dc1(2) < 0.0)

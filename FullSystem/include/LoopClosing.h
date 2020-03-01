@@ -91,7 +91,7 @@ private:
     std::vector<KeyFrame *> mvpCurrentConnectedKFs;
     std::vector<MapPoint *> mvpCurrentMatchedPoints;
     std::vector<MapPoint *> mvpLoopMapPoints;
-    Sophus::Sim3d mScw;
+    Sophus::SE3d mScw;
     g2o::Sim3 mg2oScw;
 
     long unsigned int mLastLoopKFid;

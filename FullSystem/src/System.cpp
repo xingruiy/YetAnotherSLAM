@@ -18,6 +18,7 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
 
     mpLocalMapper = new LocalMapping(mpORBVocabulary, mpMap);
     mpLocalMapper->setLoopCloser(mpLoopClosing);
+    mpLoopClosing->SetLocalMapper(mpLocalMapper);
     mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
 
     mpTracker = new Tracking(this, mpMap);

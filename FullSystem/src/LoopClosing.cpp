@@ -8,9 +8,15 @@ namespace SLAM
 {
 
 LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
-    : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0)
+    : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0),
+      mbFixScale(true), mpThreadGBA(nullptr), mbRunningGBA(false)
 {
     mnCovisibilityConsistencyTh = 3;
+}
+
+void LoopClosing::SetLocalMapper(LocalMapping *pLocalMapper)
+{
+    mpLocalMapper = pLocalMapper;
 }
 
 void LoopClosing::Run()
@@ -19,11 +25,12 @@ void LoopClosing::Run()
     {
         if (CheckNewKeyFrames())
         {
-            if (DetectLoop() && ComputeSim3())
+            if (DetectLoop())
             {
                 std::cout << "Loop Detected!" << std::endl;
-                // Perform loop fusion and pose graph optimization
-                CorrectLoop();
+                if (ComputeSim3())
+                    // Perform loop fusion and pose graph optimization
+                    CorrectLoop();
             }
         }
     }
@@ -171,6 +178,8 @@ bool LoopClosing::DetectLoop()
 
 bool LoopClosing::ComputeSim3()
 {
+    std::cout << "Compute Sim3!" << std::endl;
+    std::cout << "============================" << std::endl;
     // For each consistent loop candidate we try to compute a Sim3
     const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
 
@@ -203,6 +212,7 @@ bool LoopClosing::ComputeSim3()
         }
 
         int nmatches = matcher.SearchByBoW(mpCurrentKF, pKF, vvpMapPointMatches[i]);
+        std::cout << "Iteration " << i << " Matches " << nmatches << std::endl;
 
         if (nmatches < 20)
         {
@@ -227,6 +237,7 @@ bool LoopClosing::ComputeSim3()
     {
         for (int i = 0; i < nInitialCandidates; i++)
         {
+            std::cout << "start computing " << std::endl;
             if (vbDiscarded[i])
                 continue;
 
@@ -238,6 +249,7 @@ bool LoopClosing::ComputeSim3()
             bool bNoMore;
 
             Sim3Solver *pSolver = vpSim3Solvers[i];
+
             Sophus::SE3d Scw;
             bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, Scw);
 
@@ -251,6 +263,7 @@ bool LoopClosing::ComputeSim3()
             // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
             if (found)
             {
+                std::cout << "Found Candidate Scw: " << Scw.matrix() << std::endl;
                 std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint *>(NULL));
                 for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
                 {
@@ -258,28 +271,35 @@ bool LoopClosing::ComputeSim3()
                         vpMapPointMatches[j] = vvpMapPointMatches[i][j];
                 }
 
-                auto R = pSolver->GetEstimatedRotation();
-                auto t = pSolver->GetEstimatedTranslation();
-                const float s = pSolver->GetEstimatedScale();
-                matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, s, R, t, 7.5);
+                // auto R = pSolver->GetEstimatedRotation();
+                // auto t = pSolver->GetEstimatedTranslation();
+                // const float s = 1.0f; // pSolver->GetEstimatedScale();
+                // std::cout << R << std::endl;
+                // std::cout << t << std::endl;
+                std::cout << "search again for sim3 matching" << std::endl;
+                matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, Scw, 7.5);
 
-                g2o::Sim3 gScm(R, t, s);
+                // gScm here should be the inverse of Scw, i.e. 2->1
+                Sophus::SE3d T21 = Scw.inverse();
+                g2o::Sim3 gScm(T21.rotationMatrix(), T21.translation(), 1.0);
+                std::cout << "sim3 optimization started" << std::endl;
                 const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
-
+                std::cout << "sim3 optimization finished: " << nInliers << std::endl;
                 // If optimization is succesful stop ransacs and continue
                 if (nInliers >= 20)
                 {
+                    std::cout << "sim3 optimization succeeded" << std::endl;
                     bMatch = true;
                     mpMatchedKF = pKF;
-                    g2o::Sim3 gSmw(pKF->GetRotation(), pKF->GetTranslation(), 1.0);
-                    mg2oScw = gScm * gSmw;
+                    Sophus::SE3d T21(gScm.rotation(), gScm.translation());
+                    Sophus::SE3d Twc = pKF->GetPoseInverse();
+                    // g2o::Sim3 gSmw(Twc.rotationMatrix(), Twc.translation(), 1.0);
+                    // mg2oScw = gScm.inverse() * gSmw;
 
-                    Eigen::Matrix3d eigR = mg2oScw.scale() * mg2oScw.rotation().toRotationMatrix();
-                    Eigen::Vector3d eigt = mg2oScw.translation();
-                    Eigen::Matrix4d sRt = Eigen::Matrix4d::Identity();
-                    sRt.topLeftCorner(3, 3) = eigR;
-                    sRt.topRightCorner(3, 1) = eigt;
-                    mScw = Sophus::Sim3d(sRt);
+                    // Eigen::Matrix3d eigRot = mg2oScw.rotation().toRotationMatrix();
+                    // Eigen::Vector3d eigtrans = mg2oScw.translation();
+                    // mScw = Sophus::SE3d(eigRot, eigtrans).inverse();
+                    mScw = Twc * T21.inverse();
 
                     mvpCurrentMatchedPoints = vpMapPointMatches;
                     break;
@@ -319,6 +339,7 @@ bool LoopClosing::ComputeSim3()
     }
 
     // Find more matches projecting with the computed Sim3
+    std::cout << "searching again for mscw..." << std::endl;
     matcher.SearchByProjection(mpCurrentKF, mScw, mvpLoopMapPoints, mvpCurrentMatchedPoints, 10);
 
     // If enough matches accept Loop

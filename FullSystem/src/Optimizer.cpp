@@ -938,7 +938,7 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint
                 optimizer.addVertex(vPoint1);
 
                 g2o::VertexSBAPointXYZ *vPoint2 = new g2o::VertexSBAPointXYZ();
-                Eigen::Vector3d P3D2c = Twc2 * pMP1->GetWorldPos();
+                Eigen::Vector3d P3D2c = Twc2 * pMP2->GetWorldPos();
                 vPoint2->setEstimate(P3D2c);
                 vPoint2->setId(id2);
                 vPoint2->setFixed(true);

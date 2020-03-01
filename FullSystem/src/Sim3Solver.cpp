@@ -147,8 +147,8 @@ bool Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbIn
 
     std::vector<size_t> vAvailableIndices;
 
-    std::vector<Eigen::Vector3d> P3Dc1i;
-    std::vector<Eigen::Vector3d> P3Dc2i;
+    std::vector<Eigen::Vector3d> P3Dc1i(3);
+    std::vector<Eigen::Vector3d> P3Dc2i(3);
 
     int nCurrentIterations = 0;
     while (mnIterations < mRansacMaxIts && nCurrentIterations < nIterations)
@@ -245,65 +245,85 @@ void Sim3Solver::ComputeSim3(const std::vector<Eigen::Vector3d> &P1, const std::
     for (int i = 0; i < Pr1.size(); ++i)
         M += Pr2[i] * Pr1[i].transpose();
 
+    const auto SVD = M.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV);
+    const auto MatU = SVD.matrixU();
+    const auto MatV = SVD.matrixV();
+    Eigen::Matrix3d R;
+
+    //! Check if R is a valid rotation matrix
+    if (MatU.determinant() * MatV.determinant() < 0)
+    {
+        Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+        I(2, 2) = -1;
+        R = MatV * I * MatU.transpose();
+    }
+    else
+    {
+        R = MatV * MatU.transpose();
+    }
+
+    const auto t = O1 - R * O2;
+    mT12i = Sophus::SE3d(R, t);
+    mT21i = mT12i.inverse();
     // Step 3: Compute N matrix
 
-    double N11, N12, N13, N14, N22, N23, N24, N33, N34, N44;
+    // double N11, N12, N13, N14, N22, N23, N24, N33, N34, N44;
 
-    N11 = M(0, 0) + M(1, 1) + M(2, 2);
-    N12 = M(1, 2) - M(2, 1);
-    N13 = M(2, 0) - M(0, 2);
-    N14 = M(0, 1) - M(1, 0);
-    N22 = M(0, 0) - M(1, 1) - M(2, 2);
-    N23 = M(0, 1) + M(1, 0);
-    N24 = M(2, 0) + M(0, 2);
-    N33 = -M(0, 0) + M(1, 1) - M(2, 2);
-    N34 = M(1, 2) + M(2, 1);
-    N44 = -M(0, 0) - M(1, 1) + M(2, 2);
+    // N11 = M(0, 0) + M(1, 1) + M(2, 2);
+    // N12 = M(1, 2) - M(2, 1);
+    // N13 = M(2, 0) - M(0, 2);
+    // N14 = M(0, 1) - M(1, 0);
+    // N22 = M(0, 0) - M(1, 1) - M(2, 2);
+    // N23 = M(0, 1) + M(1, 0);
+    // N24 = M(2, 0) + M(0, 2);
+    // N33 = -M(0, 0) + M(1, 1) - M(2, 2);
+    // N34 = M(1, 2) + M(2, 1);
+    // N44 = -M(0, 0) - M(1, 1) + M(2, 2);
 
-    cv::Mat N = (cv::Mat_<float>(4, 4) << N11, N12, N13, N14,
-                 N12, N22, N23, N24,
-                 N13, N23, N33, N34,
-                 N14, N24, N34, N44);
+    // cv::Mat N = (cv::Mat_<float>(4, 4) << N11, N12, N13, N14,
+    //              N12, N22, N23, N24,
+    //              N13, N23, N33, N34,
+    //              N14, N24, N34, N44);
 
-    // Step 4: Eigenvector of the highest eigenvalue
+    // // Step 4: Eigenvector of the highest eigenvalue
 
-    cv::Mat eval, evec;
+    // cv::Mat eval, evec;
 
-    cv::eigen(N, eval, evec); //evec[0] is the quaternion of the desired rotation
+    // cv::eigen(N, eval, evec); //evec[0] is the quaternion of the desired rotation
 
-    cv::Mat vec(1, 3, evec.type());
-    (evec.row(0).colRange(1, 4)).copyTo(vec); //extract imaginary part of the quaternion (sin*axis)
+    // cv::Mat vec(1, 3, evec.type());
+    // (evec.row(0).colRange(1, 4)).copyTo(vec); //extract imaginary part of the quaternion (sin*axis)
 
-    // Rotation angle. sin is the norm of the imaginary part, cos is the real part
-    double ang = atan2(norm(vec), evec.at<float>(0, 0));
+    // // Rotation angle. sin is the norm of the imaginary part, cos is the real part
+    // double ang = atan2(norm(vec), evec.at<float>(0, 0));
 
-    vec = 2 * ang * vec / norm(vec); //Angle-axis representation. quaternion angle is the half
+    // vec = 2 * ang * vec / norm(vec); //Angle-axis representation. quaternion angle is the half
 
-    cv::Mat aux_mR12i;
-    aux_mR12i.create(3, 3, vec.type());
+    // cv::Mat aux_mR12i;
+    // aux_mR12i.create(3, 3, vec.type());
 
-    cv::Rodrigues(vec, aux_mR12i); // computes the rotation matrix from angle-axis
+    // cv::Rodrigues(vec, aux_mR12i); // computes the rotation matrix from angle-axis
 
-    mR12i << aux_mR12i.at<float>(0, 0), aux_mR12i.at<float>(0, 1), aux_mR12i.at<float>(0, 2),
-        aux_mR12i.at<float>(1, 0), aux_mR12i.at<float>(1, 1), aux_mR12i.at<float>(1, 2),
-        aux_mR12i.at<float>(2, 0), aux_mR12i.at<float>(2, 1), aux_mR12i.at<float>(2, 2);
+    // mR12i << aux_mR12i.at<float>(0, 0), aux_mR12i.at<float>(0, 1), aux_mR12i.at<float>(0, 2),
+    //     aux_mR12i.at<float>(1, 0), aux_mR12i.at<float>(1, 1), aux_mR12i.at<float>(1, 2),
+    //     aux_mR12i.at<float>(2, 0), aux_mR12i.at<float>(2, 1), aux_mR12i.at<float>(2, 2);
 
-    // Step 5: Rotate set 2
-    // not required if we fix scales
+    // // Step 5: Rotate set 2
+    // // not required if we fix scales
 
-    // Step 6: Scale
+    // // Step 6: Scale
 
-    ms12i = 1.0f;
+    // ms12i = 1.0f;
 
-    // Step 7: Translation
+    // // Step 7: Translation
 
-    mt12i = O1 - ms12i * mR12i * O2;
+    // mt12i = O1 - ms12i * mR12i * O2;
 
-    // Step 8: Transformation
+    // // Step 8: Transformation
 
-    Eigen::Matrix3d sR = ms12i * mR12i;
-    mT12i = Sophus::SE3d(sR, mt12i);
-    mT21i = mT12i.inverse();
+    // Eigen::Matrix3d sR = ms12i * mR12i;
+    // mT21i = Sophus::SE3d(sR, mt12i);
+    // mT12i = mT21i.inverse();
 }
 
 void Sim3Solver::CheckInliers()

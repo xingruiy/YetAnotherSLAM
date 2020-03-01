@@ -56,6 +56,14 @@ void LocalMapping::Run()
             // Update reference keyframe
             mpLastKeyFrame = mpCurrentKeyFrame;
         }
+        else if (Stop())
+        {
+            // Safe area to stop
+            while (isStopped())
+            {
+                usleep(3000);
+            }
+        }
     }
 }
 
