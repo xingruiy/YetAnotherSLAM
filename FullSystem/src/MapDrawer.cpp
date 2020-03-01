@@ -206,14 +206,6 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
             glDisableVertexAttribArray(1);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
             mShader.Unbind();
-
-            // glBegin(GL_TRIANGLES);
-            // glColor3f(pMS->mColour(0), pMS->mColour(1), pMS->mColour(2));
-            // for (int i = 0; i < pMS->N / 3 - 1; ++i)
-            //     glVertex3f(pMS->mplPoint[i * 3], pMS->mplPoint[i * 3 + 1], pMS->mplPoint[i * 3 + 2]);
-
-            // glEnd();
-            // glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         }
     }
 }

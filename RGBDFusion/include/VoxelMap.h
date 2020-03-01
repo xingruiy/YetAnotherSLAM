@@ -45,6 +45,7 @@ public:
     void setMeshEngine(MeshEngine *pMeshEngine);
     void Reset();
     void Release();
+    void Swap(MapStruct *pMapStruct);
 
     // TODO: create map based on the desired memory space
     MapStruct(int SizeInMB);

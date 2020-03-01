@@ -159,7 +159,7 @@ void Tracking::CreateNewKeyFrame()
     // Create a new MapStruct for the new Keyframe
     mpCurrentMapStruct = new MapStruct(g_calib[0]);
     mpCurrentMapStruct->setMeshEngine(mpMeshEngine);
-    mpCurrentMapStruct->create(20000, 10000, 15000, 0.01, 0.05);
+    mpCurrentMapStruct->create(20000, 15000, 15000, 0.008, 0.03);
     mpCurrentMapStruct->Reset();
     mpCurrentMapStruct->mTcw = mCurrentFrame.mTcw;
 

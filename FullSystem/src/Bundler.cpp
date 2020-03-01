@@ -393,6 +393,8 @@ void Bundler::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap)
         Eigen::Matrix3d R = SE3quat_recov.rotation().matrix();
         Eigen::Vector3d t = SE3quat_recov.translation();
         pKF->mTcw = Sophus::SE3d(R, t).inverse();
+        if (pKF->mpVoxelStruct)
+            pKF->mpVoxelStruct->mTcw = Sophus::SE3d(R, t).inverse();
     }
 
     //Points

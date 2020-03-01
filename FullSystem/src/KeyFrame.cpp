@@ -14,7 +14,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap)
       mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0),
       fx(g_fx[0]), fy(g_fy[0]), cx(g_cx[0]), cy(g_cy[0]), mK(g_cvCalib),
       invfx(g_invfx[0]), invfy(g_invfy[0]), mbf(g_bf), mThDepth(g_thDepth),
-      mbVoxelStructMarginalized(false)
+      mbVoxelStructMarginalized(false), mTimeStamp(F.mTimeStamp)
 {
   mnId = nNextId++;
 
@@ -682,16 +682,6 @@ cv::Mat KeyFrame::GetInvTransform() const
       cvMat.at<float>(i, j) = Twc(i, j);
 
   return cvMat;
-}
-
-void KeyFrame::SetPose(cv::Mat cvMat)
-{
-  Eigen::Matrix4d Twc = Eigen::Matrix4d::Identity();
-  Twc.setIdentity();
-  for (int i = 0; i < 4; i++)
-    for (int j = 0; j < 4; j++)
-      Twc(i, j) = (double)cvMat.at<float>(i, j);
-  mTcw = Sophus::SE3d(Twc.inverse());
 }
 
 void KeyFrame::SetNotErase()

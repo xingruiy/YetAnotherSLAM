@@ -204,7 +204,7 @@ __device__ __forceinline__ bool CreateHashEntry(int *mplHeap, int *mplHeapPtr, c
                                                 const int &offset, HashEntry *pEntry)
 {
     int old = atomicSub(mplHeapPtr, 1);
-    if (old >= 0)
+    if (old > 0)
     {
         int ptr = mplHeap[old];
         if (ptr != -1 && pEntry != NULL)
