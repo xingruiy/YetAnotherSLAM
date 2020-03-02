@@ -141,10 +141,10 @@ bool Tracking::NeedNewKeyFrame()
 {
     Sophus::SE3d DT = mCurrentFrame.mRelativePose;
 
-    if (DT.log().topRows<3>().norm() > 0.15)
+    if (DT.log().topRows<3>().norm() > 0.1)
         return true;
 
-    if (DT.log().bottomRows<3>().norm() > 0.2)
+    if (DT.log().bottomRows<3>().norm() > 0.15)
         return true;
 
     return false;

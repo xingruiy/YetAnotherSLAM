@@ -40,7 +40,7 @@ void MapDrawer::LinkGlSlProgram()
         "    float i2 = lx * kd * dx * max(0.0, dot(a_normal, L));\n"
         "    float i3 = lx * ks * sx * pow(max(0.0, dot(R, V)), n);\n"
         "    float Ix = max(0.0, min(255.0, i1 + i2 + i3));\n"
-        "    shaded_colour = vec3(Ix, Ix, colourTaint);\n"
+        "    shaded_colour = vec3(Ix, Ix, Ix);\n"
         "}\n";
 
     const char fragShader[] =
