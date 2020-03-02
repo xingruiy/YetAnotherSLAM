@@ -9,7 +9,8 @@ namespace SLAM
 LocalMapping::LocalMapping(ORBVocabulary *pVoc, Map *pMap)
     : ORBvocabulary(pVoc), mpLastKeyFrame(nullptr),
       mpMap(pMap), mbAbortBA(false), mbStopped(false),
-      mbStopRequested(false), mbNotStop(false)
+      mbStopRequested(false), mbNotStop(false),
+      mbFinished(false)
 {
 }
 
@@ -59,10 +60,13 @@ void LocalMapping::Run()
         else if (Stop())
         {
             // Safe area to stop
-            while (isStopped())
+            while (isStopped() && !isFinished())
             {
                 usleep(3000);
             }
+
+            if (isFinished())
+                break;
         }
     }
 }
@@ -548,9 +552,9 @@ void LocalMapping::Release()
         return;
     mbStopped = false;
     mbStopRequested = false;
-    for (auto lit = mlNewKeyFrames.begin(), lend = mlNewKeyFrames.end(); lit != lend; lit++)
-        delete *lit;
-    mlNewKeyFrames.clear();
+    // for (auto lit = mlNewKeyFrames.begin(), lend = mlNewKeyFrames.end(); lit != lend; lit++)
+    //     delete *lit;
+    // mlNewKeyFrames.clear();
 
     std::cout << "Local Mapping RELEASE" << std::endl;
 }

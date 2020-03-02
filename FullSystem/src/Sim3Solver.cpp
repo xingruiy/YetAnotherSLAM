@@ -133,7 +133,7 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
     mnIterations = 0;
 }
 
-bool Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers, Sophus::SE3d &Scw)
+bool Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers, Sophus::SE3d &T12)
 {
     bNoMore = false;
     vbInliers = std::vector<bool>(mN1, false);
@@ -191,7 +191,7 @@ bool Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbIn
                 for (int i = 0; i < N; i++)
                     if (mvbInliersi[i])
                         vbInliers[mvnIndices1[i]] = true;
-                Scw = mBestT12;
+                T12 = mBestT12;
                 return true;
             }
         }

@@ -19,7 +19,7 @@ public:
     MapPoint(const Eigen::Vector3d &Pos, KeyFrame *pRefKF, Map *pMap);
     MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF);
 
-    void SetWorldPos(const Eigen::Vector3d &Tcw);
+    void SetWorldPos(const Eigen::Vector3d &pos);
     Eigen::Vector3d GetWorldPos();
 
     // Get Normal

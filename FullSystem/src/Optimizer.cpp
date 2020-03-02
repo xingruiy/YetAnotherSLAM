@@ -609,6 +609,8 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
                                        const LoopClosing::KeyFrameAndPose &CorrectedSim3,
                                        const std::map<KeyFrame *, std::set<KeyFrame *>> &LoopConnections, const bool &bFixScale)
 {
+    return;
+
     // Setup optimizer
     g2o::SparseOptimizer optimizer;
     optimizer.setVerbose(false);
@@ -647,8 +649,10 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
 
         if (it != CorrectedSim3.end())
         {
-            vScw[nIDi] = it->second;
-            VSim3->setEstimate(it->second);
+            Sophus::SE3d CorrectedTcw = it->second;
+            g2o::Sim3 estimate = g2o::Sim3(CorrectedTcw.rotationMatrix(), CorrectedTcw.translation(), 1.0);
+            vScw[nIDi] = estimate;
+            VSim3->setEstimate(estimate);
         }
         else
         {
@@ -719,7 +723,11 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
         LoopClosing::KeyFrameAndPose::const_iterator iti = NonCorrectedSim3.find(pKF);
 
         if (iti != NonCorrectedSim3.end())
-            Swi = (iti->second).inverse();
+        {
+            Sophus::SE3d NonCorrectedTcw = iti->second;
+            // Swi = (iti->second).inverse();
+            Swi = g2o::Sim3(NonCorrectedTcw.rotationMatrix(), NonCorrectedTcw.translation(), 1.0f);
+        }
         else
             Swi = vScw[nIDi].inverse();
 
@@ -735,7 +743,11 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
             LoopClosing::KeyFrameAndPose::const_iterator itj = NonCorrectedSim3.find(pParentKF);
 
             if (itj != NonCorrectedSim3.end())
-                Sjw = itj->second;
+            {
+                // Sjw = itj->second;
+                Sophus::SE3d NonCorrectedTwc = itj->second.inverse();
+                Sjw = g2o::Sim3(NonCorrectedTwc.rotationMatrix(), NonCorrectedTwc.translation(), 1.0f);
+            }
             else
                 Sjw = vScw[nIDj];
 
@@ -762,7 +774,11 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
                 LoopClosing::KeyFrameAndPose::const_iterator itl = NonCorrectedSim3.find(pLKF);
 
                 if (itl != NonCorrectedSim3.end())
-                    Slw = itl->second;
+                {
+                    // Slw = itl->second;
+                    Sophus::SE3d NonCorrectedTwc = itl->second.inverse();
+                    Slw = g2o::Sim3(NonCorrectedTwc.rotationMatrix(), NonCorrectedTwc.translation(), 1.0f);
+                }
                 else
                     Slw = vScw[pLKF->mnId];
 
@@ -793,7 +809,11 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
                     LoopClosing::KeyFrameAndPose::const_iterator itn = NonCorrectedSim3.find(pKFn);
 
                     if (itn != NonCorrectedSim3.end())
-                        Snw = itn->second;
+                    {
+                        // Snw = itn->second;
+                        Sophus::SE3d NonCorrectedTwc = itn->second.inverse();
+                        Snw = g2o::Sim3(NonCorrectedTwc.rotationMatrix(), NonCorrectedTwc.translation(), 1.0f);
+                    }
                     else
                         Snw = vScw[pKFn->mnId];
 
@@ -831,7 +851,7 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
         double s = CorrectedSiw.scale();
 
         eigt *= (1. / s); //[R t/s;0 1]
-        pKFi->SetPose(Sophus::SE3d(eigR, eigt));
+        pKFi->SetPose(Sophus::SE3d(eigR, eigt).inverse());
     }
 
     // Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose

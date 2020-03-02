@@ -250,8 +250,8 @@ bool LoopClosing::ComputeSim3()
 
             Sim3Solver *pSolver = vpSim3Solvers[i];
 
-            Sophus::SE3d Scw;
-            bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, Scw);
+            Sophus::SE3d T12;
+            bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, T12);
 
             // If Ransac reachs max. iterations discard keyframe
             if (bNoMore)
@@ -263,7 +263,7 @@ bool LoopClosing::ComputeSim3()
             // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
             if (found)
             {
-                std::cout << "Found Candidate Scw: " << Scw.matrix() << std::endl;
+                std::cout << "Found Candidate Scw: " << T12.matrix() << std::endl;
                 std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint *>(NULL));
                 for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
                 {
@@ -271,20 +271,14 @@ bool LoopClosing::ComputeSim3()
                         vpMapPointMatches[j] = vvpMapPointMatches[i][j];
                 }
 
-                // auto R = pSolver->GetEstimatedRotation();
-                // auto t = pSolver->GetEstimatedTranslation();
-                // const float s = 1.0f; // pSolver->GetEstimatedScale();
-                // std::cout << R << std::endl;
-                // std::cout << t << std::endl;
-                std::cout << "search again for sim3 matching" << std::endl;
-                matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, Scw, 7.5);
+                matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, T12, 7.5);
 
-                // gScm here should be the inverse of Scw, i.e. 2->1
-                Sophus::SE3d T21 = Scw.inverse();
+                // gScm here should be the inverse of T12, i.e. 2->1
+                Sophus::SE3d T21 = T12.inverse();
                 g2o::Sim3 gScm(T21.rotationMatrix(), T21.translation(), 1.0);
-                std::cout << "sim3 optimization started" << std::endl;
+
                 const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
-                std::cout << "sim3 optimization finished: " << nInliers << std::endl;
+
                 // If optimization is succesful stop ransacs and continue
                 if (nInliers >= 20)
                 {
@@ -298,8 +292,11 @@ bool LoopClosing::ComputeSim3()
 
                     // Eigen::Matrix3d eigRot = mg2oScw.rotation().toRotationMatrix();
                     // Eigen::Vector3d eigtrans = mg2oScw.translation();
-                    // mScw = Sophus::SE3d(eigRot, eigtrans).inverse();
-                    mScw = Twc * T21.inverse();
+                    // mTcwNew = Sophus::SE3d(eigRot, eigtrans).inverse();
+                    // mTcwNew = Twc * T21.inverse();
+                    mTcwNew = pKF->GetPose() * T21.inverse();
+                    // Sophus::SE3d Swc = mTcwNew.inverse();
+                    // mg2oScw = g2o::Sim3(Swc.rotationMatrix(), Swc.translation(), 1.0f);
 
                     mvpCurrentMatchedPoints = vpMapPointMatches;
                     break;
@@ -339,8 +336,8 @@ bool LoopClosing::ComputeSim3()
     }
 
     // Find more matches projecting with the computed Sim3
-    std::cout << "searching again for mscw..." << std::endl;
-    matcher.SearchByProjection(mpCurrentKF, mScw, mvpLoopMapPoints, mvpCurrentMatchedPoints, 10);
+    std::cout << "searching again for mTcwNew..." << std::endl;
+    matcher.SearchByProjection(mpCurrentKF, mTcwNew, mvpLoopMapPoints, mvpCurrentMatchedPoints, 10);
 
     // If enough matches accept Loop
     int nTotalMatches = 0;
@@ -403,8 +400,8 @@ void LoopClosing::CorrectLoop()
     mvpCurrentConnectedKFs.push_back(mpCurrentKF);
 
     KeyFrameAndPose CorrectedSim3, NonCorrectedSim3;
-    CorrectedSim3[mpCurrentKF] = mg2oScw;
-    Sophus::SE3d Twc = mpCurrentKF->GetPose();
+    CorrectedSim3[mpCurrentKF] = mTcwNew;
+    Sophus::SE3d Twc1 = mpCurrentKF->GetPoseInverse();
 
     {
         // Get Map Mutex
@@ -414,29 +411,36 @@ void LoopClosing::CorrectLoop()
         {
             KeyFrame *pKFi = *vit;
 
-            Sophus::SE3d Tiw = pKFi->GetPoseInverse();
+            Sophus::SE3d Tcw2 = pKFi->GetPose();
 
             if (pKFi != mpCurrentKF)
             {
-                g2o::Sim3 g2oSic(Twc.rotationMatrix(), Twc.translation(), 1.0);
-                g2o::Sim3 g2oCorrectedSiw = g2oSic * mg2oScw;
+                // g2o::Sim3 g2oSic(Twc.rotationMatrix(), Twc.translation(), 1.0);
+                // g2o::Sim3 g2oCorrectedSiw = g2oSic * mg2oScw;
                 //Pose corrected with the Sim3 of the loop closure
-                CorrectedSim3[pKFi] = g2oCorrectedSiw;
+                Sophus::SE3d T21 = Twc1 * Tcw2;
+                Sophus::SE3d CorrectedScw = mTcwNew * T21;
+                CorrectedSim3[pKFi] = CorrectedScw;
             }
 
-            g2o::Sim3 g2oSiw(Tiw.rotationMatrix(), Tiw.translation(), 1.0);
+            // g2o::Sim3 g2oSiw(Tiw.rotationMatrix(), Tiw.translation(), 1.0);
             //Pose without correction
-            NonCorrectedSim3[pKFi] = g2oSiw;
+            NonCorrectedSim3[pKFi] = Tcw2;
         }
 
         // Correct all MapPoints obsrved by current keyframe and neighbors, so that they align with the other side of the loop
         for (auto mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
         {
             KeyFrame *pKFi = mit->first;
-            g2o::Sim3 g2oCorrectedSiw = mit->second;
-            g2o::Sim3 g2oCorrectedSwi = g2oCorrectedSiw.inverse();
+            // g2o::Sim3 g2oCorrectedSiw = mit->second;
+            // g2o::Sim3 g2oCorrectedSwi = g2oCorrectedSiw.inverse();
 
-            g2o::Sim3 g2oSiw = NonCorrectedSim3[pKFi];
+            // g2o::Sim3 g2oSiw = NonCorrectedSim3[pKFi];
+
+            Sophus::SE3d CorrectedTcw = mit->second;
+            Sophus::SE3d CorrectedTwc = CorrectedTcw.inverse();
+
+            Sophus::SE3d NonCorrectedTcw = NonCorrectedSim3[pKFi];
 
             std::vector<MapPoint *> vpMPsi = pKFi->GetMapPointMatches();
             for (size_t iMP = 0, endMPi = vpMPsi.size(); iMP < endMPi; iMP++)
@@ -451,24 +455,26 @@ void LoopClosing::CorrectLoop()
 
                 // Project with non-corrected pose and project back with corrected pose
                 Eigen::Vector3d eigP3Dw = pMPi->GetWorldPos();
-                Eigen::Vector3d eigCorrectedP3Dw = g2oCorrectedSwi.map(g2oSiw.map(eigP3Dw));
+                // Eigen::Vector3d eigCorrectedP3Dw = g2oCorrectedSwi.map(g2oSiw.map(eigP3Dw));
+                Eigen::Vector3d eigCorrectedP3Dw = CorrectedTwc * NonCorrectedTcw * eigP3Dw;
 
-                pMPi->mWorldPos = eigCorrectedP3Dw;
+                pMPi->SetWorldPos(eigCorrectedP3Dw);
                 pMPi->mnCorrectedByKF = mpCurrentKF->mnId;
                 pMPi->mnCorrectedReference = pKFi->mnId;
                 pMPi->UpdateNormalAndDepth();
             }
 
             // Update keyframe pose with corrected Sim3. First transform Sim3 to SE3 (scale translation)
-            Eigen::Matrix3d eigR = g2oCorrectedSiw.rotation().toRotationMatrix();
-            Eigen::Vector3d eigt = g2oCorrectedSiw.translation();
-            double s = g2oCorrectedSiw.scale();
+            // Eigen::Matrix3d eigR = g2oCorrectedSiw.rotation().toRotationMatrix();
+            // Eigen::Vector3d eigt = g2oCorrectedSiw.translation();
+            // double s = g2oCorrectedSiw.scale();
 
-            eigt *= (1. / s); //[R t/s;0 1]
+            // eigt *= (1. / s); //[R t/s;0 1]
 
-            Sophus::SE3d correctedTiw(eigR, eigt);
+            // Sophus::SE3d correctedTiw(eigR, eigt);
 
-            pKFi->SetPose(correctedTiw);
+            // pKFi->SetPose(correctedTiw);
+            pKFi->SetPose(CorrectedTcw);
 
             // Make sure connections are updated
             pKFi->UpdateConnections();
@@ -549,14 +555,15 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
     {
         KeyFrame *pKF = mit->first;
 
-        g2o::Sim3 g2oScw = mit->second;
-        Eigen::Matrix4d eigScw = Eigen::Matrix4d::Identity();
-        eigScw.topLeftCorner(3, 3) = g2oScw.scale() * g2oScw.rotation().toRotationMatrix();
-        eigScw.topRightCorner(3, 1) = g2oScw.translation();
-        Sophus::Sim3d Scw(eigScw);
+        // g2o::Sim3 g2oScw = mit->second;
+        // Eigen::Matrix4d eigScw = Eigen::Matrix4d::Identity();
+        // eigScw.topLeftCorner(3, 3) = g2oScw.scale() * g2oScw.rotation().toRotationMatrix();
+        // eigScw.topRightCorner(3, 1) = g2oScw.translation();
+        // Sophus::Sim3d Scw(eigScw);
+        Sophus::SE3d CorrectedTcw = mit->second;
 
         std::vector<MapPoint *> vpReplacePoints(mvpLoopMapPoints.size(), static_cast<MapPoint *>(NULL));
-        matcher.Fuse(pKF, Scw, mvpLoopMapPoints, 4, vpReplacePoints);
+        matcher.Fuse(pKF, CorrectedTcw, mvpLoopMapPoints, 4, vpReplacePoints);
 
         // Get Map Mutex
         std::unique_lock<std::mutex> lock(mpMap->mMutexMapUpdate);
@@ -610,21 +617,21 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
             {
                 KeyFrame *pKF = lpKFtoCheck.front();
                 const std::set<KeyFrame *> sChilds = pKF->GetChilds();
-                Sophus::SE3d Twc = pKF->GetPose();
+                Sophus::SE3d Twc = pKF->GetPoseInverse();
                 for (auto sit = sChilds.begin(); sit != sChilds.end(); sit++)
                 {
                     KeyFrame *pChild = *sit;
                     if (pChild->mnBAGlobalForKF != nLoopKF)
                     {
-                        Sophus::SE3d Tchildc = pChild->GetPose() * Twc;
-                        pChild->mTcwGBA = Tchildc * pKF->mTcwGBA; //*Tcorc*pKF->mTcwGBA;
+                        Sophus::SE3d Tchildc = Twc * pChild->GetPose();
+                        pChild->mTcwGBA = pKF->mTcwGBA * Tchildc; //*Tcorc*pKF->mTcwGBA;
                         pChild->mnBAGlobalForKF = nLoopKF;
                     }
 
                     lpKFtoCheck.push_back(pChild);
                 }
 
-                pKF->mTcwBefGBA = pKF->GetPose();
+                pKF->mTcwBefGBA = pKF->GetPoseInverse();
                 pKF->SetPose(pKF->mTcwGBA);
                 lpKFtoCheck.pop_front();
             }
@@ -656,7 +663,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
                     Eigen::Vector3d Xc = pRefKF->mTcwBefGBA * pMP->GetWorldPos();
 
                     // Backproject using corrected camera
-                    pMP->SetWorldPos(pRefKF->mTcw * Xc);
+                    pMP->SetWorldPos(pRefKF->GetPose() * Xc);
                 }
             }
 

@@ -509,7 +509,7 @@ int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, 
     std::cout << nFused << " Points fused together." << std::endl;
 }
 
-int ORBMatcher::Fuse(KeyFrame *pKF, Sophus::Sim3d Scw, const std::vector<MapPoint *> &vpPoints, float th, std::vector<MapPoint *> &vpReplacePoint)
+int ORBMatcher::Fuse(KeyFrame *pKF, Sophus::SE3d Tcw, const std::vector<MapPoint *> &vpPoints, float th, std::vector<MapPoint *> &vpReplacePoint)
 {
     // Get Calibration Parameters for later projection
     const float &fx = pKF->fx;
@@ -517,9 +517,9 @@ int ORBMatcher::Fuse(KeyFrame *pKF, Sophus::Sim3d Scw, const std::vector<MapPoin
     const float &cx = pKF->cx;
     const float &cy = pKF->cy;
 
-    // Decompose Scw
-    Sophus::Sim3d Swc = Scw.inverse();
-    Eigen::Vector3d Ow = Scw.translation();
+    // Decompose Tcw
+    Sophus::SE3d Twc = Tcw.inverse();
+    Eigen::Vector3d Ow = Tcw.translation();
 
     // Set of MapPoints already found in the KeyFrame
     const std::set<MapPoint *> spAlreadyFound = pKF->GetMapPoints();
@@ -541,7 +541,7 @@ int ORBMatcher::Fuse(KeyFrame *pKF, Sophus::Sim3d Scw, const std::vector<MapPoin
         Eigen::Vector3d p3Dw = pMP->GetWorldPos();
 
         // Transform into Camera Coords.
-        Eigen::Vector3d p3Dc = Swc * p3Dw;
+        Eigen::Vector3d p3Dc = Twc * p3Dw;
 
         // Depth must be positive
         if (p3Dc(2) < 0.0f)
