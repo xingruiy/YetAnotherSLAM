@@ -2,6 +2,11 @@
 
 ## Change Log
 
++ _2020-03-02_: 
+    + Added ```LoopClosing``` from ```ORB-SLAM2```.
+    + Had to change the sim3 optimization to se3.   
+    + The ```OptimizeEssentialGraph``` function gives a segment fault for unknown reason.
+
 + _2020-02-24_: 
     + Changed ```README.md```, added the dependencies list.
     + Refined the file structure.

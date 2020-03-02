@@ -85,6 +85,9 @@ protected:
     uint mNumVisibleBlocks;
 
 public:
+    long unsigned int mnId;
+    static long unsigned int nNextId;
+
     // Heap memory stores the pointers to the actual voxel space.
     // It is in descending order, so the first element has the value N-1.
     int *mplHeap;

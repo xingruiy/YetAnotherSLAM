@@ -6,6 +6,8 @@
 #define HASHENTRY_IN_BYTE 0.00002
 #define VOXEL_BLOCK_IN_BYTE 0.000003
 
+long unsigned int MapStruct::nNextId = 0;
+
 __global__ void ResetHash_kernel(HashEntry *mplHashTable, int numEntry)
 {
     int index = threadIdx.x + blockDim.x * blockIdx.x;
@@ -73,7 +75,9 @@ MapStruct::MapStruct(const Eigen::Matrix3f &K)
       mbVertexBufferCreated(false)
 {
     // Get a random colour taint for visualization
-    mColourTaint = 255 * rand() / (double)RAND_MAX;
+    // mColourTaint = 255 * rand() / (double)RAND_MAX;
+    mnId = nNextId++;
+    mColourTaint = (33554431 * mnId % 255);
 }
 
 MapStruct::MapStruct(int SizeInMB)
