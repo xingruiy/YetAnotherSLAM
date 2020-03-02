@@ -37,6 +37,27 @@ void Map::AddMapPoint(MapPoint *pMP)
     mspMapPoints.insert(pMP);
 }
 
+void Map::AddMapStruct(MapStruct *pMS)
+{
+    std::unique_lock<std::mutex> lock(mFractualMutex);
+    mspMapStructs.insert(pMS);
+
+    if (mspMapStructs.size() <= 20)
+        return;
+
+    // We always keep at most 20 maps in device memory
+    for (auto sit = mspMapStructs.begin(), send = mspMapStructs.end(); sit != send; ++sit)
+    {
+        MapStruct *pMS = *sit;
+        if (pMS && !pMS->mbInHibernation)
+        {
+            pMS->Hibernate();
+            pMS->DeleteMesh();
+            return;
+        }
+    }
+}
+
 void Map::reset()
 {
     std::unique_lock<std::mutex> lock(mMutexMap);
@@ -60,12 +81,6 @@ void Map::EraseKeyFrame(KeyFrame *pKF)
 
     // TODO: This only erase the pointer.
     // Delete the KeyFrame
-}
-
-void Map::AddMapStruct(MapStruct *pMS)
-{
-    std::unique_lock<std::mutex> lock(mFractualMutex);
-    mspMapStructs.insert(pMS);
 }
 
 void Map::EraseMapStruct(MapStruct *pMS)

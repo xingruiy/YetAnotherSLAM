@@ -68,16 +68,15 @@ void MapStruct::create(
 }
 
 MapStruct::MapStruct(const Eigen::Matrix3f &K)
-    : mFootprintInMB(0), mbInHibernation(false), mbActive(false),
+    : mFootPrintInMB(0), mbInHibernation(false), mbActive(false),
       mbHasMesh(false), mpMeshEngine(NULL), mplHeap(NULL),
       mplHeapPtr(NULL), mplBucketMutex(NULL), mplHashTable(NULL),
       mplVoxelBlocks(NULL), mpLinkedListHead(NULL), mK(K),
       mbVertexBufferCreated(false)
 {
     // Get a random colour taint for visualization
-    // mColourTaint = 255 * rand() / (double)RAND_MAX;
+    mColourTaint = 255 * rand() / (double)RAND_MAX;
     mnId = nNextId++;
-    mColourTaint = (33554431 * mnId % 255);
 }
 
 MapStruct::MapStruct(int SizeInMB)
@@ -116,7 +115,7 @@ void MapStruct::Release()
     visibleBlockNum = NULL;
     mpLinkedListHead = NULL;
     mbInHibernation = false;
-    mFootprintInMB = 0;
+    mFootPrintInMB = 0;
 }
 
 bool MapStruct::empty()
@@ -124,15 +123,26 @@ bool MapStruct::empty()
     return bucketSize == 0;
 }
 
-void MapStruct::UpdateMesh()
+void MapStruct::GenerateMesh()
 {
-    if (!mbHasMesh && mpMeshEngine)
+    if (!mbHasMesh && mpMeshEngine && !mbInHibernation)
     {
         mpMeshEngine->Meshify(this);
         SafeCall(cudaDeviceSynchronize());
         SafeCall(cudaGetLastError());
 
         mbHasMesh = true;
+    }
+}
+
+void MapStruct::DeleteMesh()
+{
+    if (mbHasMesh)
+    {
+        N = 0;
+        delete mplPoint;
+        delete mplNormal;
+        mbHasMesh = false;
     }
 }
 
@@ -691,4 +701,74 @@ void MapStruct::Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm)
     grid = dim3(nVisibleBlock);
 
     callDeviceFunctor<<<grid, block>>>(step3);
+}
+
+void MapStruct::SaveToFile(std::string &strFileName)
+{
+}
+
+void MapStruct::ReadFromFile(std::string &strFileName)
+{
+}
+
+void MapStruct::Hibernate()
+{
+    if (mbInHibernation || empty())
+        return;
+
+    mpLinkedListHeadHib = new int[1];
+    mplHeapPtrHib = new int[1];
+    mplBucketMutexHib = new int[bucketSize];
+    mplHeapHib = new int[voxelBlockSize];
+    mplHashTableHib = new HashEntry[hashTableSize];
+    mplVoxelBlocksHib = new Voxel[voxelBlockSize * BlockSize3];
+
+    SafeCall(cudaMemcpy(mpLinkedListHeadHib, mpLinkedListHead, sizeof(int), cudaMemcpyDeviceToHost));
+    SafeCall(cudaMemcpy(mplHeapPtrHib, mplHeapPtr, sizeof(int), cudaMemcpyDeviceToHost));
+    SafeCall(cudaMemcpy(mplBucketMutexHib, mplBucketMutex, sizeof(int) * bucketSize, cudaMemcpyDeviceToHost));
+    SafeCall(cudaMemcpy(mplHeapHib, mplHeap, sizeof(int) * voxelBlockSize, cudaMemcpyDeviceToHost));
+    SafeCall(cudaMemcpy(mplHashTableHib, mplHashTable, sizeof(HashEntry) * hashTableSize, cudaMemcpyDeviceToHost));
+    SafeCall(cudaMemcpy(mplVoxelBlocksHib, mplVoxelBlocks, sizeof(Voxel) * voxelBlockSize * BlockSize3, cudaMemcpyDeviceToHost));
+
+    mbInHibernation = true;
+
+    SafeCall(cudaFree((void *)mplHeap));
+    SafeCall(cudaFree((void *)mplHeapPtr));
+    SafeCall(cudaFree((void *)mplHashTable));
+    SafeCall(cudaFree((void *)mplBucketMutex));
+    SafeCall(cudaFree((void *)mpLinkedListHead));
+    SafeCall(cudaFree((void *)mplVoxelBlocks));
+    SafeCall(cudaFree((void *)visibleBlockNum));
+    SafeCall(cudaFree((void *)visibleTable));
+}
+
+void MapStruct::ReActivate()
+{
+    if (!mbInHibernation || empty())
+        return;
+
+    SafeCall(cudaMalloc((void **)&mpLinkedListHead, sizeof(int)));
+    SafeCall(cudaMalloc((void **)&mplHeapPtr, sizeof(int)));
+    SafeCall(cudaMalloc((void **)&visibleBlockNum, sizeof(uint)));
+    SafeCall(cudaMalloc((void **)&mplBucketMutex, sizeof(int) * bucketSize));
+    SafeCall(cudaMalloc((void **)&mplHeap, sizeof(int) * voxelBlockSize));
+    SafeCall(cudaMalloc((void **)&mplHashTable, sizeof(HashEntry) * hashTableSize));
+    SafeCall(cudaMalloc((void **)&visibleTable, sizeof(HashEntry) * hashTableSize));
+    SafeCall(cudaMalloc((void **)&mplVoxelBlocks, sizeof(Voxel) * voxelBlockSize * BlockSize3));
+
+    SafeCall(cudaMemcpy(mpLinkedListHead, mpLinkedListHeadHib, sizeof(int), cudaMemcpyHostToDevice));
+    SafeCall(cudaMemcpy(mplHeapPtr, mplHeapPtrHib, sizeof(int), cudaMemcpyHostToDevice));
+    SafeCall(cudaMemcpy(mplBucketMutex, mplBucketMutexHib, sizeof(int) * bucketSize, cudaMemcpyHostToDevice));
+    SafeCall(cudaMemcpy(mplHeap, mplHeapHib, sizeof(int) * voxelBlockSize, cudaMemcpyHostToDevice));
+    SafeCall(cudaMemcpy(mplHashTable, mplHashTableHib, sizeof(HashEntry) * hashTableSize, cudaMemcpyHostToDevice));
+    SafeCall(cudaMemcpy(mplVoxelBlocks, mplVoxelBlocksHib, sizeof(Voxel) * voxelBlockSize * BlockSize3, cudaMemcpyHostToDevice));
+
+    mbInHibernation = false;
+
+    delete mpLinkedListHeadHib;
+    delete mplHeapPtrHib;
+    delete mplBucketMutexHib;
+    delete mplHeapHib;
+    delete mplHashTableHib;
+    delete mplVoxelBlocksHib;
 }

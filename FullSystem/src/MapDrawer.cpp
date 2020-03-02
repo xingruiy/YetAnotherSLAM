@@ -157,8 +157,20 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
         MapStruct *pMS = *vit;
         if (pMS && !pMS->mbActive)
         {
+            if (pMS->mbInHibernation)
+            {
+                if (pMS->mbVertexBufferCreated)
+                {
+                    glDeleteBuffers(1, &pMS->mGlVertexBuffer);
+                    glDeleteBuffers(1, &pMS->mGlNormalBuffer);
+                    pMS->mbVertexBufferCreated = false;
+                }
+
+                continue;
+            }
+
             if (!pMS->mbHasMesh)
-                pMS->UpdateMesh();
+                pMS->GenerateMesh();
 
             if (!pMS->mplPoint)
                 return;
