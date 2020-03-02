@@ -92,10 +92,21 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
                     if ((*vit)->mnId < vpKFs[i]->mnId)
                         continue;
 
-                    Eigen::Vector3f Ow2 = (*vit)->mTcw.translation().cast<float>();
+                    Eigen::Vector3f Ow2 = (*vit)->GetTranslation().cast<float>();
                     glVertex3f(Ow(0), Ow(1), Ow(2));
                     glVertex3f(Ow2(0), Ow2(1), Ow2(2));
                 }
+            }
+
+            // Loops
+            std::set<KeyFrame *> sLoopKFs = vpKFs[i]->GetLoopEdges();
+            for (auto sit = sLoopKFs.begin(), send = sLoopKFs.end(); sit != send; sit++)
+            {
+                if ((*sit)->mnId < vpKFs[i]->mnId)
+                    continue;
+                Eigen::Vector3f Owl = (*sit)->GetTranslation().cast<float>();
+                glVertex3f(Ow(0), Ow(1), Ow(2));
+                glVertex3f(Owl(0), Owl(1), Owl(2));
             }
         }
 

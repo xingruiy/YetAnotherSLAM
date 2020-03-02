@@ -14,7 +14,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap)
       mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0),
       fx(g_fx[0]), fy(g_fy[0]), cx(g_cx[0]), cy(g_cy[0]), mK(g_cvCalib),
       invfx(g_invfx[0]), invfy(g_invfy[0]), mbf(g_bf), mThDepth(g_thDepth),
-      mbVoxelStructMarginalized(false), mTimeStamp(F.mTimeStamp)
+      mbVoxelStructMarginalized(false), mTimeStamp(F.mTimeStamp), mpParent(nullptr)
 {
   mnId = nNextId++;
 

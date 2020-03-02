@@ -677,8 +677,6 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
                                        const LoopClosing::KeyFrameAndPose &CorrectedSim3,
                                        const std::map<KeyFrame *, std::set<KeyFrame *>> &LoopConnections, const bool &bFixScale)
 {
-    return;
-
     // Setup optimizer
     g2o::SparseOptimizer optimizer;
     optimizer.setVerbose(false);
@@ -719,13 +717,11 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
         {
             Sophus::SE3d CorrectedTcw = it->second;
             g2o::Sim3 estimate = g2o::Sim3(CorrectedTcw.rotationMatrix(), CorrectedTcw.translation(), 1.0);
-            vScw[nIDi] = estimate;
+            vScw[nIDi] = estimate.inverse();
             VSim3->setEstimate(estimate);
         }
         else
         {
-            // Eigen::Matrix<double, 3, 3> Rcw = Converter::toMatrix3d(pKF->GetRotation());
-            // Eigen::Matrix<double, 3, 1> tcw = Converter::toVector3d(pKF->GetTranslation());
             Sophus::SE3d Twc = pKF->GetPoseInverse();
             g2o::Sim3 Siw(Twc.rotationMatrix(), Twc.translation(), 1.0);
             vScw[nIDi] = Siw;
@@ -918,7 +914,7 @@ void Optimizer::OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *p
         Eigen::Vector3d eigt = CorrectedSiw.translation();
         double s = CorrectedSiw.scale();
 
-        eigt *= (1. / s); //[R t/s;0 1]
+        // eigt *= (1. / s); //[R t/s;0 1]
         pKFi->SetPose(Sophus::SE3d(eigR, eigt).inverse());
     }
 

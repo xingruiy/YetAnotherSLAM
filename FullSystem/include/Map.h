@@ -24,16 +24,20 @@ public:
     void AddKeyFrame(KeyFrame *pKF);
     void AddMapPoint(MapPoint *pMP);
     void AddMapStruct(MapStruct *pMS);
+
     void EraseKeyFrame(KeyFrame *pKF);
     void EraseMapPoint(MapPoint *pMP);
     void EraseMapStruct(MapStruct *pMS);
+
     void SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs);
+
     void InformNewBigChange();
     int GetLastBigChangeIdx();
 
     std::vector<KeyFrame *> GetAllKeyFrames();
     std::vector<MapPoint *> GetAllMapPoints();
     std::vector<MapStruct *> GetAllVoxelMaps();
+
     std::vector<MapPoint *> GetReferenceMapPoints();
 
     long unsigned int MapPointsInMap();
@@ -48,10 +52,18 @@ public:
     std::mutex mMutexMapUpdate;
 
 protected:
+    struct cmp
+    {
+        bool operator()(MapStruct *a, MapStruct *b) const
+        {
+            return a->mnId < b->mnId;
+        };
+    };
+
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
 
-    std::set<MapStruct *> mspMapStructs;
+    std::set<MapStruct *, cmp> mspMapStructs;
 
     std::vector<MapPoint *> mvpReferenceMapPoints;
 

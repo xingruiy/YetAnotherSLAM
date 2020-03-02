@@ -178,8 +178,6 @@ bool LoopClosing::DetectLoop()
 
 bool LoopClosing::ComputeSim3()
 {
-    std::cout << "Compute Sim3!" << std::endl;
-    std::cout << "============================" << std::endl;
     // For each consistent loop candidate we try to compute a Sim3
     const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
 
@@ -212,7 +210,6 @@ bool LoopClosing::ComputeSim3()
         }
 
         int nmatches = matcher.SearchByBoW(mpCurrentKF, pKF, vvpMapPointMatches[i]);
-        std::cout << "Iteration " << i << " Matches " << nmatches << std::endl;
 
         if (nmatches < 20)
         {
@@ -237,7 +234,6 @@ bool LoopClosing::ComputeSim3()
     {
         for (int i = 0; i < nInitialCandidates; i++)
         {
-            std::cout << "start computing " << std::endl;
             if (vbDiscarded[i])
                 continue;
 
@@ -263,7 +259,6 @@ bool LoopClosing::ComputeSim3()
             // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
             if (found)
             {
-                std::cout << "Found Candidate Scw: " << T12.matrix() << std::endl;
                 std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint *>(NULL));
                 for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
                 {
@@ -282,21 +277,12 @@ bool LoopClosing::ComputeSim3()
                 // If optimization is succesful stop ransacs and continue
                 if (nInliers >= 20)
                 {
-                    std::cout << "sim3 optimization succeeded" << std::endl;
                     bMatch = true;
                     mpMatchedKF = pKF;
                     Sophus::SE3d T21(gScm.rotation(), gScm.translation());
                     Sophus::SE3d Twc = pKF->GetPoseInverse();
-                    // g2o::Sim3 gSmw(Twc.rotationMatrix(), Twc.translation(), 1.0);
-                    // mg2oScw = gScm.inverse() * gSmw;
 
-                    // Eigen::Matrix3d eigRot = mg2oScw.rotation().toRotationMatrix();
-                    // Eigen::Vector3d eigtrans = mg2oScw.translation();
-                    // mTcwNew = Sophus::SE3d(eigRot, eigtrans).inverse();
-                    // mTcwNew = Twc * T21.inverse();
                     mTcwNew = pKF->GetPose() * T21.inverse();
-                    // Sophus::SE3d Swc = mTcwNew.inverse();
-                    // mg2oScw = g2o::Sim3(Swc.rotationMatrix(), Swc.translation(), 1.0f);
 
                     mvpCurrentMatchedPoints = vpMapPointMatches;
                     break;
@@ -336,7 +322,6 @@ bool LoopClosing::ComputeSim3()
     }
 
     // Find more matches projecting with the computed Sim3
-    std::cout << "searching again for mTcwNew..." << std::endl;
     matcher.SearchByProjection(mpCurrentKF, mTcwNew, mvpLoopMapPoints, mvpCurrentMatchedPoints, 10);
 
     // If enough matches accept Loop

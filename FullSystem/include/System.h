@@ -20,10 +20,10 @@ namespace SLAM
 {
 
 class Viewer;
-class LocalMapping;
 class Tracking;
 class MapViewer;
 class LoopClosing;
+class LocalMapping;
 
 class System
 {
