@@ -11,14 +11,14 @@ if [ -n "$1" ]; then
 fi
 
 echo -e "CMAKE_BUILD_TYPE is set to: ${RED}$BuildType${NC}"
-echo "Configuring and building Thirdparty/OpenNI2 ..."
+echo "Configuring and Building Thirdparty/OpenNI2 ..."
 
 cd ./Thirdparty/OpenNI2
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and building Thirdparty/ORB_SLAM2/Thirdparty/DBoW2 ..."
+echo "Configuring and Building Thirdparty/ORB_SLAM2/Thirdparty/DBoW2 ..."
 
 cd ../../DBoW2
 mkdir -p build && cd build
@@ -31,8 +31,13 @@ cd ../../../Vocabulary
 tar -xf ORBvoc.txt.tar.gz
 cd ..
 
-echo "building SLAM..."
+echo "Building SLAM ..."
 
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=$BuildType
 make -j
+
+# echo "Converting Vocabulary Files to Binary Version ..."
+# cd ../Vocabulary
+# ./Text2Bin
+# cd ..

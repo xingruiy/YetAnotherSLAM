@@ -137,6 +137,18 @@ bool Tracking::Relocalization()
     return false;
 }
 
+void Tracking::UpdateLocalMap()
+{
+}
+
+void Tracking::UpdateLocalPoints()
+{
+}
+
+void Tracking::UpdateLocalKeyFrames()
+{
+}
+
 bool Tracking::NeedNewKeyFrame()
 {
     Sophus::SE3d DT = mCurrentFrame.mRelativePose;

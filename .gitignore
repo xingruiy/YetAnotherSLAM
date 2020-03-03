@@ -3,3 +3,5 @@ bin
 lib
 build
 ORBvoc.txt
+ORBvoc.bin
+Text2Bin

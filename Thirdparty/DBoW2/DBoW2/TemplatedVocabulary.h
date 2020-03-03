@@ -1,6 +1,6 @@
 /**
  * This is a modified version of TemplatedVocabulary.h from DBoW2 (see below).
- * Added functions: Save and Load from text files without using cv::FileStorage.
+ * Added functions: Save and Load from text/binary files without using cv::FileStorage.
  * Date: August 2015
  * Raúl Mur-Artal
  */
@@ -9,7 +9,7 @@
  * File: TemplatedVocabulary.h
  * Date: February 2011
  * Author: Dorian Galvez-Lopez
- * Description: templated vocabulary 
+ * Description: templated vocabulary
  * License: see the LICENSE.txt file
  *
  */
@@ -65,7 +65,7 @@ public:
    */
   TemplatedVocabulary(const char *filename);
 
-  /** 
+  /**
    * Copy constructor
    * @param voc
    */
@@ -76,7 +76,7 @@ public:
    */
   virtual ~TemplatedVocabulary();
 
-  /** 
+  /**
    * Assigns the given vocabulary to this by copying its data and removing
    * all the data contained by this vocabulary before
    * @param voc
@@ -85,7 +85,7 @@ public:
   TemplatedVocabulary<TDescriptor, F> &operator=(
       const TemplatedVocabulary<TDescriptor, F> &voc);
 
-  /** 
+  /**
    * Creates a vocabulary from the training features with the already
    * defined parameters
    * @param training_features
@@ -179,7 +179,7 @@ public:
    */
   inline int getBranchingFactor() const { return m_k; }
 
-  /** 
+  /**
    * Returns the depth levels of the tree (L)
    * @return L
    */
@@ -205,13 +205,13 @@ public:
    */
   virtual inline WordValue getWordWeight(WordId wid) const;
 
-  /** 
+  /**
    * Returns the weighting method
    * @return weighting method
    */
   inline WeightingType getWeightingType() const { return m_weighting; }
 
-  /** 
+  /**
    * Returns the scoring method
    * @return scoring method
    */
@@ -242,6 +242,18 @@ public:
   void saveToTextFile(const std::string &filename) const;
 
   /**
+   * Loads the vocabulary from a binary file
+   * @param filename
+   */
+  bool loadFromBinaryFile(const std::string &filename);
+
+  /**
+   * Saves the vocabulary into a binary file
+   * @param filename
+   */
+  void saveToBinaryFile(const std::string &filename) const;
+
+  /**
    * Saves the vocabulary into a file
    * @param filename
    */
@@ -253,7 +265,7 @@ public:
    */
   void load(const std::string &filename);
 
-  /** 
+  /**
    * Saves the vocabulary to a file storage structure
    * @param fn node in file storage
    */
@@ -269,15 +281,15 @@ public:
   virtual void load(const cv::FileStorage &fs,
                     const std::string &name = "vocabulary");
 
-  /** 
+  /**
    * Stops those words whose weight is below minWeight.
    * Words are stopped by setting their weight to 0. There are not returned
    * later when transforming image features into vectors.
    * Note that when using IDF or TF_IDF, the weight is the idf part, which
    * is equivalent to -log(f), where f is the frequency of the word
-   * (f = Ni/N, Ni: number of training images where the word is present, 
+   * (f = Ni/N, Ni: number of training images where the word is present,
    * N: number of training images).
-   * Note that the old weight is forgotten, and subsequent calls to this 
+   * Note that the old weight is forgotten, and subsequent calls to this
    * function with a lower minWeight have no effect.
    * @return number of words stopped now
    */
@@ -328,7 +340,7 @@ protected:
    */
   void createScoringObject();
 
-  /** 
+  /**
    * Returns a set of pointers to descriptores
    * @param training_features all the features
    * @param features (out) pointers to the training features
@@ -376,7 +388,7 @@ protected:
   /**
    * Creates k clusters from the given descriptor sets by running the
    * initial step of kmeans++
-   * @param descriptors 
+   * @param descriptors
    * @param clusters resulting clusters
    */
   void initiateClustersKMpp(const std::vector<pDescriptor> &descriptors,
@@ -1425,6 +1437,87 @@ void TemplatedVocabulary<TDescriptor, F>::saveToTextFile(const std::string &file
     f << F::toString(node.descriptor) << " " << (double)node.weight << std::endl;
   }
 
+  f.close();
+}
+
+// --------------------------------------------------------------------------
+
+template <class TDescriptor, class F>
+bool TemplatedVocabulary<TDescriptor, F>::loadFromBinaryFile(const std::string &filename)
+{
+  std::fstream f;
+  f.open(filename.c_str(), std::ios_base::in | std::ios::binary);
+  unsigned int nb_nodes, size_node;
+  f.read((char *)&nb_nodes, sizeof(nb_nodes));
+  f.read((char *)&size_node, sizeof(size_node));
+  f.read((char *)&m_k, sizeof(m_k));
+  f.read((char *)&m_L, sizeof(m_L));
+  f.read((char *)&m_scoring, sizeof(m_scoring));
+  f.read((char *)&m_weighting, sizeof(m_weighting));
+  createScoringObject();
+
+  m_words.clear();
+  m_words.reserve(pow((double)m_k, (double)m_L + 1));
+  m_nodes.clear();
+  m_nodes.resize(nb_nodes + 1);
+  m_nodes[0].id = 0;
+  char *buf = new char[size_node];
+  int nid = 1;
+  while (!f.eof())
+  {
+    f.read(buf, size_node);
+    m_nodes[nid].id = nid;
+    // FIXME
+    const int *ptr = (int *)buf;
+    m_nodes[nid].parent = *ptr;
+    //m_nodes[nid].parent = *(const int*)buf;
+    m_nodes[m_nodes[nid].parent].children.push_back(nid);
+    m_nodes[nid].descriptor = cv::Mat(1, F::L, CV_8U);   //F::L
+    memcpy(m_nodes[nid].descriptor.data, buf + 4, F::L); //F::L
+    m_nodes[nid].weight = *(float *)(buf + 4 + F::L);    // F::L
+    if (buf[8 + F::L])
+    { // is leaf //F::L
+      int wid = m_words.size();
+      m_words.resize(wid + 1);
+      m_nodes[nid].word_id = wid;
+      m_words[wid] = &m_nodes[nid];
+    }
+    else
+      m_nodes[nid].children.reserve(m_k);
+    nid += 1;
+  }
+  f.close();
+
+  delete[] buf;
+  return true;
+}
+
+// --------------------------------------------------------------------------
+
+template <class TDescriptor, class F>
+void TemplatedVocabulary<TDescriptor, F>::saveToBinaryFile(const std::string &filename) const
+{
+  std::fstream f;
+  f.open(filename.c_str(), std::ios_base::out | std::ios::binary);
+  unsigned int nb_nodes = m_nodes.size();
+  float _weight;
+  unsigned int size_node = sizeof(m_nodes[0].parent) + F::L * sizeof(char) + sizeof(_weight) + sizeof(bool); //F::L
+  f.write((char *)&nb_nodes, sizeof(nb_nodes));
+  f.write((char *)&size_node, sizeof(size_node));
+  f.write((char *)&m_k, sizeof(m_k));
+  f.write((char *)&m_L, sizeof(m_L));
+  f.write((char *)&m_scoring, sizeof(m_scoring));
+  f.write((char *)&m_weighting, sizeof(m_weighting));
+  for (size_t i = 1; i < nb_nodes; i++)
+  {
+    const Node &node = m_nodes[i];
+    f.write((char *)&node.parent, sizeof(node.parent));
+    f.write((char *)node.descriptor.data, F::L); //F::L
+    _weight = node.weight;
+    f.write((char *)&_weight, sizeof(_weight));
+    bool is_leaf = node.isLeaf();
+    f.write((char *)&is_leaf, sizeof(is_leaf)); // i put this one at the end for alignement....
+  }
   f.close();
 }
 

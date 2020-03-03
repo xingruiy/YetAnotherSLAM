@@ -66,8 +66,8 @@ PUBLIC
     g2o_core 
     g2o_types_sba
     g2o_types_sim3
+    ${OpenCV_LIBS}
     ${CUDA_LIBRARIES}
-    ${OpenCV_LIBRARIES}
     ${Pangolin_LIBRARIES}
     ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 )
@@ -94,4 +94,24 @@ add_executable(tumDemo
 target_link_libraries(tumDemo 
 PRIVATE 
     ${PROJECT_NAME} 
+)
+
+# Build Vocabulary Converter
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Vocabulary)
+add_executable(Text2Bin 
+    Vocabulary/Text2Bin.cpp
+)
+target_include_directories(Text2Bin
+PRIVATE
+    ${PROJECT_SOURCE_DIR}/FullSystem/include
+    ${PROJECT_SOURCE_DIR}/Thirdparty/
+)
+target_compile_features(Text2Bin
+PRIVATE
+    cxx_std_11
+)
+target_link_libraries(Text2Bin 
+PRIVATE
+    ${OpenCV_LIBS}
+    ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 )

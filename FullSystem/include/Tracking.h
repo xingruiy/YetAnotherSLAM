@@ -72,6 +72,13 @@ protected:
     void InitializeSystem();
 
     bool Relocalization();
+    void UpdateLocalMap();
+    void UpdateLocalPoints();
+    void UpdateLocalKeyFrames();
+
+    bool TrackLocalMap();
+    void SearchLocalPoints();
+
     bool TrackRGBD();
 
     bool NeedNewKeyFrame();
