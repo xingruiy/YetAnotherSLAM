@@ -160,10 +160,10 @@ bool Tracking::TrackRGBD()
     mpTracker->SetTrackingDepth(mCurrentFrame.mImDepth);
 
     // Calculate the relateive transformation
-    Sophus::SE3d DT = mpTracker->GetTransform(mLastFrame.mTcp.inverse(), false);
+    Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
 
-    mCurrentFrame.mTcp = DT.inverse();
-    mCurrentFrame.mTcw = mReferenceFramePose * DT.inverse();
+    mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
+    mCurrentFrame.mTcp = mpReferenceKF->GetPoseInverse() * mCurrentFrame.mTcw;
 
     mRawDepth.upload(mCurrentFrame.mImDepth);
     mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcp);
@@ -182,8 +182,8 @@ bool Tracking::Relocalization()
 
 bool Tracking::TrackLocalMap()
 {
-    // We have an estimation of the camera pose
-    // We retrieve the local map and try to find matches to points in the local map.
+    // retrieve the local map and try to
+    // find matches to points in the local map.
     UpdateLocalMap();
 
     SearchLocalPoints();
@@ -346,7 +346,7 @@ void Tracking::UpdateLocalKeyFrames()
     for (auto itKF = mvpLocalKeyFrames.begin(), itEndKF = mvpLocalKeyFrames.end(); itKF != itEndKF; itKF++)
     {
         // Limit the number of keyframes
-        if (mvpLocalKeyFrames.size() > 60)
+        if (mvpLocalKeyFrames.size() > 80)
             break;
 
         KeyFrame *pKF = *itKF;
@@ -406,9 +406,9 @@ bool Tracking::NeedNewKeyFrame()
     bool bCreateNew = false;
     Sophus::SE3d DT = mCurrentFrame.mTcp;
 
-    if (DT.log().topRows<3>().norm() > 0.1)
+    if (DT.log().topRows<3>().norm() > 0.2)
         bCreateNew = true;
-    else if (DT.log().bottomRows<3>().norm() > 0.15)
+    else if (DT.log().bottomRows<3>().norm() > 0.2)
         bCreateNew = true;
 
     return bCreateNew;
@@ -422,8 +422,6 @@ void Tracking::CreateNewKeyFrame()
     mCurrentFrame.ExtractORB();
     if (!TrackLocalMap())
         return;
-
-    mpLocalMapper->SetMapPointsToCheck(mvpLocalMapPoints);
 
     KeyFrame *pKF = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
 
@@ -513,7 +511,7 @@ void Tracking::CreateNewKeyFrame()
     mpCurrentMapStruct->mTcw = pKF->GetPose();
 
     // Swap the dense tracking buffer
-    mpTracker->SwapFrameBuffer();
+    // mpTracker->SwapFrameBuffer();
     mCurrentFrame.mTcp = Sophus::SE3d();
 }
 

@@ -169,27 +169,27 @@ void LocalMapping::ProcessNewKeyFrame()
 void LocalMapping::MapPointCulling()
 {
     // Check Recent Added MapPoints
-    // std::list<MapPoint *>::iterator lit = mlpRecentAddedMapPoints.begin();
-    // const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
+    std::list<MapPoint *>::iterator lit = mlpRecentAddedMapPoints.begin();
+    const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
 
-    // const int cnThObs = 3;
-    // while (lit != mlpRecentAddedMapPoints.end())
-    // {
-    //     MapPoint *pMP = *lit;
-    //     if (pMP->isBad())
-    //     {
-    //         lit = mlpRecentAddedMapPoints.erase(lit);
-    //     }
-    //     else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 2 && pMP->Observations() <= cnThObs)
-    //     {
-    //         pMP->SetBadFlag();
-    //         lit = mlpRecentAddedMapPoints.erase(lit);
-    //     }
-    //     else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 3)
-    //         lit = mlpRecentAddedMapPoints.erase(lit);
-    //     else
-    //         lit++;
-    // }
+    const int cnThObs = 3;
+    while (lit != mlpRecentAddedMapPoints.end())
+    {
+        MapPoint *pMP = *lit;
+        if (pMP->isBad())
+        {
+            lit = mlpRecentAddedMapPoints.erase(lit);
+        }
+        else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 2 && pMP->Observations() <= cnThObs)
+        {
+            pMP->SetBadFlag();
+            lit = mlpRecentAddedMapPoints.erase(lit);
+        }
+        else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 3)
+            lit = mlpRecentAddedMapPoints.erase(lit);
+        else
+            lit++;
+    }
 
     // std::cout << mlpRecentAddedMapPoints.size() << std::endl;
 
@@ -217,22 +217,22 @@ void LocalMapping::MapPointCulling()
     // }
 
     // Check points created by error
-    unsigned long int KFId = mpCurrentKeyFrame->mnId;
-    unsigned long int FrameId = mpCurrentKeyFrame->mnFrameId;
-    for (auto vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; ++vit)
-    {
-        MapPoint *pMP = *vit;
-        if (pMP && pMP->Observations() < 3)
-        {
-            KeyFrame *pRefKF = pMP->GetReferenceKeyFrame();
-            if (pRefKF && pRefKF->mnId < KFId - 3)
-                if (pMP->GetFoundRatio() < 0.1f)
-                {
-                    pMP->SetBadFlag();
-                    mpMap->EraseMapPoint(pMP);
-                }
-        }
-    }
+    // unsigned long int KFId = mpCurrentKeyFrame->mnId;
+    // unsigned long int FrameId = mpCurrentKeyFrame->mnFrameId;
+    // for (auto vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; ++vit)
+    // {
+    //     MapPoint *pMP = *vit;
+    //     if (pMP && pMP->Observations() < 3)
+    //     {
+    //         KeyFrame *pRefKF = pMP->GetReferenceKeyFrame();
+    //         if (pRefKF && pRefKF->mnId < KFId - 3)
+    //             if (pMP->GetFoundRatio() < 0.1f)
+    //             {
+    //                 pMP->SetBadFlag();
+    //                 mpMap->EraseMapPoint(pMP);
+    //             }
+    //     }
+    // }
 }
 
 void LocalMapping::KeyFrameCulling()
@@ -379,15 +379,10 @@ void LocalMapping::CreateNewMapPoints()
 
 void LocalMapping::RequestStop()
 {
-    {
-        std::unique_lock<std::mutex> lock(mMutexStop);
-        mbStopRequested = true;
-    }
-
-    {
-        std::unique_lock<std::mutex> lock2(mMutexNewKFs);
-        mbAbortBA = true;
-    }
+    std::unique_lock<std::mutex> lock(mMutexStop);
+    std::unique_lock<std::mutex> lock2(mMutexNewKFs);
+    mbStopRequested = true;
+    mbAbortBA = true;
 }
 
 void LocalMapping::RequestReset()

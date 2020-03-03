@@ -399,15 +399,12 @@ void LoopClosing::CorrectLoop()
 
             if (pKFi != mpCurrentKF)
             {
-                // g2o::Sim3 g2oSic(Twc.rotationMatrix(), Twc.translation(), 1.0);
-                // g2o::Sim3 g2oCorrectedSiw = g2oSic * mg2oScw;
                 //Pose corrected with the Sim3 of the loop closure
                 Sophus::SE3d T21 = Twc1 * Tcw2;
                 Sophus::SE3d CorrectedScw = mTcwNew * T21;
                 CorrectedSim3[pKFi] = CorrectedScw;
             }
 
-            // g2o::Sim3 g2oSiw(Tiw.rotationMatrix(), Tiw.translation(), 1.0);
             //Pose without correction
             NonCorrectedSim3[pKFi] = Tcw2;
         }
@@ -416,10 +413,6 @@ void LoopClosing::CorrectLoop()
         for (auto mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
         {
             KeyFrame *pKFi = mit->first;
-            // g2o::Sim3 g2oCorrectedSiw = mit->second;
-            // g2o::Sim3 g2oCorrectedSwi = g2oCorrectedSiw.inverse();
-
-            // g2o::Sim3 g2oSiw = NonCorrectedSim3[pKFi];
 
             Sophus::SE3d CorrectedTcw = mit->second;
             Sophus::SE3d CorrectedTwc = CorrectedTcw.inverse();
@@ -439,7 +432,6 @@ void LoopClosing::CorrectLoop()
 
                 // Project with non-corrected pose and project back with corrected pose
                 Eigen::Vector3d eigP3Dw = pMPi->GetWorldPos();
-                // Eigen::Vector3d eigCorrectedP3Dw = g2oCorrectedSwi.map(g2oSiw.map(eigP3Dw));
                 Eigen::Vector3d eigCorrectedP3Dw = CorrectedTwc * NonCorrectedTcw * eigP3Dw;
 
                 pMPi->SetWorldPos(eigCorrectedP3Dw);
@@ -448,16 +440,6 @@ void LoopClosing::CorrectLoop()
                 pMPi->UpdateNormalAndDepth();
             }
 
-            // Update keyframe pose with corrected Sim3. First transform Sim3 to SE3 (scale translation)
-            // Eigen::Matrix3d eigR = g2oCorrectedSiw.rotation().toRotationMatrix();
-            // Eigen::Vector3d eigt = g2oCorrectedSiw.translation();
-            // double s = g2oCorrectedSiw.scale();
-
-            // eigt *= (1. / s); //[R t/s;0 1]
-
-            // Sophus::SE3d correctedTiw(eigR, eigt);
-
-            // pKFi->SetPose(correctedTiw);
             pKFi->SetPose(CorrectedTcw);
 
             // Make sure connections are updated
@@ -538,12 +520,6 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
     for (auto mit = CorrectedPosesMap.begin(), mend = CorrectedPosesMap.end(); mit != mend; mit++)
     {
         KeyFrame *pKF = mit->first;
-
-        // g2o::Sim3 g2oScw = mit->second;
-        // Eigen::Matrix4d eigScw = Eigen::Matrix4d::Identity();
-        // eigScw.topLeftCorner(3, 3) = g2oScw.scale() * g2oScw.rotation().toRotationMatrix();
-        // eigScw.topRightCorner(3, 1) = g2oScw.translation();
-        // Sophus::Sim3d Scw(eigScw);
         Sophus::SE3d CorrectedTcw = mit->second;
 
         std::vector<MapPoint *> vpReplacePoints(mvpLoopMapPoints.size(), static_cast<MapPoint *>(NULL));
