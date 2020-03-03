@@ -8,6 +8,7 @@
 #include "Frame.h"
 #include "VoxelMap.h"
 #include "MapPoint.h"
+#include "KeyFrameDatabase.h"
 
 namespace SLAM
 {
@@ -15,13 +16,12 @@ namespace SLAM
 class Map;
 class Frame;
 class MapPoint;
+class KeyFrameDatabase;
 
 class KeyFrame
 {
 public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-    KeyFrame(const Frame &F, Map *pMap);
+    KeyFrame(const Frame &F, Map *pMap, KeyFrameDatabase *pKFDB);
 
     // Pose functions
     void SetPose(const Sophus::SE3d &Tcw);
@@ -31,7 +31,7 @@ public:
     Eigen::Vector3d GetTranslation();
 
     // Bag of Words Representation
-    void ComputeBoW(ORBVocabulary *voc);
+    void ComputeBoW();
 
     // Covisibility Graph functions
     int GetWeight(KeyFrame *pKF);
@@ -67,8 +67,8 @@ public:
 
     // KeyPoint functions
     std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, float r, int minlvl = -1, int maxlvl = -1);
-    Eigen::Vector3d UnprojectKeyPoint(int i);
-    bool UnprojectKeyPoint(Eigen::Vector3d &posWorld, const int &i);
+    Eigen::Vector3d UnprojectStereo(int i);
+    bool UnprojectStereo(Eigen::Vector3d &posWorld, const int &i);
 
     // Image
     bool IsInImage(const float &x, const float &y) const;
@@ -83,16 +83,27 @@ public:
 
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
 
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 public:
-    unsigned long mnId;
-    static unsigned long nNextId;
+    static long unsigned int nNextId;
+    long unsigned int mnId;
+    const long unsigned int mnFrameId;
 
     const double mTimeStamp;
 
-    // Variables used by the local mpLocalMapper
-    unsigned long mnBALocalForKF;
-    unsigned long mnBAFixedForKF;
-    unsigned long mnFuseTargetForKF;
+    // Grid (to speed up feature matching)
+    const int mnGridCols;
+    const int mnGridRows;
+    const float mfGridElementWidthInv;
+    const float mfGridElementHeightInv;
+
+    // Variables used by the tracking
+    long unsigned int mnTrackReferenceForFrame;
+    long unsigned int mnFuseTargetForKF;
+
+    // Variables used by the local mapping
+    long unsigned int mnBALocalForKF;
+    long unsigned int mnBAFixedForKF;
 
     // Variables used by the keyframe database
     long unsigned int mnLoopQuery;
@@ -102,48 +113,61 @@ public:
     int mnRelocWords;
     float mRelocScore;
 
-    // Grid over the image to speed up feature matching
-    std::vector<std::vector<std::vector<size_t>>> mGrid;
-
     // Variables used by loop closing
     Sophus::SE3d mTcwGBA;
     Sophus::SE3d mTcwBefGBA;
     long unsigned int mnBAGlobalForKF;
 
     // Calibration parameters
-    float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
-    cv::Mat mK;
+    const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
 
     // Number of KeyPoints
-    int N;
+    const int N;
 
     // KeyPoints, stereo coordinate and descriptors (all associated by an index)
-    std::vector<cv::KeyPoint> mvKeys;
-    std::vector<cv::KeyPoint> mvKeysUn;
-    std::vector<float> mvuRight;
-    std::vector<float> mvDepth;
-    cv::Mat mDescriptors;
+    const std::vector<cv::KeyPoint> mvKeys;
+    const std::vector<cv::KeyPoint> mvKeysUn;
+    const std::vector<float> mvuRight; // negative value for monocular points
+    const std::vector<float> mvDepth;  // negative value for monocular points
+    const cv::Mat mDescriptors;
 
     // BoW.
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
 
     // Pose relative to parent
-    Sophus::SE3d mRelativePose;
+    Sophus::SE3d mTcp;
+
+    // Scale
+    const int mnScaleLevels;
+    const float mfScaleFactor;
+    const float mfLogScaleFactor;
+    const std::vector<float> mvScaleFactors;
+    const std::vector<float> mvLevelSigma2;
+    const std::vector<float> mvInvLevelSigma2;
+
+    // Image bounds and calibration
+    const int mnMinX;
+    const int mnMinY;
+    const int mnMaxX;
+    const int mnMaxY;
+    const cv::Mat mK;
+
+    // The following variables need to be accessed trough a mutex to be thread safe.
+protected:
+    // Keyframe in World coord
+    Sophus::SE3d mTcw;
 
     // MapPoints associated to keypoints
-    std::vector<bool> mvbOutlier;
     std::vector<MapPoint *> mvpMapPoints;
 
-    // ORB scale pyramid info
-    int mnScaleLevels;
-    float mfScaleFactor;
-    float mfLogScaleFactor;
-    std::vector<float> mvScaleFactors;
-    std::vector<float> mvLevelSigma2;
-    std::vector<float> mvInvLevelSigma2;
+    // BoW
+    KeyFrameDatabase *mpKeyFrameDB;
+    ORBVocabulary *mpORBvocabulary;
 
-    // Covisiblity graph
+    // Grid over the image to speed up feature matching
+    std::vector<std::vector<std::vector<size_t>>> mGrid;
+
     std::map<KeyFrame *, int> mConnectedKeyFrameWeights;
     std::vector<KeyFrame *> mvpOrderedConnectedKeyFrames;
     std::vector<int> mvOrderedWeights;
@@ -154,27 +178,25 @@ public:
     std::set<KeyFrame *> mspChildrens;
     std::set<KeyFrame *> mspLoopEdges;
 
-    // Keyframe in World coord
-    Sophus::SE3d mTcw;
-    std::mutex poseMutex;
-    std::mutex mMutexConnections;
-    std::mutex mMutexFeatures;
-    KeyFrame *mReferenceKeyFrame;
-
-    void UndistortKeys();
-    void AssignFeaturesToGrid();
-    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
-    void ComputeStereoRGBD(const cv::Mat depth);
-
-    MapStruct *mpVoxelStruct;
-    bool mbVoxelStructMarginalized;
-
-    ORBextractor *mpExtractor;
-    Map *mpMap;
-    cv::Mat mImg;
-    bool mbBad;
+    // Bad flags
     bool mbNotErase;
     bool mbToBeErased;
+    bool mbBad;
+
+    std::mutex mMutexPose;
+    std::mutex mMutexConnections;
+    std::mutex mMutexFeatures;
+
+    Map *mpMap;
+
+    // The following variables are newly added
+public:
+    // The original image for visualization
+    cv::Mat mImg;
+
+    // Dense Maps contained
+    MapStruct *mpVoxelStruct;
+    bool mbVoxelStructMarginalized;
 };
 
 } // namespace SLAM

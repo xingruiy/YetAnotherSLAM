@@ -43,14 +43,14 @@ class LocalMapping
 public:
     LocalMapping(ORBVocabulary *pVoc, Map *pMap);
 
-    void setLoopCloser(LoopClosing *pLoopCloser);
+    void SetLoopCloser(LoopClosing *pLoopCloser);
 
-    void setViewer(Viewer *pViewer);
+    void SetViewer(Viewer *pViewer);
 
     // Main function
     void Run();
 
-    void AddKeyFrameCandidate(KeyFrame *pKF);
+    void InsertKeyFrame(KeyFrame *pKF);
 
     // Thread Synch
     void RequestStop();
@@ -58,11 +58,25 @@ public:
     bool Stop();
     void Release();
     bool isStopped();
+    bool stopRequested();
+    bool AcceptKeyFrames();
+    void SetAcceptKeyFrames(bool flag);
+    bool SetNotStop(bool flag);
 
     void InterruptBA();
 
     void RequestFinish();
     bool isFinished();
+
+    int KeyframesInQueue()
+    {
+        std::unique_lock<std::mutex> lock(mMutexNewKFs);
+        return mlNewKeyFrames.size();
+    }
+
+    // Customised functions
+public:
+    void SetMapPointsToCheck(const std::vector<MapPoint *> &vpLocalPoints);
 
 private:
     bool CheckNewKeyFrames();
@@ -74,33 +88,31 @@ private:
 
     void KeyFrameCulling();
 
-    // Local mapping, moved form tracker in ORB_SLAM2
-    void UpdateLocalMap();
-    void UpdateKeyFrame();
-    int MatchLocalPoints();
+    cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
 
+    cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
+
+    void ResetIfRequested();
+    bool mbResetRequested;
+    std::mutex mMutexReset;
+
+    bool CheckFinish();
+    void SetFinish();
     bool mbFinishRequested;
     bool mbFinished;
     std::mutex mMutexFinish;
 
-    // keyframe candidate
-    std::mutex mMutexNewKFs;
-    std::list<KeyFrame *> mlNewKeyFrames;
-    KeyFrame *mpCurrentKeyFrame;
-    KeyFrame *mpLastKeyFrame;
-    KeyFrame *mpReferenceKeyframe;
-
-    ORBVocabulary *ORBvocabulary;
-
-    std::vector<KeyFrame *> mvpLocalKeyFrames;
-    std::vector<MapPoint *> mvpLocalMapPoints;
-
     Map *mpMap;
-    Viewer *mpViewer;
+
     LoopClosing *mpLoopCloser;
+
+    std::list<KeyFrame *> mlNewKeyFrames;
+
+    KeyFrame *mpCurrentKeyFrame;
+
     std::list<MapPoint *> mlpRecentAddedMapPoints;
 
-    cv::Mat mImg;
+    std::mutex mMutexNewKFs;
 
     bool mbAbortBA;
 
@@ -108,6 +120,15 @@ private:
     bool mbStopRequested;
     bool mbNotStop;
     std::mutex mMutexStop;
+
+    bool mbAcceptKeyFrames;
+    std::mutex mMutexAccept;
+
+    // new members
+protected:
+    Viewer *mpViewer;
+    cv::Mat mImg;
+    std::vector<MapPoint *> mvpLocalMapPoints;
 };
 
 } // namespace SLAM

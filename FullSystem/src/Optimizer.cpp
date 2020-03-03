@@ -217,7 +217,7 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame *> &vpKFs, const std
     }
 }
 
-int Optimizer::PoseOptimization(KeyFrame *pKF)
+int Optimizer::PoseOptimization(Frame &pFrame)
 {
     // Setup optimizer
     g2o::SparseOptimizer optimizer;
@@ -232,15 +232,15 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
 
     int nInitialCorrespondences = 0;
 
-    // Set keyframe vertex
+    // Set Frame vertex
     g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
-    vSE3->setEstimate(ToSE3Quat(pKF->mTcw));
+    vSE3->setEstimate(ToSE3Quat(pFrame.mTcw));
     vSE3->setId(0);
     vSE3->setFixed(false);
     optimizer.addVertex(vSE3);
 
     // Set MapPoint vertices
-    const int N = pKF->N;
+    const int N = pFrame.N;
     std::vector<g2o::EdgeStereoSE3ProjectXYZOnlyPose *> vpEdgesStereo;
     std::vector<size_t> vnIndexEdgeStereo;
     vpEdgesStereo.reserve(N);
@@ -252,23 +252,23 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
 
         for (int i = 0; i < N; i++)
         {
-            MapPoint *pMP = pKF->mvpMapPoints[i];
+            MapPoint *pMP = pFrame.mvpMapPoints[i];
             if (pMP)
             {
                 nInitialCorrespondences++;
-                pKF->mvbOutlier[i] = false;
+                pFrame.mvbOutlier[i] = false;
 
                 //SET EDGE
                 Eigen::Matrix<double, 3, 1> obs;
-                const cv::KeyPoint &kpUn = pKF->mvKeysUn[i];
-                const float &kp_ur = pKF->mvuRight[i];
+                const cv::KeyPoint &kpUn = pFrame.mvKeysUn[i];
+                const float &kp_ur = pFrame.mvuRight[i];
                 obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
                 g2o::EdgeStereoSE3ProjectXYZOnlyPose *e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
 
                 e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(0)));
                 e->setMeasurement(obs);
-                const float invSigma2 = pKF->mvInvLevelSigma2[kpUn.octave];
+                const float invSigma2 = pFrame.mvInvLevelSigma2[kpUn.octave];
                 Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
                 e->setInformation(Info);
 
@@ -276,11 +276,11 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
                 e->setRobustKernel(rk);
                 rk->setDelta(delta);
 
-                e->fx = pKF->fx;
-                e->fy = pKF->fy;
-                e->cx = pKF->cx;
-                e->cy = pKF->cy;
-                e->bf = pKF->mbf;
+                e->fx = pFrame.fx;
+                e->fy = pFrame.fy;
+                e->cx = pFrame.cx;
+                e->cy = pFrame.cy;
+                e->bf = pFrame.mbf;
                 e->Xw = pMP->GetWorldPos();
 
                 optimizer.addEdge(e);
@@ -301,7 +301,7 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
     int nBad = 0;
     for (size_t it = 0; it < 4; it++)
     {
-        vSE3->setEstimate(ToSE3Quat(pKF->mTcw));
+        vSE3->setEstimate(ToSE3Quat(pFrame.mTcw));
         optimizer.initializeOptimization(0);
         optimizer.optimize(its[it]);
 
@@ -311,7 +311,7 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
             g2o::EdgeStereoSE3ProjectXYZOnlyPose *e = vpEdgesStereo[i];
             const size_t idx = vnIndexEdgeStereo[i];
 
-            if (pKF->mvbOutlier[idx])
+            if (pFrame.mvbOutlier[idx])
             {
                 e->computeError();
             }
@@ -319,14 +319,14 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
             const float chi2 = e->chi2();
             if (chi2 > chi2Th[it])
             {
-                pKF->mvbOutlier[idx] = true;
+                pFrame.mvbOutlier[idx] = true;
                 e->setLevel(1);
                 nBad++;
             }
             else
             {
                 e->setLevel(0);
-                pKF->mvbOutlier[idx] = false;
+                pFrame.mvbOutlier[idx] = false;
             }
 
             if (it == 2)
@@ -340,7 +340,7 @@ int Optimizer::PoseOptimization(KeyFrame *pKF)
     // Recover optimized pose and return number of inliers
     g2o::VertexSE3Expmap *vSE3_recov = static_cast<g2o::VertexSE3Expmap *>(optimizer.vertex(0));
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
-    pKF->SetPose(Sophus::SE3d(SE3quat_recov.to_homogeneous_matrix()).inverse());
+    pFrame.SetPose(Sophus::SE3d(SE3quat_recov.to_homogeneous_matrix()).inverse());
 
     return nInitialCorrespondences - nBad;
 }

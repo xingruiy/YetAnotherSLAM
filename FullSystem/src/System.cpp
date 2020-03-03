@@ -6,22 +6,29 @@ namespace SLAM
 System::System(const std::string &strSettingFile, const std::string &strVocFile)
     : mpViewer(nullptr)
 {
+    //Load Settings
     readSettings(strSettingFile);
+
+    //Load ORB Vocabulary
     loadORBVocabulary(strVocFile);
 
+    //Create the Map
     mpMap = new Map();
     mpMapDrawer = new MapDrawer(mpMap);
+
+    //Create KeyFrame Database
     mpKeyFrameDB = new KeyFrameDatabase(*mpORBVocabulary);
 
     mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, mpORBVocabulary);
     mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
 
     mpLocalMapper = new LocalMapping(mpORBVocabulary, mpMap);
-    mpLocalMapper->setLoopCloser(mpLoopClosing);
+    mpLocalMapper->SetLoopCloser(mpLoopClosing);
     mpLoopClosing->SetLocalMapper(mpLocalMapper);
     mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
 
-    mpTracker = new Tracking(this, mpMap);
+    //Initialize the Tracking thread
+    mpTracker = new Tracking(this, mpORBVocabulary, mpMap, mpKeyFrameDB);
     mpTracker->SetLocalMapper(mpLocalMapper);
 
     if (g_bEnableViewer)
@@ -29,7 +36,7 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
         mpViewer = new Viewer(this, mpMapDrawer);
         mpViewerThread = new std::thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
-        mpLocalMapper->setViewer(mpViewer);
+        mpLocalMapper->SetViewer(mpViewer);
     }
 }
 

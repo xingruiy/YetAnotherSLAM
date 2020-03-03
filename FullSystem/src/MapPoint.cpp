@@ -12,7 +12,7 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
     : mnFirstKFid(pRefKF->mnId), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
       mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
       mpReplaced(nullptr), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), mWorldPos(pos),
-      mAvgViewingDir(Eigen::Vector3d::Zero()), mnTrackReferenceForFrame(0)
+      mAvgViewingDir(Eigen::Vector3d::Zero()), mnTrackReferenceForFrame(0), mnLastFrameSeen(pRefKF->mnFrameId)
 {
     mnId = nNextId++;
 }
@@ -21,11 +21,11 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, cons
     : mnFirstKFid(pRefKF->mnId), mpRefKF(pRefKF), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0),
       mnLoopPointForKF(0), mnCorrectedByKF(0), mnCorrectedReference(0), mnBAGlobalForKF(0),
       mnVisible(1), mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap), mWorldPos(pos),
-      mnTrackReferenceForFrame(0)
+      mnTrackReferenceForFrame(0), mnLastFrameSeen(pRefKF->mnFrameId)
 {
     mnId = nNextId++;
 
-    Eigen::Vector3d Ow = pRefKF->mTcw.matrix().topRightCorner(3, 1);
+    Eigen::Vector3d Ow = pRefKF->GetPose().matrix().topRightCorner(3, 1);
     mAvgViewingDir = mWorldPos - Ow;
     mAvgViewingDir.normalize();
 
@@ -228,13 +228,13 @@ void MapPoint::UpdateNormalAndDepth()
     for (auto mit = Obs.begin(), mend = Obs.end(); mit != mend; mit++)
     {
         KeyFrame *pKF = mit->first;
-        Eigen::Vector3d Owi = pKF->mTcw.translation();
+        Eigen::Vector3d Owi = pKF->GetTranslation();
         Eigen::Vector3d viewingDiri = mWorldPos - Owi;
         viewingDir += viewingDiri.normalized();
         n++;
     }
 
-    Eigen::Vector3d PC = Pos - pRefKF->mTcw.translation();
+    Eigen::Vector3d PC = Pos - pRefKF->GetTranslation();
     const float dist = PC.norm();
     const int level = pRefKF->mvKeysUn[Obs[pRefKF]].octave;
     const float levelScaleFactor = pRefKF->mvScaleFactors[level];
@@ -348,6 +348,23 @@ int MapPoint::PredictScale(const float &currentDist, KeyFrame *pKF)
         nScale = 0;
     else if (nScale >= pKF->mnScaleLevels)
         nScale = pKF->mnScaleLevels - 1;
+
+    return nScale;
+}
+
+int MapPoint::PredictScale(const float &currentDist, Frame *pF)
+{
+    float ratio;
+    {
+        std::unique_lock<std::mutex> lock(mMutexPos);
+        ratio = mfMaxDistance / currentDist;
+    }
+
+    int nScale = ceil(log(ratio) / pF->mfLogScaleFactor);
+    if (nScale < 0)
+        nScale = 0;
+    else if (nScale >= pF->mnScaleLevels)
+        nScale = pF->mnScaleLevels - 1;
 
     return nScale;
 }

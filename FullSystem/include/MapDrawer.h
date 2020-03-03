@@ -26,7 +26,7 @@ public:
 
 private:
     Map *mpMap;
-    std::mutex mPoseMutex;
+    std::mutex mmMutexPose;
     Eigen::Matrix4f mCameraPose;
 
     Eigen::Matrix3f mCalibInv;

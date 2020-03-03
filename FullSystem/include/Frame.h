@@ -24,7 +24,7 @@ public:
     Frame(const Frame &frame);
 
     // Constructor for RGB-D cameras.
-    Frame(const cv::Mat imGray, const cv::Mat imDepth, const double &timeStamp, ORBextractor *extractor);
+    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor *extractor, ORBVocabulary *voc);
 
     // Extract ORB on the image.
     void ExtractORB();
@@ -35,11 +35,17 @@ public:
     // Set the camera pose.
     void SetPose(const Sophus::SE3d &Tcw);
 
+    // Check if a MapPoint is in the frustum of the camera
+    // and fill variables of the MapPoint to be used by the tracking
+    bool isInFrustum(MapPoint *pMP, float viewingCosLimit);
+
     // Compute the cell of a keypoint (return false if outside the grid)
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
 
+    std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, const float &r, const int minLevel = -1, const int maxLevel = -1) const;
+
     // Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
-    void ComputeStereoFromRGBD(const cv::Mat &imDepth);
+    void ComputeStereoFromRGBD();
 
 public:
     // Vocabulary used for relocalization.
@@ -106,7 +112,7 @@ public:
 
     // Camera pose.
     Sophus::SE3d mTcw;
-    Sophus::SE3d mRelativePose;
+    Sophus::SE3d mTcp;
 
     // Current and Next Frame id.
     static long unsigned int nNextId;

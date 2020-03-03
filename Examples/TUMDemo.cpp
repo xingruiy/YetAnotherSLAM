@@ -60,14 +60,14 @@ int main(int argc, char **argv)
             double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 
             // Wait to load the next frame
-            double T = 0;
-            if (i < nImages - 1)
-                T = vTimestamps[i + 1] - tframe;
-            else if (i > 0)
-                T = tframe - vTimestamps[i - 1];
+            // double T = 0;
+            // if (i < nImages - 1)
+            //     T = vTimestamps[i + 1] - tframe;
+            // else if (i > 0)
+            //     T = tframe - vTimestamps[i - 1];
 
-            if (ttrack < T)
-                usleep((T - ttrack) * 1e6);
+            // if (ttrack < T)
+            //     usleep((T - ttrack) * 1e6);
         }
         else
         {

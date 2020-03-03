@@ -45,20 +45,20 @@ void Map::AddMapStruct(MapStruct *pMS)
     std::unique_lock<std::mutex> lock(mFractualMutex);
     mspMapStructs.insert(pMS);
 
-    //     if (mspMapStructs.size() <= 20)
-    //         return;
+    if (mspMapStructs.size() <= 40)
+        return;
 
-    //     // We always keep at most 20 maps in device memory
-    //     for (auto sit = mspMapStructs.begin(), send = mspMapStructs.end(); sit != send; ++sit)
-    //     {
-    //         MapStruct *pMS = *sit;
-    //         if (pMS && !pMS->mbInHibernation)
-    //         {
-    //             pMS->Hibernate();
-    //             pMS->DeleteMesh();
-    //             return;
-    //         }
-    //     }
+    // We always keep at most 40 maps in device memory
+    for (auto sit = mspMapStructs.begin(), send = mspMapStructs.end(); sit != send; ++sit)
+    {
+        MapStruct *pMS = *sit;
+        if (pMS && !pMS->mbInHibernation)
+        {
+            pMS->Hibernate();
+            pMS->DeleteMesh();
+            return;
+        }
+    }
 }
 
 void Map::reset()
@@ -108,6 +108,18 @@ int Map::GetLastBigChangeIdx()
 {
     std::unique_lock<std::mutex> lock(mMutexMap);
     return mnBigChangeIdx;
+}
+
+long unsigned int Map::MapPointsInMap()
+{
+    std::unique_lock<std::mutex> lock(mMutexMap);
+    return mspMapPoints.size();
+}
+
+long unsigned int Map::KeyFramesInMap()
+{
+    std::unique_lock<std::mutex> lock(mMutexMap);
+    return mspKeyFrames.size();
 }
 
 std::vector<MapPoint *> Map::GetReferenceMapPoints()

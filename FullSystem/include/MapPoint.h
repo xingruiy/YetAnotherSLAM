@@ -60,6 +60,7 @@ public:
     static long unsigned int nNextId;
     long int mnFirstKFid;
     long int mnFirstFrame;
+    long unsigned int mnLastFrameSeen;
     int nObs;
 
     // Variables used by local mapper

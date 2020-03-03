@@ -65,7 +65,6 @@ void RGBDTracking::SetReferenceImage(const cv::Mat &imGray)
 
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
-        std::cout << mvReferenceIntensity[lvl].size() << std::endl;
         if (lvl == 0)
             mvReferenceIntensity[0].upload(imGrayFloat);
         else

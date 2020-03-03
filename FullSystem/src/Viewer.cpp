@@ -180,7 +180,7 @@ void Viewer::RenderLiveCameraFrustum()
     Eigen::Matrix4f T;
 
     {
-        std::unique_lock<std::mutex> lock(mPoseMutex);
+        std::unique_lock<std::mutex> lock(mmMutexPose);
         T = mCurrentCameraPose;
     }
 

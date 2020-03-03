@@ -22,7 +22,7 @@ float ORBMatcher::RadiusByViewingCos(const float &viewCos)
         return 3.0;
 }
 
-int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
+int ORBMatcher::SearchByProjection(Frame &pFrame, const std::vector<MapPoint *> &vpMapPoints, const float th)
 {
     int nmatches = 0;
 
@@ -38,16 +38,15 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
         // The size of the window will depend on the viewing direction
         float r = RadiusByViewingCos(pMP->mTrackViewCos);
         const int &nPredictedLevel = pMP->mnTrackScaleLevel;
-        // Eigen::Vector3d NormalDir = pMP->mPointNormal;
 
         if (bFactor)
             r *= th;
 
-        const auto vIndices = pKF->GetFeaturesInArea(pMP->mTrackProjX,
-                                                     pMP->mTrackProjY,
-                                                     r * pKF->mvScaleFactors[nPredictedLevel],
-                                                     nPredictedLevel - 2,
-                                                     nPredictedLevel);
+        const auto vIndices = pFrame.GetFeaturesInArea(pMP->mTrackProjX,
+                                                       pMP->mTrackProjY,
+                                                       r * pFrame.mvScaleFactors[nPredictedLevel],
+                                                       nPredictedLevel - 2,
+                                                       nPredictedLevel);
 
         if (vIndices.empty())
             continue;
@@ -65,22 +64,18 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
         {
             const size_t idx = *vit;
 
-            if (pKF->mvpMapPoints[idx])
-                if (pKF->mvpMapPoints[idx]->Observations() > 0)
+            if (pFrame.mvpMapPoints[idx])
+                if (pFrame.mvpMapPoints[idx]->Observations() > 0)
                     continue;
 
-            if (pKF->mvuRight[idx] > 0)
+            if (pFrame.mvuRight[idx] > 0)
             {
-                // Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
-                // if (NormalDir.dot(FrameNormal) < 0.5)
-                //     continue;
-
-                const float er = fabs(pMP->mTrackProjXR - pKF->mvuRight[idx]);
-                if (er > r * pKF->mvScaleFactors[nPredictedLevel])
+                const float er = fabs(pMP->mTrackProjXR - pFrame.mvuRight[idx]);
+                if (er > r * pFrame.mvScaleFactors[nPredictedLevel])
                     continue;
             }
 
-            const cv::Mat &d = pKF->mDescriptors.row(idx);
+            const cv::Mat &d = pFrame.mDescriptors.row(idx);
             const int dist = DescriptorDistance(MPdescriptor, d);
 
             if (dist < bestDist)
@@ -88,12 +83,12 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
                 bestDist2 = bestDist;
                 bestDist = dist;
                 bestLevel2 = bestLevel;
-                bestLevel = pKF->mvKeysUn[idx].octave;
+                bestLevel = pFrame.mvKeysUn[idx].octave;
                 bestIdx = idx;
             }
             else if (dist < bestDist2)
             {
-                bestLevel2 = pKF->mvKeysUn[idx].octave;
+                bestLevel2 = pFrame.mvKeysUn[idx].octave;
                 bestDist2 = dist;
             }
         }
@@ -104,7 +99,7 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, const std::vector<MapPoint *> 
             if (bestLevel == bestLevel2 && bestDist > mfNNratio * bestDist2)
                 continue;
 
-            pKF->mvpMapPoints[bestIdx] = pMP;
+            pFrame.mvpMapPoints[bestIdx] = pMP;
             nmatches++;
         }
     }
@@ -360,8 +355,8 @@ int ORBMatcher::SearchByProjection(KeyFrame *pKF, Sophus::SE3d Scw, const std::v
 
 int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
 {
-    Sophus::SE3d Twc = pKF->mTcw.inverse();
-    Eigen::Vector3d Ow = pKF->mTcw.translation();
+    Sophus::SE3d Twc = pKF->GetPoseInverse();
+    Eigen::Vector3d Ow = pKF->GetTranslation();
 
     const float &fx = pKF->fx;
     const float &fy = pKF->fy;
@@ -455,10 +450,6 @@ int ORBMatcher::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, 
 
                 if (e2 * pKF->mvInvLevelSigma2[kpLevel] > 7.8)
                     continue;
-
-                // Eigen::Vector3d FrameNormal = pKF->mvNormal[idx].cast<double>();
-                // if (PointNormal.dot(FrameNormal) < 0.3)
-                //     continue;
             }
             else
             {
@@ -640,8 +631,8 @@ int ORBMatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F
     const DBoW2::FeatureVector &vFeatVec2 = pKF2->mFeatVec;
 
     //Compute epipole in second image
-    Eigen::Vector3d Cw = pKF1->mTcw.translation();
-    Eigen::Vector3d C2 = pKF2->mTcw.inverse() * Cw;
+    Eigen::Vector3d Cw = pKF1->GetTranslation();
+    Eigen::Vector3d C2 = pKF2->GetPoseInverse() * Cw;
 
     const float invz = 1.0f / C2(2);
     const float ex = pKF2->fx * C2(0) * invz + pKF2->cx;
@@ -806,8 +797,8 @@ int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoin
     const float &cx = pKF1->cx;
     const float &cy = pKF1->cy;
 
-    auto Twc1 = pKF1->mTcw.inverse();
-    auto Twc2 = pKF2->mTcw.inverse();
+    auto Twc1 = pKF1->GetPoseInverse();
+    auto Twc2 = pKF2->GetPoseInverse();
 
     //Transformation between cameras
     Sophus::SE3d S21 = S12.inverse();

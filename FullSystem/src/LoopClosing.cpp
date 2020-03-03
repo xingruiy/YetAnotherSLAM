@@ -27,7 +27,6 @@ void LoopClosing::Run()
         {
             if (DetectLoop())
             {
-                std::cout << "Loop Detected!" << std::endl;
                 if (ComputeSim3())
                     // Perform loop fusion and pose graph optimization
                     CorrectLoop();

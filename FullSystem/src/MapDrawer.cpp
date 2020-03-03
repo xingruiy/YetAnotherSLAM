@@ -66,7 +66,7 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
         for (size_t i = 0; i < vpKFs.size(); i++)
         {
             KeyFrame *pKF = vpKFs[i];
-            Eigen::Matrix4f Tcw = pKF->mTcw.matrix().cast<float>();
+            Eigen::Matrix4f Tcw = pKF->GetPose().matrix().cast<float>();
 
             glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
             pangolin::glDrawFrustum(mCalibInv, width, height, Tcw, 0.05f);
@@ -84,7 +84,7 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
         {
             // Covisibility Graph
             const auto vCovKFs = vpKFs[i]->GetBestCovisibilityKeyFrames(N);
-            Eigen::Vector3f Ow = vpKFs[i]->mTcw.translation().cast<float>();
+            Eigen::Vector3f Ow = vpKFs[i]->GetTranslation().cast<float>();
             if (!vCovKFs.empty())
             {
                 for (auto vit = vCovKFs.begin(), vend = vCovKFs.end(); vit != vend; vit++)

@@ -56,7 +56,7 @@ private:
     pangolin::View *mpCurrentDepthView;
 
     // To view key points
-    std::mutex mPoseMutex;
+    std::mutex mmMutexPose;
     std::mutex mImageMutex;
     std::vector<bool> mvMatches;
     Eigen::Matrix4f mCurrentCameraPose;

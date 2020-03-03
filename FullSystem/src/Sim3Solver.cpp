@@ -49,8 +49,8 @@ Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoin
     mvX3Dc1.reserve(mN1);
     mvX3Dc2.reserve(mN1);
 
-    const Sophus::SE3d &Twc1 = pKF1->mTcw.inverse();
-    const Sophus::SE3d &Twc2 = pKF2->mTcw.inverse();
+    const Sophus::SE3d &Twc1 = pKF1->GetPoseInverse();
+    const Sophus::SE3d &Twc2 = pKF2->GetPoseInverse();
 
     mvAllIndices.reserve(mN1);
 

@@ -10,6 +10,7 @@
 #include "LoopClosing.h"
 #include "MeshEngine.h"
 #include "RGBDTracking.h"
+#include "KeyFrameDatabase.h"
 
 namespace SLAM
 {
@@ -22,7 +23,7 @@ class LocalMapping;
 class Tracking
 {
 public:
-    Tracking(System *pSystem, Map *pMap);
+    Tracking(System *pSystem, ORBVocabulary *pVoc, Map *pMap, KeyFrameDatabase *pKFDB);
 
     // Preprocess the input and call Track().
     void GrabImageRGBD(cv::Mat ImGray, cv::Mat Depth, const double TimeStamp);
@@ -69,7 +70,7 @@ protected:
     void Track();
 
     // Map initialization
-    void InitializeSystem();
+    void StereoInitialization();
 
     bool Relocalization();
     void UpdateLocalMap();
@@ -84,7 +85,7 @@ protected:
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
 
-    //Other Thread Pointers
+    // Other Thread Pointers
     LocalMapping *mpLocalMapper;
     LoopClosing *mpLoopClosing;
 
@@ -95,6 +96,15 @@ protected:
     // System
     System *mpSystem;
 
+    //BoW
+    ORBVocabulary *mpORBVocabulary;
+    KeyFrameDatabase *mpKeyFrameDB;
+
+    //Local Map
+    KeyFrame *mpReferenceKF;
+    std::vector<KeyFrame *> mvpLocalKeyFrames;
+    std::vector<MapPoint *> mvpLocalMapPoints;
+
     //Drawers
     Viewer *mpViewer;
     Sophus::SE3d mReferenceFramePose;
@@ -102,16 +112,25 @@ protected:
     //Map
     Map *mpMap;
 
+    //New KeyFrame rules (according to fps)
+    int mMinFrames;
+    int mMaxFrames;
+
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame *mpCurrentKeyFrame;
     KeyFrame *mpLastKeyFrame;
     Frame mLastFrame;
-    ORBextractor *mpExtractor;
+    ORBextractor *mpORBExtractor;
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
 
+    // The following sections are added
+public:
     // Voxel Map Structure
     MapStruct *mpCurrentMapStruct;
+
+    // Raw depth for fusion
+    cv::cuda::GpuMat mRawDepth;
 };
 
 } // namespace SLAM
