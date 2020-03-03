@@ -15,6 +15,7 @@ Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *pMap, KeyFrameData
 
     mpTracker = new RGBDTracking(w, h, calib.cast<double>(), g_bUseColour, g_bUseDepth);
     mpMeshEngine = new MeshEngine(20000000);
+    mpRayTraceEngine = new RayTraceEngine(w, h, g_calib[0]);
     mpORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
 }
 
@@ -136,7 +137,8 @@ void Tracking::StereoInitialization()
 
         // Create dense map struct
         mpCurrentMapStruct = new MapStruct(g_calib[0]);
-        mpCurrentMapStruct->setMeshEngine(mpMeshEngine);
+        mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
+        mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
         mpCurrentMapStruct->create(20000, 10000, 15000, 0.01, 0.05);
         mpCurrentMapStruct->Reset();
 
@@ -155,6 +157,14 @@ void Tracking::StereoInitialization()
 
 bool Tracking::TrackRGBD()
 {
+    Sophus::SE3d Tmw = mpCurrentMapStruct->mTcw;
+    Sophus::SE3d Tcm = Tmw.inverse() * mLastFrame.mTcw;
+    mpCurrentMapStruct->RayTrace(Tcm);
+    auto vmap = mpCurrentMapStruct->GetRayTracingResult();
+
+    cv::imshow("vmap", cv::Mat(vmap));
+    cv::waitKey(1);
+
     // Set tracking frames
     mpTracker->SetTrackingImage(mCurrentFrame.mImGray);
     mpTracker->SetTrackingDepth(mCurrentFrame.mImDepth);
@@ -501,7 +511,8 @@ void Tracking::CreateNewKeyFrame()
 
     // Create a new MapStruct
     mpCurrentMapStruct = new MapStruct(g_calib[0]);
-    mpCurrentMapStruct->setMeshEngine(mpMeshEngine);
+    mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
+    mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
     mpCurrentMapStruct->create(20000, 15000, 15000, 0.008, 0.03);
     mpCurrentMapStruct->Reset();
     mpCurrentMapStruct->mTcw = mCurrentFrame.mTcw;

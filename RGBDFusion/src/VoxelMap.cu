@@ -146,9 +146,14 @@ void MapStruct::DeleteMesh()
     }
 }
 
-void MapStruct::setMeshEngine(MeshEngine *pMeshEngine)
+void MapStruct::SetMeshEngine(MeshEngine *pMeshEngine)
 {
     mpMeshEngine = pMeshEngine;
+}
+
+void MapStruct::SetRayTraceEngine(RayTraceEngine *pRayTraceEngine)
+{
+    mpRayTraceEngine = pRayTraceEngine;
 }
 
 void MapStruct::Swap(MapStruct *pMapStruct)
@@ -164,6 +169,18 @@ void MapStruct::Swap(MapStruct *pMapStruct)
         swap(mpLinkedListHead, pMapStruct->mpLinkedListHead);
         swap(visibleBlockNum, pMapStruct->visibleBlockNum);
     }
+}
+
+uint MapStruct::GetNumVisibleBlocks()
+{
+    uint nVisibleBlock = 0;
+    SafeCall(cudaMemcpy(&nVisibleBlock, visibleBlockNum, sizeof(uint), cudaMemcpyDeviceToHost));
+    return nVisibleBlock;
+}
+
+void MapStruct::ResetNumVisibleBlocks()
+{
+    SafeCall(cudaMemset(visibleBlockNum, 0, sizeof(uint)));
 }
 
 struct FuseMapStruct_functor
@@ -614,6 +631,43 @@ struct DepthFusionFunctor
     }
 };
 
+uint MapStruct::CheckNumVisibleBlocks(int cols, int rows, const Sophus::SE3d &Tcm)
+{
+    ResetNumVisibleBlocks();
+
+    float fx = mK(0, 0);
+    float fy = mK(1, 1);
+    float cx = mK(0, 2);
+    float cy = mK(1, 2);
+
+    CheckEntryVisibilityFunctor functor;
+    functor.mplHashTable = mplHashTable;
+    functor.mplVoxelBlocks = mplVoxelBlocks;
+    functor.visibleEntry = visibleTable;
+    functor.visibleEntryCount = visibleBlockNum;
+    functor.mplHeap = mplHeap;
+    functor.mplHeapPtr = mplHeapPtr;
+    functor.voxelBlockSize = voxelBlockSize;
+    functor.Tinv = Tcm.inverse().cast<float>();
+    functor.cols = cols;
+    functor.rows = rows;
+    functor.fx = fx;
+    functor.fy = fy;
+    functor.cx = cx;
+    functor.cy = cy;
+    functor.depthMin = 0.1f;
+    functor.depthMax = 3.0f;
+    functor.voxelSize = voxelSize;
+    functor.hashTableSize = hashTableSize;
+
+    dim3 block = dim3(1024);
+    dim3 grid = dim3(cv::divUp(hashTableSize, block.x));
+
+    callDeviceFunctor<<<grid, block>>>(functor);
+
+    return GetNumVisibleBlocks();
+}
+
 void MapStruct::Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm)
 {
     float fx = mK(0, 0);
@@ -649,35 +703,8 @@ void MapStruct::Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm)
     dim3 grid(cv::divUp(cols, block.x), cv::divUp(rows, block.y));
     callDeviceFunctor<<<grid, block>>>(step1);
 
-    SafeCall(cudaMemset(visibleBlockNum, 0, sizeof(uint)));
+    uint nVisibleBlock = CheckNumVisibleBlocks(cols, rows, Tcm);
 
-    CheckEntryVisibilityFunctor step2;
-    step2.mplHashTable = mplHashTable;
-    step2.mplVoxelBlocks = mplVoxelBlocks;
-    step2.visibleEntry = visibleTable;
-    step2.visibleEntryCount = visibleBlockNum;
-    step2.mplHeap = mplHeap;
-    step2.mplHeapPtr = mplHeapPtr;
-    step2.voxelBlockSize = voxelBlockSize;
-    step2.Tinv = Tcm.inverse().cast<float>();
-    step2.cols = cols;
-    step2.rows = rows;
-    step2.fx = fx;
-    step2.fy = fy;
-    step2.cx = cx;
-    step2.cy = cy;
-    step2.depthMin = 0.1f;
-    step2.depthMax = 3.0f;
-    step2.voxelSize = voxelSize;
-    step2.hashTableSize = hashTableSize;
-
-    block = dim3(1024);
-    grid = dim3(cv::divUp(hashTableSize, block.x));
-
-    callDeviceFunctor<<<grid, block>>>(step2);
-
-    uint nVisibleBlock = 0;
-    SafeCall(cudaMemcpy(&nVisibleBlock, visibleBlockNum, sizeof(uint), cudaMemcpyDeviceToHost));
     if (nVisibleBlock == 0)
         return;
 
@@ -699,7 +726,6 @@ void MapStruct::Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm)
 
     block = dim3(8, 8);
     grid = dim3(nVisibleBlock);
-
     callDeviceFunctor<<<grid, block>>>(step3);
 }
 
@@ -771,4 +797,29 @@ void MapStruct::ReActivate()
     delete mplHeapHib;
     delete mplHashTableHib;
     delete mplVoxelBlocksHib;
+}
+
+uint MapStruct::GetVisibleBlocks()
+{
+    uint temp = 0;
+    SafeCall(cudaMemcpy(&temp, visibleBlockNum, sizeof(uint), cudaMemcpyDeviceToHost));
+    return temp;
+}
+
+void MapStruct::ResetVisibleBlocks()
+{
+    SafeCall(cudaMemset(visibleBlockNum, 0, sizeof(uint)));
+}
+
+void MapStruct::RayTrace(const Sophus::SE3d &Tcm)
+{
+    if (mpRayTraceEngine)
+    {
+        mpRayTraceEngine->RayTrace(this, Tcm);
+    }
+}
+
+cv::cuda::GpuMat MapStruct::GetRayTracingResult()
+{
+    return mpRayTraceEngine->GetVMap();
 }

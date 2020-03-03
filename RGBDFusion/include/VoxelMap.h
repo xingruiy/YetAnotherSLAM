@@ -7,12 +7,14 @@
 #include <opencv2/opencv.hpp>
 #include <sophus/se3.hpp>
 #include "MeshEngine.h"
+#include "RayTraceEngine.h"
 
 #define BlockSize 8
 #define BlockSize3 512
 #define BlockSizeSubOne 7
 
 class MeshEngine;
+class RayTraceEngine;
 
 struct HashEntry
 {
@@ -27,13 +29,6 @@ struct Voxel
     uchar wt;
 };
 
-struct RenderingBlock
-{
-    Eigen::Matrix<short, 2, 1> upper_left;
-    Eigen::Matrix<short, 2, 1> lower_right;
-    Eigen::Vector2f zrange;
-};
-
 class MapStruct
 {
 public:
@@ -42,7 +37,8 @@ public:
 
 public:
     MapStruct(const Eigen::Matrix3f &K);
-    void setMeshEngine(MeshEngine *pMeshEngine);
+    void SetMeshEngine(MeshEngine *pMeshEngine);
+    void SetRayTraceEngine(RayTraceEngine *pRayTraceEngine);
     void Reset();
     void Release();
     void Swap(MapStruct *pMapStruct);
@@ -52,15 +48,17 @@ public:
     void Create(int SizeInMB);
     int mFootPrintInMB;
 
-    // TODO: combine two maps
+    // Map fusion
+    void ResetNumVisibleBlocks();
+    uint GetNumVisibleBlocks();
+    uint CheckNumVisibleBlocks(int cols, int rows, const Sophus::SE3d &Tcm);
     void Fuse(MapStruct *pMapStruct);
-
-    // TODO
     void Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
 
     // TODO: Save the map to RAM/HardDisk
     void SaveToFile(std::string &strFileName);
     void ReadFromFile(std::string &strFileName);
+
     void Hibernate();
     void ReActivate();
     bool mbInHibernation;
@@ -84,8 +82,15 @@ public:
     // Mesh Engine
     MeshEngine *mpMeshEngine;
 
-protected:
-    uint mNumVisibleBlocks;
+    void RayTrace(const Sophus::SE3d &Tcm);
+    cv::cuda::GpuMat GetRayTracingResult();
+
+    // RayTrace Engine
+    RayTraceEngine *mpRayTraceEngine;
+    unsigned long int mnLastFusedFrameId;
+
+    uint GetVisibleBlocks();
+    void ResetVisibleBlocks();
 
 public:
     long unsigned int mnId;

@@ -10,6 +10,7 @@
 #include "LoopClosing.h"
 #include "MeshEngine.h"
 #include "RGBDTracking.h"
+#include "RayTraceEngine.h"
 #include "KeyFrameDatabase.h"
 
 namespace SLAM
@@ -89,10 +90,6 @@ protected:
     LocalMapping *mpLocalMapper;
     LoopClosing *mpLoopClosing;
 
-    // Dense Tracking And Mapping
-    MeshEngine *mpMeshEngine;
-    RGBDTracking *mpTracker;
-
     // System
     System *mpSystem;
 
@@ -126,6 +123,11 @@ protected:
 
     // The following sections are added
 public:
+    // Dense Tracking And Mapping
+    RayTraceEngine *mpRayTraceEngine;
+    MeshEngine *mpMeshEngine;
+    RGBDTracking *mpTracker;
+
     // Voxel Map Structure
     MapStruct *mpCurrentMapStruct;
 
