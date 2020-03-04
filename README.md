@@ -2,6 +2,11 @@
 
 ## Change Log
 
++ _2020-03-05_:
+    + Merged ```dev2``` branch to ```master``` branch.
+    + Solved problems with ```OptimizeEssentialGraph```
+    + Added dense map structure for keyframes
+
 + _2020-03-02_: 
     + Added ```LoopClosing``` from ```ORB-SLAM2```.
     + Had to change the sim3 optimization to se3.   
