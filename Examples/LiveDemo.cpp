@@ -38,8 +38,8 @@ int main(int argc, char **argv)
     //     system.TrackRGBD(im, imDepth, 0);
     // }
 
-    while (!SLAM::g_bSystemKilled)
-    {
-        usleep(1000);
-    }
+    // while (!SLAM::g_bSystemKilled)
+    // {
+    //     usleep(1000);
+    // }
 }

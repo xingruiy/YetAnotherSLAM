@@ -45,20 +45,20 @@ void Map::AddMapStruct(MapStruct *pMS)
     std::unique_lock<std::mutex> lock(mFractualMutex);
     mspMapStructs.insert(pMS);
 
-    if (mspMapStructs.size() <= 40)
-        return;
+    // if (mspMapStructs.size() <= 40)
+    //     return;
 
-    // We always keep at most 40 maps in device memory
-    for (auto sit = mspMapStructs.begin(), send = mspMapStructs.end(); sit != send; ++sit)
-    {
-        MapStruct *pMS = *sit;
-        if (pMS && !pMS->mbInHibernation)
-        {
-            pMS->Hibernate();
-            pMS->DeleteMesh();
-            return;
-        }
-    }
+    // // We always keep at most 40 maps in device memory
+    // for (auto sit = mspMapStructs.begin(), send = mspMapStructs.end(); sit != send; ++sit)
+    // {
+    //     MapStruct *pMS = *sit;
+    //     if (pMS && !pMS->mbInHibernation)
+    //     {
+    //         pMS->Hibernate();
+    //         pMS->DeleteMesh();
+    //         return;
+    //     }
+    // }
 }
 
 void Map::reset()

@@ -68,7 +68,7 @@ void MapStruct::create(
 }
 
 MapStruct::MapStruct(const Eigen::Matrix3f &K)
-    : mFootPrintInMB(0), mbInHibernation(false), mbActive(false),
+    : mFootPrintInMB(0), mbInHibernation(false), mbActive(true),
       mbHasMesh(false), mpMeshEngine(NULL), mplHeap(NULL),
       mplHeapPtr(NULL), mplBucketMutex(NULL), mplHashTable(NULL),
       mplVoxelBlocks(NULL), mpLinkedListHead(NULL), mK(K),
@@ -822,4 +822,16 @@ void MapStruct::RayTrace(const Sophus::SE3d &Tcm)
 cv::cuda::GpuMat MapStruct::GetRayTracingResult()
 {
     return mpRayTraceEngine->GetVMap();
+}
+
+void MapStruct::SetActiveFlag(bool flag)
+{
+    std::unique_lock<std::mutex> lock(mMutexActive);
+    mbActive = flag;
+}
+
+bool MapStruct::isActive()
+{
+    std::unique_lock<std::mutex> lock(mMutexActive);
+    return mbActive;
 }

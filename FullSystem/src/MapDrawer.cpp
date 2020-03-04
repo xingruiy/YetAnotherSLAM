@@ -159,9 +159,9 @@ void MapDrawer::DrawMapPoints(int iPointSize)
 void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
 {
     std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
-    if (N <= 0 || vpMapStruct.size() < N)
+    if (N < 0 || vpMapStruct.size() < N)
         N = vpMapStruct.size();
-    std::vector<MapStruct *> vpMSToDraw = std::vector<MapStruct *>(vpMapStruct.end() - N, vpMapStruct.end());
+    std::vector<MapStruct *> vpMSToDraw = std::vector<MapStruct *>(vpMapStruct.begin(), vpMapStruct.begin() + N);
 
     for (auto vit = vpMSToDraw.begin(), vend = vpMSToDraw.end(); vit != vend; ++vit)
     {

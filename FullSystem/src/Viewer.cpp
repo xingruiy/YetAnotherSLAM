@@ -59,7 +59,7 @@ void Viewer::Run()
     pangolin::Var<bool> varShowMapStructs = pangolin::Var<bool>("menu.Display MapStructs", false, true);
     pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
     pangolin::Var<int> varCovMapDensity = pangolin::Var<int>("menu.Covisibility Map Density", 10, 1, 50);
-    pangolin::Var<int> varDisplayMeshNum = pangolin::Var<int>("menu.Display Mesh Number", -1, -1, 20);
+    pangolin::Var<int> varDisplayMeshNum = pangolin::Var<int>("menu.Display Mesh Number", -1, -1, 100);
 
     mpMapDrawer->LinkGlSlProgram();
 

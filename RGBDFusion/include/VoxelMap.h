@@ -63,6 +63,9 @@ public:
     void ReActivate();
     bool mbInHibernation;
 
+    void SetActiveFlag(bool flag);
+    bool isActive();
+
 public:
     void GenerateMesh();
     void DeleteMesh();
@@ -70,7 +73,6 @@ public:
     float *mplPoint;
     float *mplNormal;
     int N;
-    bool mbActive;
     bool mbHasMesh;
 
     // OpenGL buffer for Drawing
@@ -125,6 +127,10 @@ public:
 
     Sophus::SE3d mTcw;
     Eigen::Matrix3f mK;
+
+    // Indicate the current map
+    bool mbActive;
+    std::mutex mMutexActive;
 };
 
 #endif

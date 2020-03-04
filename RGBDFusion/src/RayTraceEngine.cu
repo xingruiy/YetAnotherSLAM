@@ -401,8 +401,11 @@ struct MapRenderingDelegate
         if (ptFound)
         {
             result = Tinv * (result / voxelSizeInv);
-            vmap.ptr(y)[x] = Eigen::Vector4f(result(0), result(1), result(2), 1.0f);
+            vmap.ptr(y)[x].head<3>() = result;
+            vmap.ptr(y)[x](3) = 1.f;
         }
+        else
+            vmap.ptr(y)[x](3) = -1.f;
     }
 };
 

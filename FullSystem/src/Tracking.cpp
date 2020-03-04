@@ -159,11 +159,10 @@ bool Tracking::TrackRGBD()
 {
     Sophus::SE3d Tmw = mpCurrentMapStruct->mTcw;
     Sophus::SE3d Tcm = Tmw.inverse() * mLastFrame.mTcw;
+
     mpCurrentMapStruct->RayTrace(Tcm);
     auto vmap = mpCurrentMapStruct->GetRayTracingResult();
-
-    cv::imshow("vmap", cv::Mat(vmap));
-    cv::waitKey(1);
+    mpTracker->SetReferenceMap(vmap);
 
     // Set tracking frames
     mpTracker->SetTrackingImage(mCurrentFrame.mImGray);
@@ -173,7 +172,7 @@ bool Tracking::TrackRGBD()
     Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
 
     mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
-    mCurrentFrame.mTcp = mpReferenceKF->GetPoseInverse() * mCurrentFrame.mTcw;
+    mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
 
     mRawDepth.upload(mCurrentFrame.mImDepth);
     mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcp);
@@ -260,7 +259,7 @@ void Tracking::SearchLocalPoints()
     if (nToMatch > 0)
     {
         ORBMatcher matcher(0.8);
-        int th = 1;
+        int th = 2;
         // If the camera has been relocalised recently, perform a coarser search
         if (mCurrentFrame.mnId < mnLastRelocFrameId + 2)
             th = 3;
@@ -507,6 +506,7 @@ void Tracking::CreateNewKeyFrame()
 
     // Update Pose References
     mReferenceFramePose = mCurrentFrame.mTcw;
+    mpCurrentMapStruct->SetActiveFlag(false);
     mpMap->AddMapStruct(mpCurrentMapStruct);
 
     // Create a new MapStruct
@@ -521,8 +521,6 @@ void Tracking::CreateNewKeyFrame()
     pKF->mbVoxelStructMarginalized = false;
     mpCurrentMapStruct->mTcw = pKF->GetPose();
 
-    // Swap the dense tracking buffer
-    // mpTracker->SwapFrameBuffer();
     mCurrentFrame.mTcp = Sophus::SE3d();
 }
 

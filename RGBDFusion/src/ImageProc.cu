@@ -1,6 +1,9 @@
 #include "ImageProc.h"
 #include "CudaUtils.h"
 
+#define DEPTH_MAX 8.f
+#define DEPTH_MIN 0.2f
+
 __global__ void ComputeImageGradientCentralDifference_kernel(const cv::cuda::PtrStepSz<float> src,
                                                              cv::cuda::PtrStep<float> gx,
                                                              cv::cuda::PtrStep<float> gy)
@@ -135,31 +138,29 @@ void RenderScene(const cv::cuda::GpuMat vmap,
     RenderScene_kernel<<<grid, block>>>(vmap, nmap, Eigen::Vector3f(5, 5, 5), image);
 }
 
-__global__ void DepthToInvDepth_kernel(const cv::cuda::PtrStep<float> depth,
-                                       cv::cuda::PtrStepSz<float> invDepth)
+__global__ void DepthToInvDepth_kernel(const cv::cuda::PtrStep<float> depth, cv::cuda::PtrStepSz<float> depth_inv)
 {
     const int x = threadIdx.x + blockDim.x * blockIdx.x;
     const int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x > invDepth.cols - 1 || y > invDepth.rows - 1)
+    if (x > depth_inv.cols - 1 || y > depth_inv.rows - 1)
         return;
 
     const float z = depth.ptr(y)[x];
-    if (z == z && z > 0.25f && z < 10.f)
-        invDepth.ptr(y)[x] = 1.0 / z;
+    if (z > DEPTH_MIN && z < DEPTH_MAX)
+        depth_inv.ptr(y)[x] = 1.0 / z;
     else
-        invDepth.ptr(y)[x] = 0;
+        depth_inv.ptr(y)[x] = 0;
 }
 
-void DepthToInvDepth(const cv::cuda::GpuMat depth,
-                     cv::cuda::GpuMat &invDepth)
+void DepthToInvDepth(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &depth_inv)
 {
-    if (invDepth.empty())
-        invDepth.create(depth.size(), depth.type());
+    if (depth_inv.empty())
+        depth_inv.create(depth.size(), depth.type());
 
     dim3 block(8, 8);
     dim3 grid(cv::divUp(depth.cols, block.x), cv::divUp(depth.rows, block.y));
 
-    DepthToInvDepth_kernel<<<grid, block>>>(depth, invDepth);
+    DepthToInvDepth_kernel<<<grid, block>>>(depth, depth_inv);
 }
 
 __global__ void PyrDownDepth_kernel(const cv::cuda::PtrStep<float> src,
@@ -183,4 +184,77 @@ void PyrDownDepth(const cv::cuda::GpuMat src,
     dim3 grid(cv::divUp(src.cols, block.x), cv::divUp(src.rows, block.y));
 
     PyrDownDepth_kernel<<<grid, block>>>(src, dst);
+}
+
+__global__ void ComputeVertexMap_kernel(const cv::cuda::PtrStepSz<float> depth_inv,
+                                        cv::cuda::PtrStep<Eigen::Vector4f> vmap,
+                                        const float invfx, const float invfy,
+                                        const float cx, const float cy, const float cut_off)
+{
+    const int x = blockDim.x * blockIdx.x + threadIdx.x;
+    const int y = blockDim.y * blockIdx.y + threadIdx.y;
+    if (x >= depth_inv.cols || y >= depth_inv.rows)
+        return;
+
+    const float invz = depth_inv.ptr(y)[x];
+    const float z = 1.0 / invz;
+    if (invz > 0 && z < cut_off)
+    {
+        vmap.ptr(y)[x] = Eigen::Vector4f(z * (x - cx) * invfx, z * (y - cy) * invfy, z, 1.0);
+    }
+    else
+    {
+        vmap.ptr(y)[x](3) = -1.f;
+    }
+}
+
+void ComputeVertexMap(const cv::cuda::GpuMat depth_inv, cv::cuda::GpuMat vmap, const float invfx, const float invfy, const float cx, const float cy, const float cut_off)
+{
+    if (vmap.empty())
+        vmap.create(depth_inv.size(), CV_32FC4);
+
+    dim3 block(8, 8);
+    dim3 grid(cv::divUp(depth_inv.cols, block.x), cv::divUp(depth_inv.rows, block.y));
+
+    ComputeVertexMap_kernel<<<grid, block>>>(depth_inv, vmap, invfx, invfy, cx, cy, cut_off);
+}
+
+__global__ void ComputeNormalMap_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
+                                        cv::cuda::PtrStep<Eigen::Vector4f> nmap)
+{
+    const int x = blockDim.x * blockIdx.x + threadIdx.x;
+    const int y = blockDim.y * blockIdx.y + threadIdx.y;
+    if (x >= vmap.cols || y >= vmap.rows)
+        return;
+
+    if (x == vmap.cols - 1 || y == vmap.rows - 1)
+    {
+        nmap.ptr(y)[x](3) = -1.f;
+        return;
+    }
+
+    Eigen::Vector4f v00 = vmap.ptr(y)[x];
+    Eigen::Vector4f v01 = vmap.ptr(y)[x + 1];
+    Eigen::Vector4f v10 = vmap.ptr(y + 1)[x];
+
+    if (v00(3) > 0 && v01(3) > 0 && v10(3) > 0)
+    {
+        nmap.ptr(y)[x].head<3>() = (v01 - v00).head<3>().cross((v10 - v00).head<3>()).normalized();
+        nmap.ptr(y)[x](3) = 1.f;
+    }
+    else
+    {
+        nmap.ptr(y)[x](3) = -1.f;
+    }
+}
+
+void ComputeNormalMap(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat nmap)
+{
+    if (nmap.empty())
+        nmap.create(vmap.size(), CV_32FC4);
+
+    dim3 block(8, 8);
+    dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
+
+    ComputeNormalMap_kernel<<<grid, block>>>(vmap, nmap);
 }

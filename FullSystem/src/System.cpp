@@ -127,6 +127,8 @@ void System::readSettings(const std::string &strSettingFile)
     // Update tracking parameters
     g_bf = settingsFile["Calibration.bf"];
     g_thDepth = g_bf * (float)settingsFile["Tracking.ThDepth"] / fx;
+    g_bUseColour = (int)settingsFile["Tracking.UseColour"] == 1;
+    g_bUseDepth = (int)settingsFile["Tracking.UseDepth"] == 1;
 
     // read distortion coefficients
     g_distCoeff = cv::Mat(4, 1, CV_32F);
