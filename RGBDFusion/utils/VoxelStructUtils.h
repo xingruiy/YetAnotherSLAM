@@ -223,16 +223,16 @@ __device__ __forceinline__ bool CreateHashEntry(int *mplHeap, int *mplHeapPtr, c
     return false;
 }
 
-__device__ __forceinline__ void CreateNewBlock(const Eigen::Vector3i &blockPos, int *mplHeap,
-                                               int *mplHeapPtr, HashEntry *mplHashTable, int *mplBucketMutex,
-                                               int *mpLinkedListHead, int hashTableSize, int bucketSize)
+__device__ __forceinline__ HashEntry *CreateNewBlock(const Eigen::Vector3i &blockPos, int *mplHeap,
+                                                     int *mplHeapPtr, HashEntry *mplHashTable, int *mplBucketMutex,
+                                                     int *mpLinkedListHead, int hashTableSize, int bucketSize)
 {
     auto volatileIdx = hash(blockPos, bucketSize);
     int *mutex = &mplBucketMutex[volatileIdx];
     HashEntry *current = &mplHashTable[volatileIdx];
     HashEntry *emptyEntry = nullptr;
     if (current->pos == blockPos && current->ptr != -1)
-        return;
+        return current;
 
     if (current->ptr == -1)
         emptyEntry = current;
@@ -242,7 +242,7 @@ __device__ __forceinline__ void CreateNewBlock(const Eigen::Vector3i &blockPos, 
         volatileIdx = bucketSize + current->offset - 1;
         current = &mplHashTable[volatileIdx];
         if (current->pos == blockPos && current->ptr != -1)
-            return;
+            return current;
 
         if (current->ptr == -1 && !emptyEntry)
             emptyEntry = current;
@@ -254,6 +254,7 @@ __device__ __forceinline__ void CreateNewBlock(const Eigen::Vector3i &blockPos, 
         {
             CreateHashEntry(mplHeap, mplHeapPtr, blockPos, current->offset, emptyEntry);
             UnLockBucket(mutex);
+            return emptyEntry;
         }
     }
     else
@@ -271,8 +272,11 @@ __device__ __forceinline__ void CreateNewBlock(const Eigen::Vector3i &blockPos, 
                 atomicSub(mpLinkedListHead, 1);
 
             UnLockBucket(mutex);
+            return emptyEntry;
         }
     }
+
+    return NULL;
 }
 
 __device__ __forceinline__ bool findEntry(const Eigen::Vector3i &blockPos, HashEntry *&out,

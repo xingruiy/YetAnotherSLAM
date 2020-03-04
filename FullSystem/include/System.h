@@ -33,6 +33,7 @@ public:
     void TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp);
     void Kill();
     void reset();
+    void FuseAllMapStruct();
 
 private:
     void readSettings(const std::string &strSettingFile);

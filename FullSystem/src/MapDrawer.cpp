@@ -161,7 +161,7 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
     std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
     if (N < 0 || vpMapStruct.size() < N)
         N = vpMapStruct.size();
-    std::vector<MapStruct *> vpMSToDraw = std::vector<MapStruct *>(vpMapStruct.begin(), vpMapStruct.begin() + N);
+    std::vector<MapStruct *> vpMSToDraw = std::vector<MapStruct *>(vpMapStruct.end() - N, vpMapStruct.end());
 
     for (auto vit = vpMSToDraw.begin(), vend = vpMSToDraw.end(); vit != vend; ++vit)
     {
@@ -184,7 +184,7 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
                 pMS->GenerateMesh();
 
             if (!pMS->mplPoint)
-                return;
+                continue;
 
             if (!pMS->mbVertexBufferCreated)
             {
@@ -198,7 +198,7 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
                 pMS->mbVertexBufferCreated = true;
             }
 
-            Eigen::Matrix4f Tmw = pMS->mTcw.matrix().cast<float>();
+            Eigen::Matrix4f Tmw = pMS->GetPose().matrix().cast<float>();
 
             mShader.Bind();
             mShader.SetUniform("Tmw", pangolin::OpenGlMatrix(Tmw));

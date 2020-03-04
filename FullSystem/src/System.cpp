@@ -70,6 +70,30 @@ void System::reset()
     mpMap->reset();
 }
 
+void System::FuseAllMapStruct()
+{
+    auto vpMSs = mpMap->GetAllVoxelMaps();
+    if (vpMSs.size() == 0)
+        return;
+
+    std::cout << "Num mapS to fuse: " << vpMSs.size() << std::endl;
+    auto InitMap = vpMSs[0];
+    InitMap->SetActiveFlag(true);
+
+    for (int i = 1; i < vpMSs.size(); ++i)
+    {
+        MapStruct *pMS = vpMSs[i];
+        if (pMS->isActive())
+            continue;
+
+        InitMap->Fuse(pMS);
+        mpMap->EraseMapStruct(pMS);
+    }
+
+    InitMap->SetActiveFlag(false);
+    mpMap->AddMapStruct(InitMap);
+}
+
 void System::Kill()
 {
     g_bSystemKilled = true;

@@ -1,6 +1,7 @@
 #include "Tracking.h"
 #include "ORBMatcher.h"
 #include "Optimizer.h"
+#include "Sim3Solver.h"
 
 namespace SLAM
 {
@@ -152,6 +153,9 @@ void Tracking::StereoInitialization()
         // Fuse the first depth image
         mRawDepth.upload(mCurrentFrame.mImDepth);
         mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcw);
+
+        mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
+                                   mCurrentFrame.mvKeys);
     }
 }
 
@@ -186,7 +190,52 @@ bool Tracking::TrackRGBD()
 
 bool Tracking::Relocalization()
 {
-    return false;
+    // Compute Bag of Words Vector
+    mCurrentFrame.ComputeBoW();
+
+    // Relocalization is performed when tracking is lost
+    // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
+    std::vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame);
+
+    if (vpCandidateKFs.empty())
+        return false;
+
+    mCurrentFrame.CreateRelocalisationPoints();
+
+    const int nKFs = vpCandidateKFs.size();
+
+    // We perform first an ORB matching with each candidate
+    // If enough matches are found we setup a PnP solver
+    ORBMatcher matcher(0.75, true);
+
+    std::vector<Sim3Solver *> vpSim3Solvers(nKFs);
+    std::vector<std::vector<MapPoint *>> vvpMapPointsMatches(nKFs);
+    std::vector<bool> vbDiscarded(nKFs);
+
+    int nCandidates = 0;
+    for (int iKF = 0; iKF < nKFs; ++iKF)
+    {
+        KeyFrame *pKF = vpCandidateKFs[iKF];
+        if (pKF->isBad())
+        {
+            vbDiscarded[iKF] = true;
+        }
+        else
+        {
+            int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointsMatches[iKF]);
+
+            if (nmatches > 30)
+            {
+                //  TODO: set up a ransac pose solver
+                nCandidates++;
+            }
+            else
+            {
+                vbDiscarded[iKF] = true;
+                continue;
+            }
+        }
+    }
 }
 
 bool Tracking::TrackLocalMap()
@@ -259,7 +308,7 @@ void Tracking::SearchLocalPoints()
     if (nToMatch > 0)
     {
         ORBMatcher matcher(0.8);
-        int th = 2;
+        int th = 1;
         // If the camera has been relocalised recently, perform a coarser search
         if (mCurrentFrame.mnId < mnLastRelocFrameId + 2)
             th = 3;
@@ -415,9 +464,9 @@ bool Tracking::NeedNewKeyFrame()
     bool bCreateNew = false;
     Sophus::SE3d DT = mCurrentFrame.mTcp;
 
-    if (DT.log().topRows<3>().norm() > 0.2)
+    if (DT.log().topRows<3>().norm() > 0.15)
         bCreateNew = true;
-    else if (DT.log().bottomRows<3>().norm() > 0.2)
+    else if (DT.log().bottomRows<3>().norm() > 0.15)
         bCreateNew = true;
 
     return bCreateNew;
@@ -429,6 +478,7 @@ void Tracking::CreateNewKeyFrame()
         return;
 
     mCurrentFrame.ExtractORB();
+    mCurrentFrame.mTcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
     if (!TrackLocalMap())
         return;
 
@@ -515,13 +565,16 @@ void Tracking::CreateNewKeyFrame()
     mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
     mpCurrentMapStruct->create(20000, 15000, 15000, 0.008, 0.03);
     mpCurrentMapStruct->Reset();
-    mpCurrentMapStruct->mTcw = mCurrentFrame.mTcw;
+    mpCurrentMapStruct->SetPose(mCurrentFrame.mTcw);
 
     pKF->mpVoxelStruct = mpCurrentMapStruct;
     pKF->mbVoxelStructMarginalized = false;
     mpCurrentMapStruct->mTcw = pKF->GetPose();
 
     mCurrentFrame.mTcp = Sophus::SE3d();
+
+    mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
+                               mCurrentFrame.mvKeys);
 }
 
 void Tracking::reset()

@@ -52,7 +52,7 @@ void KeyFrame::SetPose(const Sophus::SE3d &Tcw)
   mTcw = Tcw;
 
   if (mpVoxelStruct && !mpVoxelStruct->isActive())
-    mpVoxelStruct->mTcw = Tcw;
+    mpVoxelStruct->SetPose(mTcw);
 }
 
 Sophus::SE3d KeyFrame::GetPose()

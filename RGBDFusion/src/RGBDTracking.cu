@@ -434,7 +434,7 @@ void RGBDTracking::ComputeSingleStepDepth(
     P2PIcpFunctor.rows = rows;
     P2PIcpFunctor.N = cols * rows;
     P2PIcpFunctor.T_last_curr = T.cast<float>();
-    P2PIcpFunctor.angleTH = cos(30 * 3.14 / 180);
+    P2PIcpFunctor.angleTH = sin(20.f * 3.14159254f / 180.f);
     P2PIcpFunctor.distTH = 0.01;
     P2PIcpFunctor.fx = mK[lvl](0, 0);
     P2PIcpFunctor.fy = mK[lvl](1, 1);
@@ -448,79 +448,6 @@ void RGBDTracking::ComputeSingleStepDepth(
     RankUpdateHessian<6, 7>(hostData.ptr<float>(0), hessian, residual);
 
     residualSum = hostData.ptr<float>(0)[27];
-
-    // cv::Mat img1(mvCurrentVMap[0]);
-    // cv::Mat img2(mvCurrentNMap[0]);
-    // cv::Mat img3(mvReferenceVMap[0]);
-    // cv::Mat img4(mvReferenceNMap[0]);
-    // cv::imshow("img1", img1);
-    // cv::imshow("img2", img2);
-    // cv::imshow("img3", img3);
-    // cv::imshow("img4", img4);
-    // cv::waitKey(1);
-    // std::cout << residualSum << std::endl;
-
-    // TransformReferencePoint(lvl, T);
-
-    // const int w = mvWidth[lvl];
-    // const int h = mvHeight[lvl];
-
-    // se3StepDResidualFunctor functor;
-    // functor.w = w;
-    // functor.h = h;
-    // functor.n = w * h;
-    // functor.refInvDepth = mvReferenceInvDepth[lvl];
-    // functor.currInvDepth = mvCurrentInvDepth[lvl];
-    // functor.currIDepthGx = mvInvDepthGradientX[lvl];
-    // functor.currIDepthGy = mvInvDepthGradientY[lvl];
-    // functor.refPtWarped = mvReferencePointTransformed[lvl];
-    // functor.refResidual = mGpuBufferVector4HxW;
-    // functor.fx = mK[lvl](0, 0);
-    // functor.fy = mK[lvl](1, 1);
-    // functor.cx = mK[lvl](0, 2);
-    // functor.cy = mK[lvl](1, 2);
-    // functor.out = mGpuBufferFloat96x2;
-
-    // callDeviceFunctor<<<96, 224>>>(functor);
-    // cv::cuda::reduce(mGpuBufferFloat96x2, mGpuBufferFloat1x2, 0, cv::REDUCE_SUM);
-    // cv::Mat hostData(mGpuBufferFloat1x2);
-
-    // dResidualSum = hostData.ptr<float>(0)[0];
-    // numResidual = hostData.ptr<float>(0)[1];
-
-    // VarianceEstimator estimator;
-    // estimator.w = w;
-    // estimator.h = h;
-    // estimator.n = w * h;
-    // estimator.meanEstimated = dResidualSum / numResidual;
-    // estimator.residual = mGpuBufferVector4HxW;
-    // estimator.out = mGpuBufferFloat96x1;
-
-    // callDeviceFunctor<<<96, 224>>>(estimator);
-    // cv::cuda::reduce(mGpuBufferFloat96x1, mGpuBufferFloat1x1, 0, cv::REDUCE_SUM);
-    // mGpuBufferFloat1x1.download(hostData);
-
-    // float squaredDeviationSum = hostData.ptr<float>(0)[0];
-    // float varEstimated = sqrt(squaredDeviationSum / (numResidual - 1));
-
-    // se3StepDFunctor sfunctor;
-    // sfunctor.w = w;
-    // sfunctor.h = h;
-    // sfunctor.n = w * h;
-    // sfunctor.huberTh = 1.345 * varEstimated;
-    // sfunctor.refPtWarped = mvReferencePointTransformed[lvl];
-    // sfunctor.refResidual = mGpuBufferVector4HxW;
-    // sfunctor.fx = mK[lvl](0, 0);
-    // sfunctor.fy = mK[lvl](1, 1);
-    // sfunctor.out = mGpuBufferFloat96x29;
-
-    // callDeviceFunctor<<<96, 224>>>(sfunctor);
-    // cv::cuda::reduce(mGpuBufferFloat96x29, mGpuBufferFloat1x29, 0, cv::REDUCE_SUM);
-
-    // mGpuBufferFloat1x29.download(hostData);
-    // RankUpdateHessian<6, 7>(hostData.ptr<float>(0), hessian, residual);
-
-    // residualSum = hostData.ptr<float>(0)[27];
 }
 
 void RGBDTracking::ComputeSingleStepRGBD(
@@ -613,23 +540,18 @@ void RGBDTracking::ComputeSingleStepRGBDLinear(
     Eigen::Matrix<float, 6, 6> hessianBuffer;
     Eigen::Matrix<float, 6, 1> residualBuffer;
 
-    ComputeSingleStepRGB(
-        lvl,
-        T,
-        hessianBuffer.data(),
-        residualBuffer.data());
+    ComputeSingleStepRGB(lvl, T, hessianBuffer.data(), residualBuffer.data());
 
     hessianMapped += hessianBuffer;
     residualMapped += residualBuffer;
 
-    ComputeSingleStepDepth(
-        lvl,
-        T,
-        hessianBuffer.data(),
-        residualBuffer.data());
+    hessianBuffer.setZero();
+    residualBuffer.setZero();
 
-    hessianMapped += 0.01 * 0.01 * hessianBuffer;
-    residualMapped += 0.01 * residualBuffer;
+    ComputeSingleStepDepth(lvl, T, hessianBuffer.data(), residualBuffer.data());
+
+    hessianMapped += 100 * hessianBuffer;
+    residualMapped += 10 * residualBuffer;
 }
 
 cv::cuda::GpuMat RGBDTracking::GetReferenceDepth(const int lvl) const

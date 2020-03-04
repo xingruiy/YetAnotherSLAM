@@ -48,6 +48,9 @@ public:
     void ComputeStereoFromRGBD();
 
 public:
+    void CreateRelocalisationPoints();
+
+public:
     // Vocabulary used for relocalization.
     ORBVocabulary *mpORBvocabulary;
 
@@ -135,12 +138,12 @@ public:
     static float mnMaxX;
     static float mnMinY;
     static float mnMaxY;
+    static bool mbInitialComputations;
 
     // A copy of the input frame
     cv::Mat mImGray;
     cv::Mat mImDepth;
-
-    static bool mbInitialComputations;
+    std::vector<Eigen::Vector3d> mRelocPoints;
 
 private:
     // Undistort keypoints given OpenCV distortion parameters.

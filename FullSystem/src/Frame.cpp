@@ -328,4 +328,28 @@ void Frame::ComputeStereoFromRGBD()
   }
 }
 
+void Frame::CreateRelocalisationPoints()
+{
+  if (N == 0)
+  {
+    ExtractORB();
+  }
+
+  mRelocPoints.resize(N);
+
+  for (int i = 0; i < N; ++N)
+  {
+    if (mvuRight[i] > 0)
+    {
+      float z = mvDepth[i];
+      Eigen::Vector3d PtC;
+      cv::KeyPoint &Key = mvKeysUn[i];
+      PtC(0) = z * invfx * (Key.pt.x - cx);
+      PtC(1) = z * invfy * (Key.pt.y - cy);
+      PtC(2) = z;
+      mRelocPoints[i] = PtC;
+    }
+  }
+}
+
 } // namespace SLAM

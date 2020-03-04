@@ -51,6 +51,7 @@ void Viewer::Run()
     // Create menus
     pangolin::CreatePanel("menu").SetBounds(0, 1, 0, MenuDividerLeft);
     pangolin::Var<bool> varReset = pangolin::Var<bool>("menu.reset", false, false);
+    pangolin::Var<bool> varFuseMap = pangolin::Var<bool>("menu.Fuse Map", false, false);
     pangolin::Var<bool> varRunning = pangolin::Var<bool>("menu.Running", g_bSystemRunning, true);
     pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Running"));
     pangolin::Var<bool> varShowKeyFrames = pangolin::Var<bool>("menu.Display KeyFrames", true, true);
@@ -59,7 +60,7 @@ void Viewer::Run()
     pangolin::Var<bool> varShowMapStructs = pangolin::Var<bool>("menu.Display MapStructs", false, true);
     pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
     pangolin::Var<int> varCovMapDensity = pangolin::Var<int>("menu.Covisibility Map Density", 10, 1, 50);
-    pangolin::Var<int> varDisplayMeshNum = pangolin::Var<int>("menu.Display Mesh Number", -1, -1, 100);
+    pangolin::Var<int> varDisplayMeshNum = pangolin::Var<int>("menu.Display Mesh Number", -1, -1, 80);
 
     mpMapDrawer->LinkGlSlProgram();
 
@@ -67,6 +68,9 @@ void Viewer::Run()
     {
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        if (pangolin::Pushed(varFuseMap))
+            mpSystem->FuseAllMapStruct();
 
         if (pangolin::Pushed(varReset))
             mpSystem->reset();

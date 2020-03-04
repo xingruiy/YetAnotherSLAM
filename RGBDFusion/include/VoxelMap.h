@@ -37,6 +37,10 @@ public:
 
 public:
     MapStruct(const Eigen::Matrix3f &K);
+
+    Sophus::SE3d GetPose();
+    void SetPose(Sophus::SE3d &Tcw);
+
     void SetMeshEngine(MeshEngine *pMeshEngine);
     void SetRayTraceEngine(RayTraceEngine *pRayTraceEngine);
     void Reset();
@@ -58,6 +62,7 @@ public:
     // TODO: Save the map to RAM/HardDisk
     void SaveToFile(std::string &strFileName);
     void ReadFromFile(std::string &strFileName);
+    void Reserve(int hSize, int bSize, int vSize);
 
     void Hibernate();
     void ReActivate();
@@ -125,12 +130,14 @@ public:
     float voxelSize;
     float truncationDist;
 
-    Sophus::SE3d mTcw;
     Eigen::Matrix3f mK;
 
     // Indicate the current map
     bool mbActive;
     std::mutex mMutexActive;
+
+    Sophus::SE3d mTcw;
+    std::mutex mMutexPose;
 };
 
 #endif
