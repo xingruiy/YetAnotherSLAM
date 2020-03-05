@@ -76,7 +76,6 @@ void System::FuseAllMapStruct()
     if (vpMSs.size() == 0)
         return;
 
-    std::cout << "Num mapS to fuse: " << vpMSs.size() << std::endl;
     auto InitMap = vpMSs[0];
     InitMap->SetActiveFlag(true);
 
@@ -91,7 +90,6 @@ void System::FuseAllMapStruct()
     }
 
     InitMap->SetActiveFlag(false);
-    mpMap->AddMapStruct(InitMap);
 }
 
 void System::Kill()

@@ -25,7 +25,7 @@ __device__ __forceinline__ void CollectBlocksFunctor::operator()() const
 
     __syncthreads();
     uint val = 0;
-    if (x < hashTableSize && mplHashTable[x].ptr >= 0)
+    if (x < hashTableSize && mplHashTable[x].ptr != -1)
     {
         needScan = true;
         val = 1;
@@ -35,7 +35,7 @@ __device__ __forceinline__ void CollectBlocksFunctor::operator()() const
     if (needScan)
     {
         int offset = ParallelScan<1024>(val, mpNumEntry);
-        if (offset != -1)
+        if (offset != -1 && offset < hashTableSize)
             mplEntry[offset] = mplHashTable[x];
     }
 }
@@ -306,6 +306,7 @@ void MeshEngine::Meshify(MapStruct *pMapStruct)
 
     uint nHashEntry = 0;
     SafeCall(cudaMemcpy(&nHashEntry, cuda_block_count, sizeof(uint), cudaMemcpyDeviceToHost));
+
     if (nHashEntry == 0)
         return;
 

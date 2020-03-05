@@ -307,4 +307,13 @@ __device__ __forceinline__ void findVoxel(const Eigen::Vector3i &voxelPos, Voxel
         pVoxel = &pListBlocks[pEntry->ptr + VoxelPosToLocalIdx(voxelPos)];
 }
 
+__device__ __forceinline__ void findVoxel(const Eigen::Vector3f &worldPos, Voxel *&pVoxel, float voxelSize,
+                                          HashEntry *plHashTable, Voxel *pListBlocks, int bucketSize)
+{
+    HashEntry *pEntry;
+    Eigen::Vector3i voxelPos = WorldPtToVoxelPos(worldPos, voxelSize);
+    if (findEntry(VoxelPosToBlockPos(voxelPos), pEntry, plHashTable, bucketSize))
+        pVoxel = &pListBlocks[pEntry->ptr + VoxelPosToLocalIdx(voxelPos)];
+}
+
 #endif

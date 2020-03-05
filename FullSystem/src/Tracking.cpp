@@ -140,7 +140,7 @@ void Tracking::StereoInitialization()
         mpCurrentMapStruct = new MapStruct(g_calib[0]);
         mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
         mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-        mpCurrentMapStruct->create(20000, 10000, 15000, 0.01, 0.05);
+        mpCurrentMapStruct->create(10000, 7000, 8000, 0.01, 0.03);
         mpCurrentMapStruct->Reset();
 
         pKFini->mpVoxelStruct = mpCurrentMapStruct;
@@ -477,8 +477,10 @@ void Tracking::CreateNewKeyFrame()
     if (!mpLocalMapper->SetNotStop(true))
         return;
 
+    mCurrentFrame.mImDepth = cv::Mat(mpCurrentMapStruct->GetRayTracingResultDepth());
     mCurrentFrame.ExtractORB();
     mCurrentFrame.mTcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
+
     if (!TrackLocalMap())
         return;
 
@@ -563,7 +565,7 @@ void Tracking::CreateNewKeyFrame()
     mpCurrentMapStruct = new MapStruct(g_calib[0]);
     mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
     mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-    mpCurrentMapStruct->create(20000, 15000, 15000, 0.008, 0.03);
+    mpCurrentMapStruct->create(10000, 7000, 8000, 0.01, 0.03);
     mpCurrentMapStruct->Reset();
     mpCurrentMapStruct->SetPose(mCurrentFrame.mTcw);
 

@@ -58,6 +58,7 @@ public:
     uint CheckNumVisibleBlocks(int cols, int rows, const Sophus::SE3d &Tcm);
     void Fuse(MapStruct *pMapStruct);
     void Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
+    void FuseNoVisibilityCheck(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
 
     // TODO: Save the map to RAM/HardDisk
     void SaveToFile(std::string &strFileName);
@@ -91,6 +92,7 @@ public:
 
     void RayTrace(const Sophus::SE3d &Tcm);
     cv::cuda::GpuMat GetRayTracingResult();
+    cv::cuda::GpuMat GetRayTracingResultDepth();
 
     // RayTrace Engine
     RayTraceEngine *mpRayTraceEngine;

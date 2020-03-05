@@ -20,3 +20,5 @@ void ComputeImageGradientCentralDifference(const cv::cuda::GpuMat image, cv::cud
 
 void TransformReferencePoint(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &vmap,
                              const Eigen::Matrix3d &K, const Sophus::SE3d &T);
+
+void VMapToDepth(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &depth);

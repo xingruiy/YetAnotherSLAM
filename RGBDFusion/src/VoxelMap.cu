@@ -1,5 +1,6 @@
 #include "VoxelMap.h"
 #include "CudaUtils.h"
+#include "ImageProc.h"
 #include "ParallelScan.h"
 #include "VoxelStructUtils.h"
 
@@ -102,14 +103,17 @@ MapStruct::MapStruct(int SizeInMB)
 
 void MapStruct::Release()
 {
-    SafeCall(cudaFree((void *)mplHeap));
-    SafeCall(cudaFree((void *)mplHeapPtr));
-    SafeCall(cudaFree((void *)mplHashTable));
-    SafeCall(cudaFree((void *)mplBucketMutex));
-    SafeCall(cudaFree((void *)mpLinkedListHead));
-    SafeCall(cudaFree((void *)mplVoxelBlocks));
-    SafeCall(cudaFree((void *)visibleBlockNum));
-    SafeCall(cudaFree((void *)visibleTable));
+    if (!empty())
+    {
+        SafeCall(cudaFree((void *)mplHeap));
+        SafeCall(cudaFree((void *)mplHeapPtr));
+        SafeCall(cudaFree((void *)mplHashTable));
+        SafeCall(cudaFree((void *)mplBucketMutex));
+        SafeCall(cudaFree((void *)mpLinkedListHead));
+        SafeCall(cudaFree((void *)mplVoxelBlocks));
+        SafeCall(cudaFree((void *)visibleBlockNum));
+        SafeCall(cudaFree((void *)visibleTable));
+    }
 
     if (mbHasMesh && N > 0)
     {
@@ -128,7 +132,7 @@ void MapStruct::Release()
     visibleBlockNum = NULL;
     mpLinkedListHead = NULL;
     mbInHibernation = false;
-    mFootPrintInMB = 0;
+    bucketSize = 0;
 }
 
 bool MapStruct::empty()
@@ -168,33 +172,30 @@ void MapStruct::SetRayTraceEngine(RayTraceEngine *pRayTraceEngine)
 
 void MapStruct::Swap(MapStruct *pMapStruct)
 {
-    {
-        using std::swap;
-        swap(mplHeap, pMapStruct->mplHeap);
-        swap(mplHeapPtr, pMapStruct->mplHeapPtr);
-        swap(mplHashTable, pMapStruct->mplHashTable);
-        swap(visibleTable, pMapStruct->visibleTable);
-        swap(mplVoxelBlocks, pMapStruct->mplVoxelBlocks);
-        swap(mplBucketMutex, pMapStruct->mplBucketMutex);
-        swap(mpLinkedListHead, pMapStruct->mpLinkedListHead);
-        swap(visibleBlockNum, pMapStruct->visibleBlockNum);
+    using std::swap;
+    swap(mplHeap, pMapStruct->mplHeap);
+    swap(mplHeapPtr, pMapStruct->mplHeapPtr);
+    swap(mplHashTable, pMapStruct->mplHashTable);
+    swap(visibleTable, pMapStruct->visibleTable);
+    swap(mplVoxelBlocks, pMapStruct->mplVoxelBlocks);
+    swap(mplBucketMutex, pMapStruct->mplBucketMutex);
+    swap(mpLinkedListHead, pMapStruct->mpLinkedListHead);
+    swap(visibleBlockNum, pMapStruct->visibleBlockNum);
 
-        swap(bucketSize, pMapStruct->bucketSize);
-        swap(hashTableSize, pMapStruct->hashTableSize);
-        swap(voxelBlockSize, pMapStruct->voxelBlockSize);
-        swap(voxelSize, pMapStruct->voxelSize);
-        swap(truncationDist, pMapStruct->truncationDist);
+    swap(bucketSize, pMapStruct->bucketSize);
+    swap(hashTableSize, pMapStruct->hashTableSize);
+    swap(voxelBlockSize, pMapStruct->voxelBlockSize);
+    swap(voxelSize, pMapStruct->voxelSize);
+    swap(truncationDist, pMapStruct->truncationDist);
 
-        swap(mTcw, pMapStruct->mTcw);
-        swap(mbInHibernation, pMapStruct->mbInHibernation);
-        swap(mbVertexBufferCreated, pMapStruct->mbVertexBufferCreated);
-        swap(mnId, pMapStruct->mnId);
-        swap(mK, pMapStruct->mK);
-        swap(mbHasMesh, pMapStruct->mbHasMesh);
-        swap(mplPoint, pMapStruct->mplPoint);
-        swap(mplNormal, pMapStruct->mplNormal);
-        swap(N, pMapStruct->N);
-    }
+    swap(mbInHibernation, pMapStruct->mbInHibernation);
+    swap(mbVertexBufferCreated, pMapStruct->mbVertexBufferCreated);
+    swap(mnId, pMapStruct->mnId);
+    swap(mK, pMapStruct->mK);
+    swap(mbHasMesh, pMapStruct->mbHasMesh);
+    swap(mplPoint, pMapStruct->mplPoint);
+    swap(mplNormal, pMapStruct->mplNormal);
+    swap(N, pMapStruct->N);
 }
 
 uint MapStruct::GetNumVisibleBlocks()
@@ -209,7 +210,7 @@ void MapStruct::ResetNumVisibleBlocks()
     SafeCall(cudaMemset(visibleBlockNum, 0, sizeof(uint)));
 }
 
-struct MapStructFusionFunctor
+struct CreateBlockFunctor
 {
     HashEntry *plDstEntry;
     HashEntry *plCurrEntry;
@@ -218,26 +219,16 @@ struct MapStructFusionFunctor
     int dstHashTableSize;
     int *plBucketMutex;
     Voxel *plVoxels;
-    Voxel *plDstVoxels;
     int *plHeapPtr;
     int *plHeap;
     int *pLinkedListPtr;
     float voxelSize;
     Sophus::SE3f T_src_dst;
 
-    __device__ __forceinline__ void fuse(Voxel &src, Voxel &dst) const;
     __device__ __forceinline__ void operator()() const;
 };
 
-__device__ __forceinline__ void MapStructFusionFunctor::fuse(Voxel &src, Voxel &dst) const
-{
-    float dstSdf = UnPackFloat(dst.sdf);
-    float srcSdf = UnPackFloat(src.sdf);
-    dst.sdf = PackFloat(dstSdf * dst.wt + srcSdf * src.wt);
-    dst.wt = min(255, dst.wt + src.wt);
-}
-
-__device__ __forceinline__ void MapStructFusionFunctor::operator()() const
+__device__ __forceinline__ void CreateBlockFunctor::operator()() const
 {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     if (x >= currHashTableSize)
@@ -252,26 +243,139 @@ __device__ __forceinline__ void MapStructFusionFunctor::operator()() const
         if (voxel_src.wt == 0)
             continue;
 
-        Eigen::Vector3i VoxelPos = plCurrEntry[x].pos + LocalIdxToLocalPos(vid);
+        Eigen::Vector3i VoxelPos = BlockPosToVoxelPos(plCurrEntry[x].pos) + LocalIdxToLocalPos(vid);
         Eigen::Vector3f WorldPt = T_src_dst * VoxelPosToWorldPt(VoxelPos, voxelSize);
-        VoxelPos = VoxelPosToBlockPos(WorldPtToVoxelPos(WorldPt, voxelSize));
+        VoxelPos = WorldPtToVoxelPos(WorldPt, voxelSize);
         Eigen::Vector3i blockPos = VoxelPosToBlockPos(VoxelPos);
+        // Eigen::Vector3i blockPos = VoxelPosToBlockPos(VoxelPos);
 
-        HashEntry *dstEntry;
-        findEntry(blockPos, dstEntry, plDstEntry, dstBucketSize);
+        HashEntry *dstEntry = NULL;
+        bool found = findEntry(blockPos, dstEntry, plDstEntry, dstBucketSize);
 
-        if (!dstEntry)
+        if (!found)
         {
-            dstEntry = CreateNewBlock(blockPos, plHeap, plHeapPtr, plDstEntry,
-                                      plBucketMutex, pLinkedListPtr,
-                                      dstHashTableSize, dstBucketSize);
-            if (!dstEntry)
-                continue;
+            CreateNewBlock(blockPos, plHeap, plHeapPtr, plDstEntry,
+                           plBucketMutex, pLinkedListPtr,
+                           dstHashTableSize, dstBucketSize);
         }
+    }
+}
 
-        int idx = VoxelPosToLocalIdx(VoxelPos);
-        Voxel &voxel_dst = plDstVoxels[dstEntry->ptr + idx];
-        fuse(voxel_src, voxel_dst);
+struct MapStructFusionFunctor
+{
+    HashEntry *plDstEntry;
+    HashEntry *plCurrEntry;
+    int currBucketSize;
+    int currHashTableSize;
+    int dstHashTableSize;
+    int *plBucketMutex;
+    Voxel *plVoxels;
+    Voxel *plDstVoxels;
+    float voxelSize;
+    Sophus::SE3f T_dst_src;
+
+    mutable uchar wtOld;
+    mutable bool mbGetWt;
+
+    __device__ __forceinline__ float ReadSDF(Eigen::Vector3i pt, bool &valid) const;
+    __device__ __forceinline__ float InterpolateSDF(Eigen::Vector3f pt, bool &valid) const;
+    __device__ __forceinline__ void operator()() const;
+};
+
+__device__ __forceinline__ float MapStructFusionFunctor::ReadSDF(Eigen::Vector3i pt, bool &valid) const
+{
+    Voxel *voxel = NULL;
+    findVoxel(pt, voxel, plCurrEntry, plVoxels, currBucketSize);
+    if (voxel && voxel->wt != 0)
+    {
+        valid = true;
+        if (mbGetWt)
+        {
+            wtOld = voxel->wt;
+            mbGetWt = false;
+        }
+        return UnPackFloat(voxel->sdf);
+    }
+    else
+    {
+        valid = false;
+        return 1.0f;
+    }
+}
+
+__device__ __forceinline__ float MapStructFusionFunctor::InterpolateSDF(Eigen::Vector3f pt, bool &valid) const
+{
+    Eigen::Vector3f voxelPt = pt / voxelSize;
+    Eigen::Vector3i voxelPos = WorldPtToVoxelPos(pt, voxelSize);
+    float x = voxelPt(0) - voxelPos(0);
+    float y = voxelPt(1) - voxelPos(1);
+    float z = voxelPt(2) - voxelPos(2);
+    // printf("%f,%f,%f,%d,%d,%d,%f,%f,%f\n", x, y, z, voxelPos(0), voxelPos(1), voxelPos(2), voxelPt(0), voxelPt(1), voxelPt(2));
+    float sdf[4] = {1.f, 1.f, 1.f, 1.f};
+
+    sdf[0] = ReadSDF(voxelPos, valid);
+    if (!valid)
+        return 1.f;
+    sdf[1] = ReadSDF(voxelPos + Eigen::Vector3i(1, 0, 0), valid);
+    if (!valid)
+        return 1.f;
+
+    sdf[2] = sdf[0] * (1 - x) + sdf[1] * x;
+
+    sdf[0] = ReadSDF(voxelPos + Eigen::Vector3i(0, 1, 0), valid);
+    if (!valid)
+        return 1.f;
+    sdf[1] = ReadSDF(voxelPos + Eigen::Vector3i(1, 1, 0), valid);
+    if (!valid)
+        return 1.f;
+
+    sdf[3] = sdf[2] * (1 - y) + (sdf[0] * (1 - x) + sdf[1] * x) * y;
+
+    sdf[0] = ReadSDF(voxelPos + Eigen::Vector3i(0, 0, 1), valid);
+    if (!valid)
+        return 1.f;
+    sdf[1] = ReadSDF(voxelPos + Eigen::Vector3i(1, 0, 1), valid);
+    if (!valid)
+        return 1.f;
+
+    sdf[2] = sdf[0] * (1 - x) + sdf[1] * x;
+
+    sdf[0] = ReadSDF(voxelPos + Eigen::Vector3i(0, 1, 1), valid);
+    if (!valid)
+        return 1.f;
+    sdf[1] = ReadSDF(voxelPos + Eigen::Vector3i(1, 1, 1), valid);
+    if (!valid)
+        return 1.f;
+
+    return sdf[3] * (1 - z) + (sdf[2] * (1 - y) + (sdf[0] * (1 - x) + sdf[1] * x) * y) * z;
+}
+
+__device__ __forceinline__ void MapStructFusionFunctor::operator()() const
+{
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    if (x >= dstHashTableSize)
+        return;
+
+    if (plDstEntry[x].ptr == -1)
+        return;
+
+    for (int vid = 0; vid < BlockSize3; ++vid)
+    {
+        Voxel &dst = plDstVoxels[plDstEntry[x].ptr + vid];
+
+        Eigen::Vector3i VoxelPos = BlockPosToVoxelPos(plDstEntry[x].pos) + LocalIdxToLocalPos(vid);
+        Eigen::Vector3f WorldPt = T_dst_src * (VoxelPosToWorldPt(VoxelPos, voxelSize));
+        bool valid = false;
+
+        wtOld = 0;
+        mbGetWt = true;
+        float sdf = InterpolateSDF(WorldPt, valid);
+        if (!valid)
+            continue;
+
+        float dstSdf = UnPackFloat(dst.sdf);
+        dst.sdf = PackFloat((dstSdf * dst.wt + sdf * wtOld) / (dst.wt + wtOld));
+        dst.wt = min(255, dst.wt + wtOld);
     }
 }
 
@@ -288,32 +392,49 @@ void MapStruct::Fuse(MapStruct *pMapStruct)
 
     DeleteMesh();
 
-    int nHashEntryCom = hashTableSize + pMapStruct->hashTableSize;
+    int nHashEntryCom = (hashTableSize + pMapStruct->hashTableSize);
     int nBucektCom = static_cast<int>(0.8 * nHashEntryCom);
-    int nVoxelBlockCom = voxelBlockSize + pMapStruct->voxelBlockSize;
+    int nVoxelBlockCom = (voxelBlockSize + pMapStruct->voxelBlockSize);
 
     Reserve(nHashEntryCom, nBucektCom, nVoxelBlockCom);
 
-    // MapStructFusionFunctor functor;
-    // functor.plDstEntry = mplHashTable;
-    // functor.plCurrEntry = pMapStruct->mplHashTable;
-    // functor.dstBucketSize = bucketSize;
-    // functor.currHashTableSize = pMapStruct->hashTableSize;
-    // functor.dstHashTableSize = hashTableSize;
-    // functor.plBucketMutex = mplBucketMutex;
-    // functor.plVoxels = pMapStruct->mplVoxelBlocks;
-    // functor.plDstVoxels = mplVoxelBlocks;
-    // functor.plHeapPtr = mplHeapPtr;
-    // functor.plHeap = mplHeap;
-    // functor.pLinkedListPtr = mpLinkedListHead;
-    // functor.T_src_dst = (mTcw.inverse() * pMapStruct->mTcw).cast<float>();
-    // functor.voxelSize = voxelSize;
+    CreateBlockFunctor step1;
+    step1.plDstEntry = mplHashTable;
+    step1.plCurrEntry = pMapStruct->mplHashTable;
+    step1.dstBucketSize = bucketSize;
+    step1.currHashTableSize = pMapStruct->hashTableSize;
+    step1.dstHashTableSize = hashTableSize;
+    step1.plBucketMutex = mplBucketMutex;
+    step1.plVoxels = pMapStruct->mplVoxelBlocks;
+    step1.plHeapPtr = mplHeapPtr;
+    step1.plHeap = mplHeap;
+    step1.pLinkedListPtr = mpLinkedListHead;
+    step1.T_src_dst = (GetPose().inverse() * pMapStruct->GetPose()).cast<float>();
+    step1.voxelSize = voxelSize;
 
-    // dim3 block(1024);
-    // dim3 grid(cv::divUp(pMapStruct->hashTableSize, block.x));
-    // callDeviceFunctor<<<grid, block>>>(functor);
+    dim3 block(1024);
+    dim3 grid(cv::divUp(pMapStruct->hashTableSize, block.x));
+    callDeviceFunctor<<<grid, block>>>(step1);
 
-    // pMapStruct->Release();
+    MapStructFusionFunctor step2;
+    step2.plDstEntry = mplHashTable;
+    step2.plCurrEntry = pMapStruct->mplHashTable;
+    step2.currBucketSize = pMapStruct->bucketSize;
+    step2.currHashTableSize = pMapStruct->hashTableSize;
+    step2.dstHashTableSize = hashTableSize;
+    step2.plBucketMutex = mplBucketMutex;
+    step2.plVoxels = pMapStruct->mplVoxelBlocks;
+    step2.plDstVoxels = mplVoxelBlocks;
+    step2.T_dst_src = (pMapStruct->GetPose().inverse() * GetPose()).cast<float>();
+    step2.voxelSize = voxelSize;
+
+    block = dim3(512);
+    grid = dim3(cv::divUp(hashTableSize, block.x));
+    callDeviceFunctor<<<grid, block>>>(step2);
+
+    SafeCall(cudaDeviceSynchronize());
+
+    pMapStruct->Release();
 }
 
 struct ResizeMapStructFunctor
@@ -354,7 +475,7 @@ __device__ __forceinline__ void ResizeMapStructFunctor::operator()() const
         return;
 
     Voxel *dst = &plDstVoxels[pNewEntry->ptr];
-    memcpy(&src, dst, sizeof(Voxel) * BlockSize3);
+    memcpy(dst, src, sizeof(Voxel) * BlockSize3);
 }
 
 void MapStruct::Reserve(int hSize, int bSize, int vSize)
@@ -844,6 +965,14 @@ void MapStruct::RayTrace(const Sophus::SE3d &Tcm)
 cv::cuda::GpuMat MapStruct::GetRayTracingResult()
 {
     return mpRayTraceEngine->GetVMap();
+}
+
+cv::cuda::GpuMat MapStruct::GetRayTracingResultDepth()
+{
+    auto vmap = mpRayTraceEngine->GetVMap();
+    cv::cuda::GpuMat depth;
+    VMapToDepth(vmap, depth);
+    return depth;
 }
 
 void MapStruct::SetActiveFlag(bool flag)
