@@ -20,7 +20,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap, KeyFrameDatabase *pKFDB)
       mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
       mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
       mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
-      mbToBeErased(false), mbBad(false), mpMap(pMap), mImg(F.mImGray.clone()),mpVoxelStruct(nullptr)
+      mbToBeErased(false), mbBad(false), mpMap(pMap), mImg(F.mImGray.clone()), mpVoxelStruct(nullptr)
 {
   mnId = nNextId++;
 
@@ -51,8 +51,8 @@ void KeyFrame::SetPose(const Sophus::SE3d &Tcw)
   std::unique_lock<std::mutex> lock(mMutexPose);
   mTcw = Tcw;
 
-  if (mpVoxelStruct)
-    mpVoxelStruct->mTcw = Tcw;
+  if (mpVoxelStruct && !mpVoxelStruct->isActive())
+    mpVoxelStruct->SetPose(mTcw);
 }
 
 Sophus::SE3d KeyFrame::GetPose()
@@ -552,7 +552,7 @@ bool KeyFrame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
   float u = fx * PcX * invz + cx;
   float v = fy * PcY * invz + cy;
 
-  if (u < g_minX || u > g_maxX || v < g_minY || v > g_maxY)
+  if (u < mnMinX || u > mnMaxX || v < mnMinY || v > mnMaxY)
     return false;
   // Check distance is in the scale invariance region of the MapPoint
   float maxDistance = pMP->GetMaxDistanceInvariance();

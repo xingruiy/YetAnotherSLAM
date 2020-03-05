@@ -32,14 +32,19 @@ struct Voxel
 class MapStruct
 {
 public:
-    bool empty();
     void create(int hashTableSize, int bucketSize, int voxelBlockSize, float voxelSize, float truncationDist);
 
 public:
     MapStruct(const Eigen::Matrix3f &K);
+
+    Sophus::SE3d GetPose();
+    void SetPose(Sophus::SE3d &Tcw);
+
     void SetMeshEngine(MeshEngine *pMeshEngine);
     void SetRayTraceEngine(RayTraceEngine *pRayTraceEngine);
     void Reset();
+    bool Empty();
+
     void Release();
     void Swap(MapStruct *pMapStruct);
 
@@ -54,14 +59,19 @@ public:
     uint CheckNumVisibleBlocks(int cols, int rows, const Sophus::SE3d &Tcm);
     void Fuse(MapStruct *pMapStruct);
     void Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
+    void FuseNoVisibilityCheck(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
 
     // TODO: Save the map to RAM/HardDisk
     void SaveToFile(std::string &strFileName);
     void ReadFromFile(std::string &strFileName);
+    void Reserve(int hSize, int bSize, int vSize);
 
     void Hibernate();
     void ReActivate();
     bool mbInHibernation;
+
+    void SetActiveFlag(bool flag);
+    bool isActive();
 
 public:
     void GenerateMesh();
@@ -70,7 +80,6 @@ public:
     float *mplPoint;
     float *mplNormal;
     int N;
-    bool mbActive;
     bool mbHasMesh;
 
     // OpenGL buffer for Drawing
@@ -84,6 +93,7 @@ public:
 
     void RayTrace(const Sophus::SE3d &Tcm);
     cv::cuda::GpuMat GetRayTracingResult();
+    cv::cuda::GpuMat GetRayTracingResultDepth();
 
     // RayTrace Engine
     RayTraceEngine *mpRayTraceEngine;
@@ -123,8 +133,14 @@ public:
     float voxelSize;
     float truncationDist;
 
-    Sophus::SE3d mTcw;
     Eigen::Matrix3f mK;
+
+    // Indicate the current map
+    bool mbActive;
+    std::mutex mMutexActive;
+
+    Sophus::SE3d mTcw;
+    std::mutex mMutexPose;
 };
 
 #endif

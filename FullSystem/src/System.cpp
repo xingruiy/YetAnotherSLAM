@@ -70,6 +70,28 @@ void System::reset()
     mpMap->reset();
 }
 
+void System::FuseAllMapStruct()
+{
+    auto vpMSs = mpMap->GetAllVoxelMaps();
+    if (vpMSs.size() == 0)
+        return;
+
+    auto InitMap = vpMSs[0];
+    InitMap->SetActiveFlag(true);
+
+    for (int i = 1; i < vpMSs.size(); ++i)
+    {
+        MapStruct *pMS = vpMSs[i];
+        if (pMS->isActive())
+            continue;
+
+        InitMap->Fuse(pMS);
+        mpMap->EraseMapStruct(pMS);
+    }
+
+    InitMap->SetActiveFlag(false);
+}
+
 void System::Kill()
 {
     g_bSystemKilled = true;
@@ -111,7 +133,6 @@ void System::readSettings(const std::string &strSettingFile)
     g_ORBNLevels = settingsFile["ORB_SLAM2.nLevels"];
     g_ORBIniThFAST = settingsFile["ORB_SLAM2.iniThFAST"];
     g_ORBMinThFAST = settingsFile["ORB_SLAM2.minThFAST"];
-    g_pORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
 
     // read calibration parameters
     int width = settingsFile["Calibration.width"];
@@ -127,6 +148,8 @@ void System::readSettings(const std::string &strSettingFile)
     // Update tracking parameters
     g_bf = settingsFile["Calibration.bf"];
     g_thDepth = g_bf * (float)settingsFile["Tracking.ThDepth"] / fx;
+    g_bUseColour = (int)settingsFile["Tracking.UseColour"] == 1;
+    g_bUseDepth = (int)settingsFile["Tracking.UseDepth"] == 1;
 
     // read distortion coefficients
     g_distCoeff = cv::Mat(4, 1, CV_32F);
@@ -141,14 +164,11 @@ void System::readSettings(const std::string &strSettingFile)
         g_distCoeff.at<float>(4) = k3;
     }
 
-    computeImageBounds();
-
     g_pointSize = settingsFile["Viewer.PointSize"];
     g_bSystemRunning = (int)settingsFile["Viewer.StartWhenReady"] == 1;
 
     std::cout << "===================================================\n"
               << "The system is created with the following parameters:\n"
-              << "image bounds: " << g_minX << " " << g_maxX << " " << g_minY << " " << g_maxY << "\n"
               << "pyramid level - " << NUM_PYR << "\n";
     for (int i = 0; i < NUM_PYR; ++i)
     {

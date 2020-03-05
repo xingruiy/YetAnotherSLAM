@@ -63,7 +63,7 @@ protected:
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
 
-    std::set<MapStruct *, cmp> mspMapStructs;
+    std::set<MapStruct *> mspMapStructs;
 
     std::vector<MapPoint *> mvpReferenceMapPoints;
 

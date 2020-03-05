@@ -21,7 +21,7 @@ public:
     void SetTrackingImage(const cv::Mat &imGray);
     void SetTrackingDepth(const cv::Mat &imDepth);
 
-    void SetReferenceInvD(cv::cuda::GpuMat imInvD);
+    void SetReferenceMap(const cv::cuda::GpuMat vmap);
 
     Sophus::SE3d GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer);
     void SwapFrameBuffer();
@@ -69,16 +69,34 @@ private:
     Eigen::Matrix3d mK[NUM_PYR];
 
     // Tracking images
+
+    // Depth Pyramid
     cv::cuda::GpuMat mvCurrentDepth[NUM_PYR];
     cv::cuda::GpuMat mvReferenceDepth[NUM_PYR];
+
+    // Image Pyramid
     cv::cuda::GpuMat mvCurrentIntensity[NUM_PYR];
     cv::cuda::GpuMat mvReferenceIntensity[NUM_PYR];
+
+    // Current Image Gradient
     cv::cuda::GpuMat mvIntensityGradientX[NUM_PYR];
     cv::cuda::GpuMat mvIntensityGradientY[NUM_PYR];
+
+    // Inverse Depth Pyramid
     cv::cuda::GpuMat mvCurrentInvDepth[NUM_PYR];
     cv::cuda::GpuMat mvReferenceInvDepth[NUM_PYR];
+
+    // Inverse Depth Gradient
     cv::cuda::GpuMat mvInvDepthGradientX[NUM_PYR];
     cv::cuda::GpuMat mvInvDepthGradientY[NUM_PYR];
+
+    // Vetex and Normal Map
+    cv::cuda::GpuMat mvCurrentVMap[NUM_PYR];
+    cv::cuda::GpuMat mvCurrentNMap[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceVMap[NUM_PYR];
+    cv::cuda::GpuMat mvReferenceNMap[NUM_PYR];
+
+    // Transformed Reference Points in Current Space
     cv::cuda::GpuMat mvReferencePointTransformed[NUM_PYR];
 
     float residualSum;

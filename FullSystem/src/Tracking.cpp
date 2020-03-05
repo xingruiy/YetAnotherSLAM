@@ -1,6 +1,7 @@
 #include "Tracking.h"
 #include "ORBMatcher.h"
 #include "Optimizer.h"
+#include "Sim3Solver.h"
 
 namespace SLAM
 {
@@ -139,7 +140,7 @@ void Tracking::StereoInitialization()
         mpCurrentMapStruct = new MapStruct(g_calib[0]);
         mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
         mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-        mpCurrentMapStruct->create(20000, 10000, 15000, 0.01, 0.05);
+        mpCurrentMapStruct->create(10000, 7000, 8000, 0.01, 0.03);
         mpCurrentMapStruct->Reset();
 
         pKFini->mpVoxelStruct = mpCurrentMapStruct;
@@ -152,6 +153,9 @@ void Tracking::StereoInitialization()
         // Fuse the first depth image
         mRawDepth.upload(mCurrentFrame.mImDepth);
         mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcw);
+
+        mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
+                                   mCurrentFrame.mvKeys);
     }
 }
 
@@ -159,11 +163,10 @@ bool Tracking::TrackRGBD()
 {
     Sophus::SE3d Tmw = mpCurrentMapStruct->mTcw;
     Sophus::SE3d Tcm = Tmw.inverse() * mLastFrame.mTcw;
+
     mpCurrentMapStruct->RayTrace(Tcm);
     auto vmap = mpCurrentMapStruct->GetRayTracingResult();
-
-    cv::imshow("vmap", cv::Mat(vmap));
-    cv::waitKey(1);
+    mpTracker->SetReferenceMap(vmap);
 
     // Set tracking frames
     mpTracker->SetTrackingImage(mCurrentFrame.mImGray);
@@ -173,7 +176,7 @@ bool Tracking::TrackRGBD()
     Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
 
     mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
-    mCurrentFrame.mTcp = mpReferenceKF->GetPoseInverse() * mCurrentFrame.mTcw;
+    mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
 
     mRawDepth.upload(mCurrentFrame.mImDepth);
     mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcp);
@@ -187,7 +190,52 @@ bool Tracking::TrackRGBD()
 
 bool Tracking::Relocalization()
 {
-    return false;
+    // Compute Bag of Words Vector
+    mCurrentFrame.ComputeBoW();
+
+    // Relocalization is performed when tracking is lost
+    // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
+    std::vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame);
+
+    if (vpCandidateKFs.empty())
+        return false;
+
+    mCurrentFrame.CreateRelocalisationPoints();
+
+    const int nKFs = vpCandidateKFs.size();
+
+    // We perform first an ORB matching with each candidate
+    // If enough matches are found we setup a PnP solver
+    ORBMatcher matcher(0.75, true);
+
+    std::vector<Sim3Solver *> vpSim3Solvers(nKFs);
+    std::vector<std::vector<MapPoint *>> vvpMapPointsMatches(nKFs);
+    std::vector<bool> vbDiscarded(nKFs);
+
+    int nCandidates = 0;
+    for (int iKF = 0; iKF < nKFs; ++iKF)
+    {
+        KeyFrame *pKF = vpCandidateKFs[iKF];
+        if (pKF->isBad())
+        {
+            vbDiscarded[iKF] = true;
+        }
+        else
+        {
+            int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointsMatches[iKF]);
+
+            if (nmatches > 30)
+            {
+                //  TODO: set up a ransac pose solver
+                nCandidates++;
+            }
+            else
+            {
+                vbDiscarded[iKF] = true;
+                continue;
+            }
+        }
+    }
 }
 
 bool Tracking::TrackLocalMap()
@@ -416,9 +464,9 @@ bool Tracking::NeedNewKeyFrame()
     bool bCreateNew = false;
     Sophus::SE3d DT = mCurrentFrame.mTcp;
 
-    if (DT.log().topRows<3>().norm() > 0.2)
+    if (DT.log().topRows<3>().norm() > 0.15)
         bCreateNew = true;
-    else if (DT.log().bottomRows<3>().norm() > 0.2)
+    else if (DT.log().bottomRows<3>().norm() > 0.15)
         bCreateNew = true;
 
     return bCreateNew;
@@ -429,7 +477,10 @@ void Tracking::CreateNewKeyFrame()
     if (!mpLocalMapper->SetNotStop(true))
         return;
 
+    mCurrentFrame.mImDepth = cv::Mat(mpCurrentMapStruct->GetRayTracingResultDepth());
     mCurrentFrame.ExtractORB();
+    mCurrentFrame.mTcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
+
     if (!TrackLocalMap())
         return;
 
@@ -507,23 +558,25 @@ void Tracking::CreateNewKeyFrame()
 
     // Update Pose References
     mReferenceFramePose = mCurrentFrame.mTcw;
+    mpCurrentMapStruct->SetActiveFlag(false);
     mpMap->AddMapStruct(mpCurrentMapStruct);
 
     // Create a new MapStruct
     mpCurrentMapStruct = new MapStruct(g_calib[0]);
     mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
     mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-    mpCurrentMapStruct->create(20000, 15000, 15000, 0.008, 0.03);
+    mpCurrentMapStruct->create(10000, 7000, 8000, 0.01, 0.03);
     mpCurrentMapStruct->Reset();
-    mpCurrentMapStruct->mTcw = mCurrentFrame.mTcw;
+    mpCurrentMapStruct->SetPose(mCurrentFrame.mTcw);
 
     pKF->mpVoxelStruct = mpCurrentMapStruct;
     pKF->mbVoxelStructMarginalized = false;
     mpCurrentMapStruct->mTcw = pKF->GetPose();
 
-    // Swap the dense tracking buffer
-    // mpTracker->SwapFrameBuffer();
     mCurrentFrame.mTcp = Sophus::SE3d();
+
+    mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
+                               mCurrentFrame.mvKeys);
 }
 
 void Tracking::reset()

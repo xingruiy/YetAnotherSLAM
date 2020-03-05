@@ -57,8 +57,10 @@ protected:
 
 protected:
     // KeyFrames and matches
+    Frame *mpFrame;
     KeyFrame *mpKF1;
     KeyFrame *mpKF2;
+    std::vector<Eigen::Vector3d> mvpFramePoints;
 
     std::vector<Eigen::Vector3d> mvX3Dc1;
     std::vector<Eigen::Vector3d> mvX3Dc2;
