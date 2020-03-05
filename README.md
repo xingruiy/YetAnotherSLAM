@@ -3,6 +3,11 @@
 ## Change Log
 
 + _2020-03-05_:
+    + Merged ```dev``` branch to ```master``` branch.
+    + Implemented Map fusion function.
+    + Solved problems with global bundle adjustment.
+
++ _2020-03-05_:
     + Merged ```dev2``` branch to ```master``` branch.
     + Solved problems with ```OptimizeEssentialGraph```
     + Added dense map structure for keyframes
