@@ -3,11 +3,11 @@
 
 int main(int argc, char **argv)
 {
-    if (argc <= 2)
-    {
-        std::cout << "usage: ./liveDemo settingsFile ORBVocFile" << std::endl;
-        exit(-1);
-    }
+    // if (argc <= 2)
+    // {
+    //     std::cout << "usage: ./liveDemo settingsFile ORBVocFile" << std::endl;
+    //     exit(-1);
+    // }
 
     // OpenNI2::Camera cam;
     // SLAM::System system(argv[1], argv[2]);
@@ -38,8 +38,8 @@ int main(int argc, char **argv)
         system.TrackRGBD(im, imDepth, 0);
     }
 
-    // while (!SLAM::g_bSystemKilled)
-    // {
-    //     usleep(1000);
-    // }
+    while (!SLAM::g_bSystemKilled)
+    {
+        usleep(1000);
+    }
 }

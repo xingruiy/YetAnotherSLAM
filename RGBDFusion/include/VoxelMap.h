@@ -32,7 +32,6 @@ struct Voxel
 class MapStruct
 {
 public:
-    bool empty();
     void create(int hashTableSize, int bucketSize, int voxelBlockSize, float voxelSize, float truncationDist);
 
 public:
@@ -44,6 +43,8 @@ public:
     void SetMeshEngine(MeshEngine *pMeshEngine);
     void SetRayTraceEngine(RayTraceEngine *pRayTraceEngine);
     void Reset();
+    bool Empty();
+
     void Release();
     void Swap(MapStruct *pMapStruct);
 

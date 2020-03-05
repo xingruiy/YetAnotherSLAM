@@ -552,7 +552,7 @@ bool KeyFrame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
   float u = fx * PcX * invz + cx;
   float v = fy * PcY * invz + cy;
 
-  if (u < g_minX || u > g_maxX || v < g_minY || v > g_maxY)
+  if (u < mnMinX || u > mnMaxX || v < mnMinY || v > mnMaxY)
     return false;
   // Check distance is in the scale invariance region of the MapPoint
   float maxDistance = pMP->GetMaxDistanceInvariance();

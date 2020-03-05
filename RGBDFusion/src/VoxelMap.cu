@@ -103,7 +103,7 @@ MapStruct::MapStruct(int SizeInMB)
 
 void MapStruct::Release()
 {
-    if (!empty())
+    if (!Empty())
     {
         SafeCall(cudaFree((void *)mplHeap));
         SafeCall(cudaFree((void *)mplHeapPtr));
@@ -135,7 +135,7 @@ void MapStruct::Release()
     bucketSize = 0;
 }
 
-bool MapStruct::empty()
+bool MapStruct::Empty()
 {
     return bucketSize == 0;
 }
@@ -381,10 +381,10 @@ __device__ __forceinline__ void MapStructFusionFunctor::operator()() const
 
 void MapStruct::Fuse(MapStruct *pMapStruct)
 {
-    if (!pMapStruct || pMapStruct->empty())
+    if (!pMapStruct || pMapStruct->Empty())
         return;
 
-    if (this->empty())
+    if (Empty())
     {
         this->Swap(pMapStruct);
         return;
@@ -882,7 +882,7 @@ void MapStruct::ReadFromFile(std::string &strFileName)
 
 void MapStruct::Hibernate()
 {
-    if (mbInHibernation || empty())
+    if (mbInHibernation || Empty())
         return;
 
     mpLinkedListHeadHib = new int[1];
@@ -913,7 +913,7 @@ void MapStruct::Hibernate()
 
 void MapStruct::ReActivate()
 {
-    if (!mbInHibernation || empty())
+    if (!mbInHibernation || Empty())
         return;
 
     SafeCall(cudaMalloc((void **)&mpLinkedListHead, sizeof(int)));

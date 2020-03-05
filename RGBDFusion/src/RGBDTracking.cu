@@ -185,7 +185,6 @@ Sophus::SE3d RGBDTracking::GetTransform(const Sophus::SE3d &init, const bool bSw
                 break;
 
             case TrackingModal::RGB_AND_DEPTH:
-                // std::cout << "use both depth and colour " << std::endl;
                 // ComputeSingleStepRGBD(lvl, estimate, hessian.data(), residual.data());
                 ComputeSingleStepRGBDLinear(lvl, estimate, hessian.data(), residual.data());
                 break;
