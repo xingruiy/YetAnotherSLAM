@@ -9,7 +9,7 @@ namespace SLAM
 
 LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
     : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0),
-      mbFixScale(true), mpThreadGBA(nullptr), mbRunningGBA(false)
+      mpThreadGBA(nullptr), mbRunningGBA(false)
 {
     mnCovisibilityConsistencyTh = 3;
 }
@@ -27,7 +27,7 @@ void LoopClosing::Run()
         {
             if (DetectLoop())
             {
-                if (ComputeSim3())
+                if (ComputeSE3())
                     // Perform loop fusion and pose graph optimization
                     CorrectLoop();
             }
@@ -175,9 +175,9 @@ bool LoopClosing::DetectLoop()
     return false;
 }
 
-bool LoopClosing::ComputeSim3()
+bool LoopClosing::ComputeSE3()
 {
-    // For each consistent loop candidate we try to compute a Sim3
+    // For each consistent loop candidate we try to compute a SE3
     const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
 
     // We compute first ORB matches for each candidate
@@ -271,7 +271,7 @@ bool LoopClosing::ComputeSim3()
                 Sophus::SE3d T21 = T12.inverse();
                 g2o::Sim3 gScm(T21.rotationMatrix(), T21.translation(), 1.0);
 
-                const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
+                const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, true);
 
                 // If optimization is succesful stop ransacs and continue
                 if (nInliers >= 20)
@@ -493,7 +493,7 @@ void LoopClosing::CorrectLoop()
     }
 
     // Optimize graph
-    Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, mbFixScale);
+    Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, true);
 
     mpMap->InformNewBigChange();
 

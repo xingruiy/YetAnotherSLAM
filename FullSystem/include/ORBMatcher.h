@@ -58,8 +58,8 @@ public:
     int SearchByBoW(KeyFrame *pKF, Frame &F, std::vector<MapPoint *> &vpMapPointMatches);
     int SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12);
 
-    // Search matches between MapPoints seen in KF1 and KF2 transforming by a Sim3 [s12*R12|t12]
-    // In the stereo and RGB-D case, s12=1
+    // Search matches between MapPoints seen in KF1 and KF2 transforming by a SE3
+    int SearchBySim3(Frame &pFrame, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
     int SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
 
     // Project MapPoints into KeyFrame and search for duplicated MapPoints.

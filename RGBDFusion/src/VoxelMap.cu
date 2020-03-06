@@ -237,26 +237,30 @@ __device__ __forceinline__ void CreateBlockFunctor::operator()() const
     if (plCurrEntry[x].ptr == -1)
         return;
 
-    for (int vid = 0; vid < BlockSize3; ++vid)
+#pragma unroll
+    for (int vid = 0; vid < BlockSize; ++vid)
     {
-        Voxel &voxel_src = plVoxels[plCurrEntry[x].ptr + vid];
+        Eigen::Vector3i localPos(threadIdx.x, threadIdx.y, vid);
+        int localIdx = LocalPosToLocalIdx(localPos);
+        Voxel &voxel_src = plVoxels[plCurrEntry[x].ptr + localIdx];
         if (voxel_src.wt == 0)
             continue;
 
-        Eigen::Vector3i VoxelPos = BlockPosToVoxelPos(plCurrEntry[x].pos) + LocalIdxToLocalPos(vid);
+        Eigen::Vector3i VoxelPos = BlockPosToVoxelPos(plCurrEntry[x].pos) + localPos;
         Eigen::Vector3f WorldPt = T_src_dst * VoxelPosToWorldPt(VoxelPos, voxelSize);
         VoxelPos = WorldPtToVoxelPos(WorldPt, voxelSize);
         Eigen::Vector3i blockPos = VoxelPosToBlockPos(VoxelPos);
-        // Eigen::Vector3i blockPos = VoxelPosToBlockPos(VoxelPos);
 
         HashEntry *dstEntry = NULL;
         bool found = findEntry(blockPos, dstEntry, plDstEntry, dstBucketSize);
 
         if (!found)
         {
-            CreateNewBlock(blockPos, plHeap, plHeapPtr, plDstEntry,
-                           plBucketMutex, pLinkedListPtr,
-                           dstHashTableSize, dstBucketSize);
+            dstEntry = NULL;
+            while (!dstEntry)
+                dstEntry = CreateNewBlock(blockPos, plHeap, plHeapPtr, plDstEntry,
+                                          plBucketMutex, pLinkedListPtr,
+                                          dstHashTableSize, dstBucketSize);
         }
     }
 }
@@ -352,18 +356,21 @@ __device__ __forceinline__ float MapStructFusionFunctor::InterpolateSDF(Eigen::V
 
 __device__ __forceinline__ void MapStructFusionFunctor::operator()() const
 {
-    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    int x = blockIdx.x;
     if (x >= dstHashTableSize)
         return;
 
     if (plDstEntry[x].ptr == -1)
         return;
 
-    for (int vid = 0; vid < BlockSize3; ++vid)
+#pragma unroll
+    for (int vid = 0; vid < BlockSize; ++vid)
     {
-        Voxel &dst = plDstVoxels[plDstEntry[x].ptr + vid];
+        Eigen::Vector3i localPos(threadIdx.x, threadIdx.y, vid);
+        int localIdx = LocalPosToLocalIdx(localPos);
+        Voxel &dst = plDstVoxels[plDstEntry[x].ptr + localIdx];
 
-        Eigen::Vector3i VoxelPos = BlockPosToVoxelPos(plDstEntry[x].pos) + LocalIdxToLocalPos(vid);
+        Eigen::Vector3i VoxelPos = BlockPosToVoxelPos(plDstEntry[x].pos) + localPos;
         Eigen::Vector3f WorldPt = T_dst_src * (VoxelPosToWorldPt(VoxelPos, voxelSize));
         bool valid = false;
 
@@ -412,8 +419,8 @@ void MapStruct::Fuse(MapStruct *pMapStruct)
     step1.T_src_dst = (GetPose().inverse() * pMapStruct->GetPose()).cast<float>();
     step1.voxelSize = voxelSize;
 
-    dim3 block(1024);
-    dim3 grid(cv::divUp(pMapStruct->hashTableSize, block.x));
+    dim3 block(8, 8);
+    dim3 grid(pMapStruct->hashTableSize);
     callDeviceFunctor<<<grid, block>>>(step1);
 
     MapStructFusionFunctor step2;
@@ -428,8 +435,7 @@ void MapStruct::Fuse(MapStruct *pMapStruct)
     step2.T_dst_src = (pMapStruct->GetPose().inverse() * GetPose()).cast<float>();
     step2.voxelSize = voxelSize;
 
-    block = dim3(512);
-    grid = dim3(cv::divUp(hashTableSize, block.x));
+    grid = dim3(hashTableSize);
     callDeviceFunctor<<<grid, block>>>(step2);
 
     SafeCall(cudaDeviceSynchronize());
@@ -466,13 +472,12 @@ __device__ __forceinline__ void ResizeMapStructFunctor::operator()() const
     Voxel *src = &plCurrVoxels[plCurrEntry[x].ptr];
     Eigen::Vector3i blockPos = plCurrEntry[x].pos;
 
-    HashEntry *pNewEntry = CreateNewBlock(
-        blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
-        plDstBucketMutex, pDstLinkedListPtr,
-        dstHashTableSize, dstBucketSize);
-
-    if (!pNewEntry)
-        return;
+    HashEntry *pNewEntry = NULL;
+    while (!pNewEntry)
+        pNewEntry = CreateNewBlock(
+            blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
+            plDstBucketMutex, pDstLinkedListPtr,
+            dstHashTableSize, dstBucketSize);
 
     Voxel *dst = &plDstVoxels[pNewEntry->ptr];
     memcpy(dst, src, sizeof(Voxel) * BlockSize3);
@@ -528,11 +533,19 @@ struct CreateBlockLineTracingFunctor
 
     Sophus::SE3f T;
 
+    // Allocate Blocks on the GPU memory
     __device__ __forceinline__ void allocateBlock(const Eigen::Vector3i &blockPos) const
     {
-        CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable, mplBucketMutex, mpLinkedListHead, hashTableSize, bucketSize);
+        HashEntry *pEntry = NULL;
+        while (!pEntry)
+            pEntry = CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable,
+                                    mplBucketMutex, mpLinkedListHead,
+                                    hashTableSize, bucketSize);
     }
 
+    // Allocate Blocks on the ray direction with a certain range
+    // This is derived from Bresenham's line tracing algorithm
+    // details see : https://en.m.wikipedia.org/wiki/Bresenham%27s_line_algorithm
     __device__ __forceinline__ void operator()() const
     {
         const int x = threadIdx.x + blockDim.x * blockIdx.x;
@@ -554,85 +567,83 @@ struct CreateBlockLineTracingFunctor
 
         Eigen::Vector3i dir = blockEnd - blockStart;
         Eigen::Vector3i increment = Eigen::Vector3i(dir(0) < 0 ? -1 : 1, dir(1) < 0 ? -1 : 1, dir(2) < 0 ? -1 : 1);
-        Eigen::Vector3i absIncrement = Eigen::Vector3i(abs(dir(0)), abs(dir(1)), abs(dir(2)));
-        Eigen::Vector3i incrementErr = Eigen::Vector3i(absIncrement(0) << 1, absIncrement(1) << 1, absIncrement(2) << 1);
+        Eigen::Vector3i AbsIncre = Eigen::Vector3i(abs(dir(0)), abs(dir(1)), abs(dir(2)));
+        Eigen::Vector3i IncreErr = Eigen::Vector3i(AbsIncre(0) << 1, AbsIncre(1) << 1, AbsIncre(2) << 1);
 
         int err1;
         int err2;
 
-        // Bresenham's line algorithm
-        // details see : https://en.m.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-        if ((absIncrement(0) >= absIncrement(1)) && (absIncrement(0) >= absIncrement(2)))
+        if ((AbsIncre(0) >= AbsIncre(1)) && (AbsIncre(0) >= AbsIncre(2)))
         {
-            err1 = incrementErr(1) - 1;
-            err2 = incrementErr(2) - 1;
+            err1 = IncreErr(1) - 1;
+            err2 = IncreErr(2) - 1;
             allocateBlock(blockStart);
-            for (int i = 0; i < absIncrement(0); ++i)
+            for (int i = 0; i < AbsIncre(0); ++i)
             {
                 if (err1 > 0)
                 {
                     blockStart(1) += increment(1);
-                    err1 -= incrementErr(0);
+                    err1 -= IncreErr(0);
                 }
 
                 if (err2 > 0)
                 {
                     blockStart(2) += increment(2);
-                    err2 -= incrementErr(0);
+                    err2 -= IncreErr(0);
                 }
 
-                err1 += incrementErr(1);
-                err2 += incrementErr(2);
+                err1 += IncreErr(1);
+                err2 += IncreErr(2);
                 blockStart(0) += increment(0);
                 allocateBlock(blockStart);
             }
         }
-        else if ((absIncrement(1) >= absIncrement(0)) && (absIncrement(1) >= absIncrement(2)))
+        else if ((AbsIncre(1) >= AbsIncre(0)) && (AbsIncre(1) >= AbsIncre(2)))
         {
-            err1 = incrementErr(0) - 1;
-            err2 = incrementErr(2) - 1;
+            err1 = IncreErr(0) - 1;
+            err2 = IncreErr(2) - 1;
             allocateBlock(blockStart);
-            for (int i = 0; i < absIncrement(1); ++i)
+            for (int i = 0; i < AbsIncre(1); ++i)
             {
                 if (err1 > 0)
                 {
                     blockStart(0) += increment(0);
-                    err1 -= incrementErr(1);
+                    err1 -= IncreErr(1);
                 }
 
                 if (err2 > 0)
                 {
                     blockStart(2) += increment(2);
-                    err2 -= incrementErr(1);
+                    err2 -= IncreErr(1);
                 }
 
-                err1 += incrementErr(0);
-                err2 += incrementErr(2);
+                err1 += IncreErr(0);
+                err2 += IncreErr(2);
                 blockStart(1) += increment(1);
                 allocateBlock(blockStart);
             }
         }
         else
         {
-            err1 = incrementErr(1) - 1;
-            err2 = incrementErr(0) - 1;
+            err1 = IncreErr(1) - 1;
+            err2 = IncreErr(0) - 1;
             allocateBlock(blockStart);
-            for (int i = 0; i < absIncrement(2); ++i)
+            for (int i = 0; i < AbsIncre(2); ++i)
             {
                 if (err1 > 0)
                 {
                     blockStart(1) += increment(1);
-                    err1 -= incrementErr(2);
+                    err1 -= IncreErr(2);
                 }
 
                 if (err2 > 0)
                 {
                     blockStart(0) += increment(0);
-                    err2 -= incrementErr(2);
+                    err2 -= IncreErr(2);
                 }
 
-                err1 += incrementErr(1);
-                err2 += incrementErr(0);
+                err1 += IncreErr(1);
+                err2 += IncreErr(0);
                 blockStart(2) += increment(2);
                 allocateBlock(blockStart);
             }

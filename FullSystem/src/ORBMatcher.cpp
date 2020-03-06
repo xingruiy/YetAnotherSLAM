@@ -919,6 +919,224 @@ int ORBMatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F
     return nmatches;
 }
 
+// int ORBMatcher::SearchBySim3(Frame &pFrame, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th)
+// {
+//     const float &fx = pKF2->fx;
+//     const float &fy = pKF2->fy;
+//     const float &cx = pKF2->cx;
+//     const float &cy = pKF2->cy;
+
+//     auto Twc1 = pFrame.mTcw.inverse();
+//     auto Twc2 = pKF2->GetPoseInverse();
+
+//     //Transformation between cameras
+//     Sophus::SE3d S21 = S12.inverse();
+
+//     const std::vector<MapPoint *> vpMapPoints1 = pFrame.mvpMapPoints;
+//     const int N1 = vpMapPoints1.size();
+
+//     const std::vector<MapPoint *> vpMapPoints2 = pKF2->GetMapPointMatches();
+//     const int N2 = vpMapPoints2.size();
+
+//     std::vector<bool> vbAlreadyMatched1(N1, false);
+//     std::vector<bool> vbAlreadyMatched2(N2, false);
+
+//     for (int i = 0; i < N1; i++)
+//     {
+//         MapPoint *pMP = vpMatches12[i];
+//         if (pMP)
+//         {
+//             vbAlreadyMatched1[i] = true;
+//             int idx2 = pMP->GetIndexInKeyFrame(pKF2);
+//             if (idx2 >= 0 && idx2 < N2)
+//                 vbAlreadyMatched2[idx2] = true;
+//         }
+//     }
+
+//     std::vector<int> vnMatch1(N1, -1);
+//     std::vector<int> vnMatch2(N2, -1);
+
+//     // Transform from KF1 to KF2 and search
+//     for (int i1 = 0; i1 < N1; i1++)
+//     {
+//         MapPoint *pMP = vpMapPoints1[i1];
+
+//         if (!pMP || vbAlreadyMatched1[i1])
+//             continue;
+
+//         if (pMP->isBad())
+//             continue;
+
+//         Eigen::Vector3d p3Dw = pMP->GetWorldPos();
+//         Eigen::Vector3d p3Dc1 = Twc1 * p3Dw;
+//         Eigen::Vector3d p3Dc2 = S12 * p3Dc1;
+
+//         // Depth must be positive
+//         if (p3Dc2(2) < 0.0)
+//             continue;
+
+//         const float invz = 1.0 / p3Dc2(2);
+//         const float x = p3Dc2(0) * invz;
+//         const float y = p3Dc2(1) * invz;
+
+//         const float u = fx * x + cx;
+//         const float v = fy * y + cy;
+
+//         // Point must be inside the image
+//         if (!pKF2->IsInImage(u, v))
+//             continue;
+
+//         const float maxDistance = pMP->GetMaxDistanceInvariance();
+//         const float minDistance = pMP->GetMinDistanceInvariance();
+//         const float dist3D = p3Dc2.norm();
+
+//         // Depth must be inside the scale invariance region
+//         if (dist3D < minDistance || dist3D > maxDistance)
+//             continue;
+
+//         // Compute predicted octave
+//         const int nPredictedLevel = pMP->PredictScale(dist3D, pKF2);
+
+//         // Search in a radius
+//         const float radius = th * pKF2->mvScaleFactors[nPredictedLevel];
+
+//         const std::vector<size_t> vIndices = pKF2->GetFeaturesInArea(u, v, radius);
+
+//         if (vIndices.empty())
+//             continue;
+
+//         // Match to the most similar keypoint in the radius
+//         const cv::Mat dMP = pMP->GetDescriptor();
+
+//         int bestDist = INT_MAX;
+//         int bestIdx = -1;
+//         for (auto vit = vIndices.begin(), vend = vIndices.end(); vit != vend; vit++)
+//         {
+//             const size_t idx = *vit;
+
+//             const cv::KeyPoint &kp = pKF2->mvKeysUn[idx];
+
+//             if (kp.octave < nPredictedLevel - 1 || kp.octave > nPredictedLevel)
+//                 continue;
+
+//             const cv::Mat &dKF = pKF2->mDescriptors.row(idx);
+
+//             const int dist = DescriptorDistance(dMP, dKF);
+
+//             if (dist < bestDist)
+//             {
+//                 bestDist = dist;
+//                 bestIdx = idx;
+//             }
+//         }
+
+//         if (bestDist <= TH_HIGH)
+//         {
+//             vnMatch1[i1] = bestIdx;
+//         }
+//     }
+
+//     // Transform from KF2 to KF2 and search
+//     for (int i2 = 0; i2 < N2; i2++)
+//     {
+//         MapPoint *pMP = vpMapPoints2[i2];
+
+//         if (!pMP || vbAlreadyMatched2[i2])
+//             continue;
+
+//         if (pMP->isBad())
+//             continue;
+
+//         Eigen::Vector3d p3Dw = pMP->GetWorldPos();
+//         Eigen::Vector3d p3Dc2 = Twc2 * p3Dw;
+//         Eigen::Vector3d p3Dc1 = S21 * p3Dc2;
+
+//         // Depth must be positive
+//         if (p3Dc1(2) < 0.0)
+//             continue;
+
+//         const float invz = 1.0 / p3Dc1(2);
+//         const float x = p3Dc1(0) * invz;
+//         const float y = p3Dc1(1) * invz;
+
+//         const float u = fx * x + cx;
+//         const float v = fy * y + cy;
+
+//         // Point must be inside the image
+//         if (!pKF1->IsInImage(u, v))
+//             continue;
+
+//         const float maxDistance = pMP->GetMaxDistanceInvariance();
+//         const float minDistance = pMP->GetMinDistanceInvariance();
+//         const float dist3D = p3Dc1.norm();
+
+//         // Depth must be inside the scale pyramid of the image
+//         if (dist3D < minDistance || dist3D > maxDistance)
+//             continue;
+
+//         // Compute predicted octave
+//         const int nPredictedLevel = pMP->PredictScale(dist3D, pKF1);
+
+//         // Search in a radius of 2.5*sigma(ScaleLevel)
+//         const float radius = th * pKF1->mvScaleFactors[nPredictedLevel];
+
+//         const std::vector<size_t> vIndices = pKF1->GetFeaturesInArea(u, v, radius);
+
+//         if (vIndices.empty())
+//             continue;
+
+//         // Match to the most similar keypoint in the radius
+//         const cv::Mat dMP = pMP->GetDescriptor();
+
+//         int bestDist = INT_MAX;
+//         int bestIdx = -1;
+//         for (auto vit = vIndices.begin(), vend = vIndices.end(); vit != vend; vit++)
+//         {
+//             const size_t idx = *vit;
+
+//             const cv::KeyPoint &kp = pKF1->mvKeysUn[idx];
+
+//             if (kp.octave < nPredictedLevel - 1 || kp.octave > nPredictedLevel)
+//                 continue;
+
+//             const cv::Mat &dKF = pKF1->mDescriptors.row(idx);
+
+//             const int dist = DescriptorDistance(dMP, dKF);
+
+//             if (dist < bestDist)
+//             {
+//                 bestDist = dist;
+//                 bestIdx = idx;
+//             }
+//         }
+
+//         if (bestDist <= TH_HIGH)
+//         {
+//             vnMatch2[i2] = bestIdx;
+//         }
+//     }
+
+//     // Check agreement
+//     int nFound = 0;
+
+//     for (int i1 = 0; i1 < N1; i1++)
+//     {
+//         int idx2 = vnMatch1[i1];
+
+//         if (idx2 >= 0)
+//         {
+//             int idx1 = vnMatch2[idx2];
+//             if (idx1 == i1)
+//             {
+//                 vpMatches12[i1] = vpMapPoints2[idx2];
+//                 nFound++;
+//             }
+//         }
+//     }
+
+//     return nFound;
+// }
+
 int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th)
 {
     const float &fx = pKF1->fx;

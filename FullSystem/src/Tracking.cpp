@@ -140,7 +140,7 @@ void Tracking::StereoInitialization()
         mpCurrentMapStruct = new MapStruct(g_calib[0]);
         mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
         mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-        mpCurrentMapStruct->create(10000, 7000, 8000, 0.01, 0.03);
+        mpCurrentMapStruct->create(5000, 4000, 4500, 0.01, 0.03);
         mpCurrentMapStruct->Reset();
 
         pKFini->mpVoxelStruct = mpCurrentMapStruct;
@@ -224,18 +224,80 @@ bool Tracking::Relocalization()
         {
             int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointsMatches[iKF]);
 
-            if (nmatches > 30)
-            {
-                //  TODO: set up a ransac pose solver
-                nCandidates++;
-            }
-            else
+            if (nmatches < 30)
             {
                 vbDiscarded[iKF] = true;
                 continue;
             }
+            else
+            {
+                //  TODO: set up a ransac pose solver
+                Sim3Solver *pSolver = new Sim3Solver(&mCurrentFrame, pKF, vvpMapPointsMatches[iKF]);
+                pSolver->SetRansacParameters(0.99, 20, 300);
+                vpSim3Solvers[iKF] = pSolver;
+            }
+
+            nCandidates++;
         }
     }
+
+    bool bMatch = false;
+
+    // for (int i = 0; i < nCandidates; i++)
+    // {
+    //     if (vbDiscarded[i])
+    //         continue;
+
+    //     // Perform 5 Ransac Iterations
+    //     std::vector<bool> vbInliers;
+    //     int nInliers;
+    //     bool bNoMore;
+
+    //     Sim3Solver *pSolver = vpSim3Solvers[i];
+
+    //     Sophus::SE3d T12;
+    //     bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, T12);
+
+    //     // If Ransac reachs max. iterations discard keyframe
+    //     if (bNoMore)
+    //     {
+    //         vbDiscarded[i] = true;
+    //         nCandidates--;
+    //     }
+
+    //     // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
+    //     if (found)
+    //     {
+    //         std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint *>(NULL));
+    //         for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
+    //         {
+    //             if (vbInliers[j])
+    //                 vpMapPointMatches[j] = vvpMapPointMatches[i][j];
+    //         }
+
+    //         matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, T12, 7.5);
+
+    //         // gScm here should be the inverse of T12, i.e. 2->1
+    //         Sophus::SE3d T21 = T12.inverse();
+    //         g2o::Sim3 gScm(T21.rotationMatrix(), T21.translation(), 1.0);
+
+    //         const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, true);
+
+    //         // If optimization is succesful stop ransacs and continue
+    //         if (nInliers >= 20)
+    //         {
+    //             bMatch = true;
+    //             mpMatchedKF = pKF;
+    //             Sophus::SE3d T21(gScm.rotation(), gScm.translation());
+    //             Sophus::SE3d Twc = pKF->GetPoseInverse();
+
+    //             mTcwNew = pKF->GetPose() * T21.inverse();
+
+    //             mvpCurrentMatchedPoints = vpMapPointMatches;
+    //             break;
+    //         }
+    //     }
+    // }
 }
 
 bool Tracking::TrackLocalMap()
@@ -565,7 +627,7 @@ void Tracking::CreateNewKeyFrame()
     mpCurrentMapStruct = new MapStruct(g_calib[0]);
     mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
     mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-    mpCurrentMapStruct->create(10000, 7000, 8000, 0.01, 0.03);
+    mpCurrentMapStruct->create(5000, 4000, 4500, 0.01, 0.03);
     mpCurrentMapStruct->Reset();
     mpCurrentMapStruct->SetPose(mCurrentFrame.mTcw);
 
