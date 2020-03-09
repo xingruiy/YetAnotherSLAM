@@ -258,7 +258,7 @@ bool LoopClosing::ComputeSE3()
             // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
             if (found)
             {
-                std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint *>(NULL));
+                std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), nullptr);
                 for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
                 {
                     if (vbInliers[j])
@@ -522,7 +522,7 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
         KeyFrame *pKF = mit->first;
         Sophus::SE3d CorrectedTcw = mit->second;
 
-        std::vector<MapPoint *> vpReplacePoints(mvpLoopMapPoints.size(), static_cast<MapPoint *>(NULL));
+        std::vector<MapPoint *> vpReplacePoints(mvpLoopMapPoints.size(), nullptr);
         matcher.Fuse(pKF, CorrectedTcw, mvpLoopMapPoints, 4, vpReplacePoints);
 
         // Get Map Mutex

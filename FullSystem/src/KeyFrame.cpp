@@ -19,7 +19,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap, KeyFrameDatabase *pKFDB)
       mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
       mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
       mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
-      mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
+      mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
       mbToBeErased(false), mbBad(false), mpMap(pMap), mImg(F.mImGray.clone()), mpVoxelStruct(nullptr)
 {
   mnId = nNextId++;
@@ -175,12 +175,12 @@ void KeyFrame::EraseMapPointMatch(MapPoint *pMP)
 {
   int idx = pMP->GetIndexInKeyFrame(this);
   if (idx >= 0)
-    mvpMapPoints[idx] = static_cast<MapPoint *>(NULL);
+    mvpMapPoints[idx] = nullptr;
 }
 
 void KeyFrame::EraseMapPointMatch(const size_t &idx)
 {
-  mvpMapPoints[idx] = static_cast<MapPoint *>(NULL);
+  mvpMapPoints[idx] = nullptr;
 }
 
 void KeyFrame::ReplaceMapPointMatch(const size_t &idx, MapPoint *pMP)
@@ -250,7 +250,7 @@ void KeyFrame::UpdateConnections()
   //If the counter is greater than threshold add connection
   //In case no keyframe counter is over threshold add the one with maximum counter
   int nmax = 0;
-  KeyFrame *pKFmax = NULL;
+  KeyFrame *pKFmax = nullptr;
   int th = 15;
 
   std::vector<std::pair<int, KeyFrame *>> vPairs;

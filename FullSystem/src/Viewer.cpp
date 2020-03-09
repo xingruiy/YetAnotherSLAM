@@ -44,9 +44,9 @@ void Viewer::Run()
     mpRightImageBar->AddDisplay(*mpCurrentKFView);
 
     // Create textures
-    mTextureKF.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mTextureColour.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, NULL);
+    mTextureKF.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    mTextureColour.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, nullptr);
 
     // Create menus
     pangolin::CreatePanel("menu").SetBounds(0, 1, 0, MenuDividerLeft);

@@ -82,9 +82,9 @@ void MapStruct::create(
 
 MapStruct::MapStruct(const Eigen::Matrix3f &K)
     : mFootPrintInMB(0), mbInHibernation(false), mbActive(true),
-      mbHasMesh(false), mpMeshEngine(NULL), mplHeap(NULL),
-      mplHeapPtr(NULL), mplBucketMutex(NULL), mplHashTable(NULL),
-      mplVoxelBlocks(NULL), mpLinkedListHead(NULL), mK(K),
+      mbHasMesh(false), mpMeshEngine(nullptr), mplHeap(nullptr),
+      mplHeapPtr(nullptr), mplBucketMutex(nullptr), mplHashTable(nullptr),
+      mplVoxelBlocks(nullptr), mpLinkedListHead(nullptr), mK(K),
       mbVertexBufferCreated(false)
 {
     // Get a random colour taint for visualization
@@ -123,14 +123,14 @@ void MapStruct::Release()
         mbHasMesh = false;
     }
 
-    mplHeap = NULL;
-    mplHeapPtr = NULL;
-    mplHashTable = NULL;
-    visibleTable = NULL;
-    mplVoxelBlocks = NULL;
-    mplBucketMutex = NULL;
-    visibleBlockNum = NULL;
-    mpLinkedListHead = NULL;
+    mplHeap = nullptr;
+    mplHeapPtr = nullptr;
+    mplHashTable = nullptr;
+    visibleTable = nullptr;
+    mplVoxelBlocks = nullptr;
+    mplBucketMutex = nullptr;
+    visibleBlockNum = nullptr;
+    mpLinkedListHead = nullptr;
     mbInHibernation = false;
     bucketSize = 0;
 }
@@ -251,12 +251,12 @@ __device__ __forceinline__ void CreateBlockFunctor::operator()() const
         VoxelPos = WorldPtToVoxelPos(WorldPt, voxelSize);
         Eigen::Vector3i blockPos = VoxelPosToBlockPos(VoxelPos);
 
-        HashEntry *dstEntry = NULL;
+        HashEntry *dstEntry = nullptr;
         bool found = findEntry(blockPos, dstEntry, plDstEntry, dstBucketSize);
 
         if (!found)
         {
-            dstEntry = NULL;
+            dstEntry = nullptr;
             while (!dstEntry)
                 dstEntry = CreateNewBlock(blockPos, plHeap, plHeapPtr, plDstEntry,
                                           plBucketMutex, pLinkedListPtr,
@@ -288,7 +288,7 @@ struct MapStructFusionFunctor
 
 __device__ __forceinline__ float MapStructFusionFunctor::ReadSDF(Eigen::Vector3i pt, bool &valid) const
 {
-    Voxel *voxel = NULL;
+    Voxel *voxel = nullptr;
     findVoxel(pt, voxel, plCurrEntry, plVoxels, currBucketSize);
     if (voxel && voxel->wt != 0)
     {
@@ -472,7 +472,7 @@ __device__ __forceinline__ void ResizeMapStructFunctor::operator()() const
     Voxel *src = &plCurrVoxels[plCurrEntry[x].ptr];
     Eigen::Vector3i blockPos = plCurrEntry[x].pos;
 
-    HashEntry *pNewEntry = NULL;
+    HashEntry *pNewEntry = nullptr;
     while (!pNewEntry)
         pNewEntry = CreateNewBlock(
             blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
@@ -536,7 +536,7 @@ struct CreateBlockLineTracingFunctor
     // Allocate Blocks on the GPU memory
     __device__ __forceinline__ void allocateBlock(const Eigen::Vector3i &blockPos) const
     {
-        HashEntry *pEntry = NULL;
+        HashEntry *pEntry = nullptr;
         while (!pEntry)
             pEntry = CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable,
                                     mplBucketMutex, mpLinkedListHead,

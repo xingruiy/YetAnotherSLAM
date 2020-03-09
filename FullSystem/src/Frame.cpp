@@ -101,7 +101,7 @@ void Frame::ExtractORB()
 
   ComputeStereoFromRGBD();
 
-  mvpMapPoints = std::vector<MapPoint *>(N, static_cast<MapPoint *>(NULL));
+  mvpMapPoints = std::vector<MapPoint *>(N, nullptr);
   mvbOutlier = std::vector<bool>(N, false);
 
   AssignFeaturesToGrid();

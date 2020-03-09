@@ -101,7 +101,7 @@ public:
     // ORB descriptor, each row associated to a keypoint.
     cv::Mat mDescriptors;
 
-    // MapPoints associated to keypoints, NULL pointer if no association.
+    // MapPoints associated to keypoints, nullptr pointer if no association.
     std::vector<MapPoint *> mvpMapPoints;
 
     // Flag to identify outlier associations.

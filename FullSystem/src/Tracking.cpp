@@ -8,7 +8,7 @@ namespace SLAM
 
 Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *pMap, KeyFrameDatabase *pKFDB)
     : mState(SYSTEM_NOT_READY), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
-      mpCurrentKeyFrame(NULL), mpLastKeyFrame(NULL), mpMap(pMap), mnLastRelocFrameId(0)
+      mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastRelocFrameId(0)
 {
     int w = g_width[0];
     int h = g_height[0];
@@ -209,7 +209,7 @@ bool Tracking::Relocalization()
     ORBMatcher matcher(0.75, true);
 
     std::vector<Sim3Solver *> vpSim3Solvers(nKFs);
-    std::vector<std::vector<MapPoint *>> vvpMapPointsMatches(nKFs);
+    std::vector<std::vector<MapPoint *>> vvpMapPointMatches(nKFs);
     std::vector<bool> vbDiscarded(nKFs);
 
     int nCandidates = 0;
@@ -222,7 +222,7 @@ bool Tracking::Relocalization()
         }
         else
         {
-            int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointsMatches[iKF]);
+            int nmatches = matcher.SearchByBoW(mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
 
             if (nmatches < 30)
             {
@@ -232,7 +232,7 @@ bool Tracking::Relocalization()
             else
             {
                 //  TODO: set up a ransac pose solver
-                Sim3Solver *pSolver = new Sim3Solver(&mCurrentFrame, pKF, vvpMapPointsMatches[iKF]);
+                Sim3Solver *pSolver = new Sim3Solver(&mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
                 pSolver->SetRansacParameters(0.99, 20, 300);
                 vpSim3Solvers[iKF] = pSolver;
             }
@@ -242,62 +242,58 @@ bool Tracking::Relocalization()
     }
 
     bool bMatch = false;
+    for (int i = 0; i < nCandidates; ++i)
+    {
+        if (vbDiscarded[i])
+            continue;
 
-    // for (int i = 0; i < nCandidates; i++)
-    // {
-    //     if (vbDiscarded[i])
-    //         continue;
+        std::vector<bool> vbInliers;
+        int nInliers;
+        bool bNoMore;
 
-    //     // Perform 5 Ransac Iterations
-    //     std::vector<bool> vbInliers;
-    //     int nInliers;
-    //     bool bNoMore;
+        Sim3Solver *pSolver = vpSim3Solvers[i];
 
-    //     Sim3Solver *pSolver = vpSim3Solvers[i];
+        Sophus::SE3d Rt_frameToKF;
+        bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, Rt_frameToKF);
 
-    //     Sophus::SE3d T12;
-    //     bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, T12);
+        // If Ransac reachs max. iterations discard keyframe
+        if (bNoMore)
+        {
+            vbDiscarded[i] = true;
+            nCandidates--;
+        }
 
-    //     // If Ransac reachs max. iterations discard keyframe
-    //     if (bNoMore)
-    //     {
-    //         vbDiscarded[i] = true;
-    //         nCandidates--;
-    //     }
+        // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
+        if (found)
+        {
+            KeyFrame *pKF = vpCandidateKFs[i];
 
-    //     // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
-    //     if (found)
-    //     {
-    //         std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint *>(NULL));
-    //         for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
-    //         {
-    //             if (vbInliers[j])
-    //                 vpMapPointMatches[j] = vvpMapPointMatches[i][j];
-    //         }
+            std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), nullptr);
 
-    //         matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, T12, 7.5);
+            for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
+            {
+                if (vbInliers[j])
+                    vpMapPointMatches[j] = vvpMapPointMatches[i][j];
+            }
 
-    //         // gScm here should be the inverse of T12, i.e. 2->1
-    //         Sophus::SE3d T21 = T12.inverse();
-    //         g2o::Sim3 gScm(T21.rotationMatrix(), T21.translation(), 1.0);
+            matcher.SearchBySE3(mCurrentFrame, pKF, vpMapPointMatches, Rt_frameToKF, 7.5);
 
-    //         const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, true);
+            nInliers = Optimizer::PoseOptimization(mCurrentFrame);
 
-    //         // If optimization is succesful stop ransacs and continue
-    //         if (nInliers >= 20)
-    //         {
-    //             bMatch = true;
-    //             mpMatchedKF = pKF;
-    //             Sophus::SE3d T21(gScm.rotation(), gScm.translation());
-    //             Sophus::SE3d Twc = pKF->GetPoseInverse();
+            if (nInliers >= 20)
+            {
+                mpReferenceKF = pKF;
+                if (TrackLocalMap())
+                {
+                    bMatch = true;
+                    mState = OK;
+                    break;
+                }
+            }
+        }
+    }
 
-    //             mTcwNew = pKF->GetPose() * T21.inverse();
-
-    //             mvpCurrentMatchedPoints = vpMapPointMatches;
-    //             break;
-    //         }
-    //     }
-    // }
+    return bMatch;
 }
 
 bool Tracking::TrackLocalMap()
@@ -439,7 +435,7 @@ void Tracking::UpdateLocalKeyFrames()
         return;
 
     int max = 0;
-    KeyFrame *pKFmax = static_cast<KeyFrame *>(NULL);
+    KeyFrame *pKFmax = nullptr;
 
     mvpLocalKeyFrames.clear();
     mvpLocalKeyFrames.reserve(3 * keyframeCounter.size());

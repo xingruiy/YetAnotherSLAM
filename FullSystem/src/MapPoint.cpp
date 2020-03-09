@@ -20,7 +20,7 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
 MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF)
     : mnFirstKFid(pRefKF->mnId), mpRefKF(pRefKF), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0),
       mnLoopPointForKF(0), mnCorrectedByKF(0), mnCorrectedReference(0), mnBAGlobalForKF(0),
-      mnVisible(1), mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap), mWorldPos(pos),
+      mnVisible(1), mnFound(1), mbBad(false), mpReplaced(nullptr), mpMap(pMap), mWorldPos(pos),
       mnTrackReferenceForFrame(0), mnLastFrameSeen(pRefKF->mnFrameId)
 {
     mnId = nNextId++;

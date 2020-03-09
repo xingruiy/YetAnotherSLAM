@@ -280,7 +280,7 @@ struct MapRenderingDelegate
 
     __device__ __forceinline__ float read_sdf(const Eigen::Vector3f &pt3d, bool &valid) const
     {
-        Voxel *voxel = NULL;
+        Voxel *voxel = nullptr;
         findVoxel(floor(pt3d), voxel, hashTable, listBlock, bucketSize);
         if (voxel && voxel->wt != 0)
         {

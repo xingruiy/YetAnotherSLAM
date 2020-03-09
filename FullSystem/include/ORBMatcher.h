@@ -55,11 +55,11 @@ public:
     // Search matches between MapPoints in a KeyFrame and ORB in a Frame.
     // Brute force constrained to ORB that belong to the same vocabulary node (at a certain level)
     // Used in Relocalisation and Loop Detection
-    int SearchByBoW(KeyFrame *pKF, Frame &F, std::vector<MapPoint *> &vpMapPointMatches);
+    int SearchByBoW(Frame &F, KeyFrame *pKF, std::vector<MapPoint *> &vpMapPointMatches);
     int SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12);
 
     // Search matches between MapPoints seen in KF1 and KF2 transforming by a SE3
-    int SearchBySim3(Frame &pFrame, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
+    int SearchBySE3(Frame &pFrame, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
     int SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
 
     // Project MapPoints into KeyFrame and search for duplicated MapPoints.
