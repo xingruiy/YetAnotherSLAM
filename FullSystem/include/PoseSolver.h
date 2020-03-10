@@ -30,11 +30,11 @@
 namespace SLAM
 {
 
-class Sim3Solver
+class PoseSolver
 {
 public:
-    Sim3Solver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12);
-    Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale = true);
+    PoseSolver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12);
+    PoseSolver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale = true);
 
     void SetRansacParameters(double probability = 0.99, int minInliers = 6, int maxIterations = 300);
 
@@ -49,7 +49,7 @@ public:
 protected:
     void ComputeCentroid(const std::vector<Eigen::Vector3d> &P, std::vector<Eigen::Vector3d> &Pr, Eigen::Vector3d &C);
 
-    void ComputeSim3(const std::vector<Eigen::Vector3d> &P1, const std::vector<Eigen::Vector3d> &P2);
+    void ComputeSE3(const std::vector<Eigen::Vector3d> &P1, const std::vector<Eigen::Vector3d> &P2);
 
     void CheckInliers();
 

@@ -16,8 +16,8 @@ private:
     FrameShell frames[NUM_LOCAL_KF];
 
     // Device
-    FramePoint *activePoints;
-    Sophus::SE3f *framePoseMatrix;
+    float *state;
+    float *framePosePrecalc;
 };
 
 #endif

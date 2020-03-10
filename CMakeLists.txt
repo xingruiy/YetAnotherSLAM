@@ -28,7 +28,7 @@ PRIVATE
     FullSystem/src/LoopClosing.cpp
     FullSystem/src/KeyFrameDatabase.cpp
     FullSystem/src/ORBextractor.cpp
-    FullSystem/src/Sim3Solver.cpp
+    FullSystem/src/PoseSolver.cpp
 
     RGBDFusion/src/ImageProc.cu
     RGBDFusion/src/VoxelMap.cu

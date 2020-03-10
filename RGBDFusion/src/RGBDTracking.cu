@@ -127,8 +127,6 @@ void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
         else
             PyrDownDepth(mvCurrentInvDepth[lvl - 1], mvCurrentInvDepth[lvl]);
 
-        // ComputeImageGradientCentralDifference(mvCurrentInvDepth[lvl], mvInvDepthGradientX[lvl], mvInvDepthGradientY[lvl]);
-
         float invfx = 1.0 / mK[lvl](0, 0);
         float invfy = 1.0 / mK[lvl](1, 1);
         float cx = mK[lvl](0, 2);
@@ -137,12 +135,6 @@ void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
         ComputeVertexMap(mvCurrentInvDepth[lvl], mvCurrentVMap[lvl], invfx, invfy, cx, cy, 3.0f);
         ComputeNormalMap(mvCurrentVMap[lvl], mvCurrentNMap[lvl]);
     }
-
-    // cv::Mat vmap(mvCurrentVMap[0]);
-    // cv::Mat nmap(mvCurrentNMap[0]);
-    // cv::imshow("vmap", vmap);
-    // cv::imshow("nmap", nmap);
-    // cv::waitKey(0);
 }
 
 void RGBDTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
@@ -185,7 +177,6 @@ Sophus::SE3d RGBDTracking::GetTransform(const Sophus::SE3d &init, const bool bSw
                 break;
 
             case TrackingModal::RGB_AND_DEPTH:
-                // ComputeSingleStepRGBD(lvl, estimate, hessian.data(), residual.data());
                 ComputeSingleStepRGBDLinear(lvl, estimate, hessian.data(), residual.data());
                 break;
             }
@@ -561,4 +552,17 @@ cv::cuda::GpuMat RGBDTracking::GetReferenceDepth(const int lvl) const
 bool RGBDTracking::IsTrackingGood() const
 {
     return mbTrackingGood;
+}
+
+void RGBDTracking::WriteDebugImages()
+{
+    cv::Mat out;
+    mvCurrentIntensity[0].download(out);
+    cv::imwrite("curr_image.png", out);
+    mvReferenceIntensity[0].download(out);
+    cv::imwrite("last_image.png", out);
+    mvIntensityGradientX[0].download(out);
+    cv::imwrite("gx.png", out);
+    mvIntensityGradientY[0].download(out);
+    cv::imwrite("gy.png", out);
 }

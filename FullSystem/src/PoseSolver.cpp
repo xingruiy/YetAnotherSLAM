@@ -1,24 +1,4 @@
-/**
-* This file is part of ORB-SLAM2.
-*
-* Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
-* For more information see <https://github.com/raulmur/ORB_SLAM2>
-*
-* ORB-SLAM2 is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* ORB-SLAM2 is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
-*/
-
-#include "Sim3Solver.h"
+#include "PoseSolver.h"
 
 #include <vector>
 #include <cmath>
@@ -32,7 +12,7 @@
 namespace SLAM
 {
 
-Sim3Solver::Sim3Solver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12)
+PoseSolver::PoseSolver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12)
     : mnIterations(0), mnBestInliers(0)
 {
     mN1 = vpMatched12.size();
@@ -97,7 +77,7 @@ Sim3Solver::Sim3Solver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint
     SetRansacParameters();
 }
 
-Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale)
+PoseSolver::PoseSolver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale)
     : mnIterations(0), mnBestInliers(0)
 {
     auto vpKeyFrameMP1 = pKF1->GetMapPointMatches();
@@ -169,7 +149,7 @@ Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoin
     SetRansacParameters();
 }
 
-void Sim3Solver::SetRansacParameters(double probability, int minInliers, int maxIterations)
+void PoseSolver::SetRansacParameters(double probability, int minInliers, int maxIterations)
 {
     mRansacProb = probability;
     mRansacMinInliers = minInliers;
@@ -195,7 +175,7 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
     mnIterations = 0;
 }
 
-bool Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers, Sophus::SE3d &T12)
+bool PoseSolver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers, Sophus::SE3d &T12)
 {
     bNoMore = false;
     vbInliers = std::vector<bool>(mN1, false);
@@ -234,7 +214,7 @@ bool Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbIn
             vAvailableIndices.pop_back();
         }
 
-        ComputeSim3(P3Dc1i, P3Dc2i);
+        ComputeSE3(P3Dc1i, P3Dc2i);
 
         CheckInliers();
 
@@ -265,13 +245,13 @@ bool Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbIn
     return false;
 }
 
-bool Sim3Solver::find(std::vector<bool> &vbInliers12, int &nInliers, Sophus::SE3d &Scw)
+bool PoseSolver::find(std::vector<bool> &vbInliers12, int &nInliers, Sophus::SE3d &Scw)
 {
     bool bFlag;
     return iterate(mRansacMaxIts, bFlag, vbInliers12, nInliers, Scw);
 }
 
-void Sim3Solver::ComputeCentroid(const std::vector<Eigen::Vector3d> &P, std::vector<Eigen::Vector3d> &Pr, Eigen::Vector3d &C)
+void PoseSolver::ComputeCentroid(const std::vector<Eigen::Vector3d> &P, std::vector<Eigen::Vector3d> &Pr, Eigen::Vector3d &C)
 {
     for (int i = 0; i < P.size(); ++i)
         C += P[i];
@@ -281,7 +261,7 @@ void Sim3Solver::ComputeCentroid(const std::vector<Eigen::Vector3d> &P, std::vec
         Pr[i] = P[i] - C;
 }
 
-void Sim3Solver::ComputeSim3(const std::vector<Eigen::Vector3d> &P1, const std::vector<Eigen::Vector3d> &P2)
+void PoseSolver::ComputeSE3(const std::vector<Eigen::Vector3d> &P1, const std::vector<Eigen::Vector3d> &P2)
 {
     // Custom implementation of:
     // Horn 1987, Closed-form solution of absolute orientataion using unit quaternions
@@ -388,7 +368,7 @@ void Sim3Solver::ComputeSim3(const std::vector<Eigen::Vector3d> &P1, const std::
     // mT12i = mT21i.inverse();
 }
 
-void Sim3Solver::CheckInliers()
+void PoseSolver::CheckInliers()
 {
     std::vector<Eigen::Vector2d> vP1im2, vP2im1;
     Project(mvX3Dc2, vP2im1, mT12i, mK1);
@@ -414,22 +394,22 @@ void Sim3Solver::CheckInliers()
     }
 }
 
-Eigen::Matrix3d Sim3Solver::GetEstimatedRotation()
+Eigen::Matrix3d PoseSolver::GetEstimatedRotation()
 {
     return mBestRotation;
 }
 
-Eigen::Vector3d Sim3Solver::GetEstimatedTranslation()
+Eigen::Vector3d PoseSolver::GetEstimatedTranslation()
 {
     return mBestTranslation;
 }
 
-float Sim3Solver::GetEstimatedScale()
+float PoseSolver::GetEstimatedScale()
 {
     return mBestScale;
 }
 
-void Sim3Solver::Project(const std::vector<Eigen::Vector3d> &vP3Dw, std::vector<Eigen::Vector2d> &vP2D, Sophus::SE3d Twc, cv::Mat K)
+void PoseSolver::Project(const std::vector<Eigen::Vector3d> &vP3Dw, std::vector<Eigen::Vector2d> &vP2D, Sophus::SE3d Twc, cv::Mat K)
 {
     const float &fx = K.at<float>(0, 0);
     const float &fy = K.at<float>(1, 1);
@@ -450,7 +430,7 @@ void Sim3Solver::Project(const std::vector<Eigen::Vector3d> &vP3Dw, std::vector<
     }
 }
 
-void Sim3Solver::FromCameraToImage(const std::vector<Eigen::Vector3d> &vP3Dc, std::vector<Eigen::Vector2d> &vP2D, cv::Mat K)
+void PoseSolver::FromCameraToImage(const std::vector<Eigen::Vector3d> &vP3Dc, std::vector<Eigen::Vector2d> &vP2D, cv::Mat K)
 {
     const float &fx = K.at<float>(0, 0);
     const float &fy = K.at<float>(1, 1);

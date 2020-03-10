@@ -1,6 +1,6 @@
 #include "LoopClosing.h"
 #include "ORBMatcher.h"
-#include "Sim3Solver.h"
+#include "PoseSolver.h"
 #include "Optimizer.h"
 
 namespace SLAM
@@ -180,10 +180,10 @@ bool LoopClosing::ComputeSE3()
     const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
 
     // We compute first ORB matches for each candidate
-    // If enough matches are found, we setup a Sim3Solver
+    // If enough matches are found, we setup a PoseSolver
     ORBMatcher matcher(0.75, true);
 
-    std::vector<Sim3Solver *> vpSim3Solvers;
+    std::vector<PoseSolver *> vpSim3Solvers;
     vpSim3Solvers.resize(nInitialCandidates);
 
     std::vector<std::vector<MapPoint *>> vvpMapPointMatches;
@@ -216,7 +216,7 @@ bool LoopClosing::ComputeSE3()
         }
         else
         {
-            Sim3Solver *pSolver = new Sim3Solver(mpCurrentKF, pKF, vvpMapPointMatches[i], true);
+            PoseSolver *pSolver = new PoseSolver(mpCurrentKF, pKF, vvpMapPointMatches[i], true);
             pSolver->SetRansacParameters(0.99, 20, 300);
             vpSim3Solvers[i] = pSolver;
         }
@@ -242,7 +242,7 @@ bool LoopClosing::ComputeSE3()
             int nInliers;
             bool bNoMore;
 
-            Sim3Solver *pSolver = vpSim3Solvers[i];
+            PoseSolver *pSolver = vpSim3Solvers[i];
 
             Sophus::SE3d T12;
             bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, T12);

@@ -22,6 +22,8 @@ public:
 
     void SetReferenceModel(const cv::cuda::GpuMat vmap);
 
+    void WriteDebugImages();
+
     Sophus::SE3d GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer);
     void SwapFrameBuffer();
 

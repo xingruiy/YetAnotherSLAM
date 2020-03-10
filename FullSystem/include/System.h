@@ -31,9 +31,12 @@ public:
     ~System();
     System(const std::string &strSettingFile, const std::string &strVocFile);
     void TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp);
-    void Kill();
+    void Shutdown();
     void reset();
     void FuseAllMapStruct();
+
+    void WriteToFile(const std::string &strFile);
+    void ReadFromFile(const std::string &strFile);
 
 private:
     void readSettings(const std::string &strSettingFile);

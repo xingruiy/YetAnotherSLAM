@@ -1,7 +1,7 @@
 #include "Tracking.h"
 #include "ORBMatcher.h"
 #include "Optimizer.h"
-#include "Sim3Solver.h"
+#include "PoseSolver.h"
 
 namespace SLAM
 {
@@ -175,8 +175,13 @@ bool Tracking::TrackRGBD()
     // Calculate the relateive transformation
     Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
 
-    if (DT.translation().norm() > 0.05)
+    if (DT.translation().norm() > 0.1)
+    {
+        std::cout << DT.matrix3x4() << std::endl;
+        std::cout << "frame id: " << mCurrentFrame.mnId << std::endl;
+        mpTracker->WriteDebugImages();
         return false;
+    }
 
     mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
     mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
@@ -219,7 +224,7 @@ bool Tracking::Relocalization()
     // If enough matches are found we setup a PnP solver
     ORBMatcher matcher(0.75, true);
 
-    std::vector<Sim3Solver *> vpSim3Solvers(nKFs);
+    std::vector<PoseSolver *> vpSim3Solvers(nKFs);
     std::vector<std::vector<MapPoint *>> vvpMapPointMatches(nKFs);
     std::vector<bool> vbDiscarded(nKFs);
 
@@ -242,8 +247,7 @@ bool Tracking::Relocalization()
             }
             else
             {
-                //  TODO: set up a ransac pose solver
-                Sim3Solver *pSolver = new Sim3Solver(&mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
+                PoseSolver *pSolver = new PoseSolver(&mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
                 pSolver->SetRansacParameters(0.99, (int)floor(0.6 * nmatches), 300);
                 vpSim3Solvers[iKF] = pSolver;
             }
@@ -274,7 +278,7 @@ bool Tracking::Relocalization()
             std::vector<bool> vbInliers;
             int nInliers;
             bool bNoMore = false;
-            Sim3Solver *pSolver = vpSim3Solvers[i];
+            PoseSolver *pSolver = vpSim3Solvers[i];
 
             Sophus::SE3d Tcw;
             bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, Tcw);
@@ -304,7 +308,6 @@ bool Tracking::Relocalization()
                 }
 
                 int nGood = Optimizer::PoseOptimization(mCurrentFrame);
-                std::cout << "optimized result: " << nGood << std::endl;
                 if (nGood < 10)
                     continue;
 
@@ -364,6 +367,7 @@ bool Tracking::Relocalization()
         std::cout << "relocalisation success! " << std::endl;
         mpReferenceKF = pMatchedKF;
         mpCurrentMapStruct = pMatchedKF->mpVoxelStruct;
+        mpCurrentMapStruct->DeleteMesh();
         mnLastRelocFrameId = mCurrentFrame.mnId;
         mCurrentFrame.mTcp = pMatchedKF->GetPoseInverse() * mCurrentFrame.mTcw;
         return true;
