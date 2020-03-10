@@ -189,6 +189,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
             }
         }
     }
+
     if (lKFsSharingWords.empty())
         return std::vector<KeyFrame *>();
 
@@ -201,7 +202,6 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
     }
 
     int minCommonWords = maxCommonWords * 0.8f;
-
     std::list<std::pair<float, KeyFrame *>> lScoreAndMatch;
 
     int nscores = 0;

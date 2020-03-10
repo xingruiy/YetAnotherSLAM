@@ -10,7 +10,6 @@
 #include <unistd.h>
 
 #include "Optimizer.h"
-#include "Converter.h"
 
 namespace SLAM
 {

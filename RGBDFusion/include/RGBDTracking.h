@@ -10,8 +10,7 @@ class RGBDTracking
 {
 
 public:
-    RGBDTracking(const int &w, const int &h, const Eigen::Matrix3d &K,
-                 const bool &bUseRGB, const bool &bUseDepth);
+    RGBDTracking(const int &w, const int &h, const Eigen::Matrix3d &K, const bool &bRGB, const bool &bIcp);
 
     bool IsTrackingGood() const;
 
@@ -21,7 +20,7 @@ public:
     void SetTrackingImage(const cv::Mat &imGray);
     void SetTrackingDepth(const cv::Mat &imDepth);
 
-    void SetReferenceMap(const cv::cuda::GpuMat vmap);
+    void SetReferenceModel(const cv::cuda::GpuMat vmap);
 
     Sophus::SE3d GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer);
     void SwapFrameBuffer();

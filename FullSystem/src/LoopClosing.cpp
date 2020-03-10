@@ -2,7 +2,6 @@
 #include "ORBMatcher.h"
 #include "Sim3Solver.h"
 #include "Optimizer.h"
-#include "Converter.h"
 
 namespace SLAM
 {

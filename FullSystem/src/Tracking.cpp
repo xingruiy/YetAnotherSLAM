@@ -72,6 +72,7 @@ void Tracking::Track()
         break;
 
     case LOST:
+        std::cout << "tracking failed, trying to relocalise..." << std::endl;
         bOK = Relocalization();
 
         if (bOK)
@@ -79,10 +80,9 @@ void Tracking::Track()
             mState = OK;
             break;
         }
-        else
-            return;
     }
 
+    mLastProcessedState = mState;
     mLastFrame = Frame(mCurrentFrame);
 }
 
@@ -166,7 +166,7 @@ bool Tracking::TrackRGBD()
 
     mpCurrentMapStruct->RayTrace(Tcm);
     auto vmap = mpCurrentMapStruct->GetRayTracingResult();
-    mpTracker->SetReferenceMap(vmap);
+    mpTracker->SetReferenceModel(vmap);
 
     // Set tracking frames
     mpTracker->SetTrackingImage(mCurrentFrame.mImGray);
@@ -174,6 +174,9 @@ bool Tracking::TrackRGBD()
 
     // Calculate the relateive transformation
     Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
+
+    if (DT.translation().norm() > 0.05)
+        return false;
 
     mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
     mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
@@ -190,6 +193,14 @@ bool Tracking::TrackRGBD()
 
 bool Tracking::Relocalization()
 {
+    // Extract Features
+    mCurrentFrame.ExtractORB();
+    if (mCurrentFrame.N < 500)
+    {
+        std::cout << "Relocalisation failed, Not enough features..." << std::endl;
+        return false;
+    }
+
     // Compute Bag of Words Vector
     mCurrentFrame.ComputeBoW();
 
@@ -233,7 +244,7 @@ bool Tracking::Relocalization()
             {
                 //  TODO: set up a ransac pose solver
                 Sim3Solver *pSolver = new Sim3Solver(&mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
-                pSolver->SetRansacParameters(0.99, 20, 300);
+                pSolver->SetRansacParameters(0.99, (int)floor(0.6 * nmatches), 300);
                 vpSim3Solvers[iKF] = pSolver;
             }
 
@@ -242,58 +253,121 @@ bool Tracking::Relocalization()
     }
 
     bool bMatch = false;
-    for (int i = 0; i < nCandidates; ++i)
+    KeyFrame *pMatchedKF = nullptr;
+
+    ORBMatcher matcher2(0.9, true);
+    while (nCandidates > 0 && !bMatch)
     {
-        if (vbDiscarded[i])
-            continue;
-
-        std::vector<bool> vbInliers;
-        int nInliers;
-        bool bNoMore;
-
-        Sim3Solver *pSolver = vpSim3Solvers[i];
-
-        Sophus::SE3d Rt_frameToKF;
-        bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, Rt_frameToKF);
-
-        // If Ransac reachs max. iterations discard keyframe
-        if (bNoMore)
+        for (int i = 0; i < nKFs; i++)
         {
-            vbDiscarded[i] = true;
-            nCandidates--;
-        }
+            if (vbDiscarded[i])
+                continue;
 
-        // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
-        if (found)
-        {
             KeyFrame *pKF = vpCandidateKFs[i];
 
-            std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), nullptr);
-
-            for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
+            if (!pKF || pKF->isBad())
             {
-                if (vbInliers[j])
-                    vpMapPointMatches[j] = vvpMapPointMatches[i][j];
+                vbDiscarded[i] = true;
+                nCandidates--;
             }
 
-            matcher.SearchBySE3(mCurrentFrame, pKF, vpMapPointMatches, Rt_frameToKF, 7.5);
+            std::vector<bool> vbInliers;
+            int nInliers;
+            bool bNoMore = false;
+            Sim3Solver *pSolver = vpSim3Solvers[i];
 
-            nInliers = Optimizer::PoseOptimization(mCurrentFrame);
+            Sophus::SE3d Tcw;
+            bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, Tcw);
 
-            if (nInliers >= 20)
+            // If Ransac reachs max. iterations discard keyframe
+            if (bNoMore)
             {
-                mpReferenceKF = pKF;
-                if (TrackLocalMap())
+                vbDiscarded[i] = true;
+                nCandidates--;
+            }
+
+            // If RANSAC returns a SE3, perform a guided matching and optimize with all correspondences
+            if (found)
+            {
+                std::set<MapPoint *> sFound;
+                const int np = vbInliers.size();
+
+                for (int j = 0; j < np; j++)
+                {
+                    if (vbInliers[j])
+                    {
+                        mCurrentFrame.mvpMapPoints[j] = vvpMapPointMatches[i][j];
+                        sFound.insert(vvpMapPointMatches[i][j]);
+                    }
+                    else
+                        mCurrentFrame.mvpMapPoints[j] = NULL;
+                }
+
+                int nGood = Optimizer::PoseOptimization(mCurrentFrame);
+                std::cout << "optimized result: " << nGood << std::endl;
+                if (nGood < 10)
+                    continue;
+
+                for (int io = 0; io < mCurrentFrame.N; io++)
+                    if (mCurrentFrame.mvbOutlier[io])
+                        mCurrentFrame.mvpMapPoints[io] = nullptr;
+
+                // If few inliers, search by projection in a coarse window and optimize again
+                if (nGood < 50)
+                {
+                    int nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 10, 100);
+
+                    if (nadditional + nGood >= 50)
+                    {
+                        nGood = Optimizer::PoseOptimization(mCurrentFrame);
+
+                        // If many inliers but still not enough, search by projection again in a narrower window
+                        // the camera has been already optimized with many points
+                        if (nGood > 30 && nGood < 50)
+                        {
+                            sFound.clear();
+                            for (int ip = 0; ip < mCurrentFrame.N; ip++)
+                                if (mCurrentFrame.mvpMapPoints[ip])
+                                    sFound.insert(mCurrentFrame.mvpMapPoints[ip]);
+                            nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 3, 64);
+
+                            // Final optimization
+                            if (nGood + nadditional >= 50)
+                            {
+                                nGood = Optimizer::PoseOptimization(mCurrentFrame);
+
+                                for (int io = 0; io < mCurrentFrame.N; io++)
+                                    if (mCurrentFrame.mvbOutlier[io])
+                                        mCurrentFrame.mvpMapPoints[io] = NULL;
+                            }
+                        }
+                    }
+                }
+
+                // If the pose is supported by enough inliers stop ransacs and continue
+                if (nGood >= 50)
                 {
                     bMatch = true;
-                    mState = OK;
+                    pMatchedKF = pKF;
                     break;
                 }
             }
         }
     }
 
-    return bMatch;
+    if (!bMatch)
+    {
+        return false;
+    }
+    else
+    {
+        std::cout << "relocalisation success! " << std::endl;
+        mpReferenceKF = pMatchedKF;
+        mpCurrentMapStruct = pMatchedKF->mpVoxelStruct;
+        mnLastRelocFrameId = mCurrentFrame.mnId;
+        mCurrentFrame.mTcp = pMatchedKF->GetPoseInverse() * mCurrentFrame.mTcw;
+        return true;
+    }
 }
 
 bool Tracking::TrackLocalMap()
@@ -368,7 +442,7 @@ void Tracking::SearchLocalPoints()
         ORBMatcher matcher(0.8);
         int th = 1;
         // If the camera has been relocalised recently, perform a coarser search
-        if (mCurrentFrame.mnId < mnLastRelocFrameId + 2)
+        if (mCurrentFrame.mnId - mnLastRelocFrameId <= 1)
             th = 3;
 
         matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);

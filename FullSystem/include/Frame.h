@@ -143,7 +143,7 @@ public:
     // A copy of the input frame
     cv::Mat mImGray;
     cv::Mat mImDepth;
-    std::vector<Eigen::Vector3d> mRelocPoints;
+    std::vector<Eigen::Vector3d> mvRelocPoints;
 
 private:
     // Undistort keypoints given OpenCV distortion parameters.

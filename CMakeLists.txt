@@ -28,7 +28,6 @@ PRIVATE
     FullSystem/src/LoopClosing.cpp
     FullSystem/src/KeyFrameDatabase.cpp
     FullSystem/src/ORBextractor.cpp
-    FullSystem/src/Converter.cpp
     FullSystem/src/Sim3Solver.cpp
 
     RGBDFusion/src/ImageProc.cu
@@ -37,6 +36,7 @@ PRIVATE
     RGBDFusion/src/MeshEngine.cu
     RGBDFusion/src/RayTraceEngine.cu
 
+    OptBackend/src/LocalOptimizer.cu
 )
 
 set_target_properties(${PROJECT_NAME}
@@ -58,6 +58,7 @@ PUBLIC
     ${Pangolin_INCLUDE_DIRS}  
     ${PROJECT_SOURCE_DIR}/Thirdparty/
     ${PROJECT_SOURCE_DIR}/RGBDFusion/utils
+    ${PROJECT_SOURCE_DIR}/OptBackend/include
     ${PROJECT_SOURCE_DIR}/RGBDFusion/include
     ${PROJECT_SOURCE_DIR}/FullSystem/include
 )

@@ -41,7 +41,11 @@ public:
 
     // Search matches between Frame keypoints and projected MapPoints. Returns number of matches
     // Used to track the local map (Tracking)
-    int SearchByProjection(Frame &pFrame, const std::vector<MapPoint *> &vpMapPoints, const float th = 3);
+    int SearchByProjection(Frame &F, const std::vector<MapPoint *> &vpMapPoints, const float th = 3);
+
+    // Project MapPoints seen in KeyFrame into the Frame and search matches.
+    // Used in relocalisation (Tracking)
+    int SearchByProjection(Frame &F, KeyFrame *pKF, const std::set<MapPoint *> &sAlreadyFound, const float th, const int ORBdist);
 
     // Project MapPoints using a Similarity Transformation and search matches.
     // Used in loop detection (Loop Closing)
@@ -59,7 +63,7 @@ public:
     int SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12);
 
     // Search matches between MapPoints seen in KF1 and KF2 transforming by a SE3
-    int SearchBySE3(Frame &pFrame, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
+    int SearchBySE3(Frame &F, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
     int SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches12, const Sophus::SE3d &S12, const float th);
 
     // Project MapPoints into KeyFrame and search for duplicated MapPoints.

@@ -1,5 +1,4 @@
 #include "KeyFrame.h"
-#include "Converter.h"
 #include "GlobalDef.h"
 
 namespace SLAM
@@ -39,7 +38,7 @@ void KeyFrame::ComputeBoW()
 {
   if (mBowVec.empty())
   {
-    std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
+    std::vector<cv::Mat> vCurrentDesc = ToDescriptorVector(mDescriptors);
     // Feature vector associate features with nodes in the 4th level (from leaves up)
     // We assume the vocabulary tree has 6 levels, change the 4 otherwise
     mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);

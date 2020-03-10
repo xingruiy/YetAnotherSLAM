@@ -35,18 +35,14 @@ namespace SLAM
 Sim3Solver::Sim3Solver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12)
     : mnIterations(0), mnBestInliers(0)
 {
-    auto vpFrameMP = pFrame->mvpMapPoints;
     mN1 = vpMatched12.size();
 
-    mvpMapPoints1.reserve(mN1);
+    // mvpMapPoints1.reserve(mN1);
     mvpMapPoints2.reserve(mN1);
     mvpMatches12 = vpMatched12;
     mvnIndices1.reserve(mN1);
     mvX3Dc1.reserve(mN1);
     mvX3Dc2.reserve(mN1);
-
-    const Sophus::SE3d &Twc1 = pFrame->mTcw.inverse();
-    const Sophus::SE3d &Twc2 = pKF2->GetPoseInverse();
 
     mvAllIndices.reserve(mN1);
 
@@ -55,22 +51,20 @@ Sim3Solver::Sim3Solver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint
     {
         if (vpMatched12[i1])
         {
-            MapPoint *pMP1 = vpFrameMP[i1];
             MapPoint *pMP2 = vpMatched12[i1];
 
-            if (!pMP1)
+            if (pFrame->mvuRight[i1] <= 0)
                 continue;
 
-            if (pMP1->isBad() || pMP2->isBad())
+            if (pMP2->isBad())
                 continue;
 
-            int indexKF1 = i1;
             int indexKF2 = pMP2->GetIndexInKeyFrame(pKF2);
 
-            if (indexKF1 < 0 || indexKF2 < 0)
+            if (i1 < 0 || indexKF2 < 0)
                 continue;
 
-            const cv::KeyPoint &kp1 = pFrame->mvKeysUn[indexKF1];
+            const cv::KeyPoint &kp1 = pFrame->mvKeysUn[i1];
             const cv::KeyPoint &kp2 = pKF2->mvKeysUn[indexKF2];
 
             const float sigmaSquare1 = pFrame->mvLevelSigma2[kp1.octave];
@@ -79,15 +73,15 @@ Sim3Solver::Sim3Solver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint
             mvnMaxError1.push_back(9.210 * sigmaSquare1);
             mvnMaxError2.push_back(9.210 * sigmaSquare2);
 
-            mvpMapPoints1.push_back(pMP1);
+            // mvpMapPoints1.push_back(pFrame->mvRelocPoints[i1]);
             mvpMapPoints2.push_back(pMP2);
             mvnIndices1.push_back(i1);
 
-            Eigen::Vector3d X3D1w = pMP1->GetWorldPos();
-            mvX3Dc1.push_back(Twc1 * X3D1w);
+            Eigen::Vector3d X3D1w = pFrame->mvRelocPoints[i1];
+            mvX3Dc1.push_back(X3D1w);
 
             Eigen::Vector3d X3D2w = pMP2->GetWorldPos();
-            mvX3Dc2.push_back(Twc2 * X3D2w);
+            mvX3Dc2.push_back(X3D2w);
 
             mvAllIndices.push_back(idx);
             idx++;
@@ -181,7 +175,7 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
     mRansacMinInliers = minInliers;
     mRansacMaxIts = maxIterations;
 
-    N = mvpMapPoints1.size(); // number of correspondences
+    N = mvpMapPoints2.size(); // number of correspondences
 
     mvbInliersi.resize(N);
 
