@@ -35,8 +35,6 @@ PRIVATE
     RGBDFusion/src/RGBDTracking.cu
     RGBDFusion/src/MeshEngine.cu
     RGBDFusion/src/RayTraceEngine.cu
-
-    OptBackend/src/LocalOptimizer.cu
 )
 
 set_target_properties(${PROJECT_NAME}
@@ -77,24 +75,32 @@ PUBLIC
 
 # Build Examples
 # Build Live Viewer
-add_executable(liveDemo 
-    ${PROJECT_SOURCE_DIR}/Examples/LiveDemo.cpp
+add_executable(asus_rgbd
+    ${PROJECT_SOURCE_DIR}/Examples/asus_rgbd.cpp
 )
-target_include_directories(liveDemo 
+target_include_directories(asus_rgbd 
 PRIVATE
     ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/include
 )
-target_link_libraries(liveDemo 
+target_link_libraries(asus_rgbd 
 PRIVATE 
     ${PROJECT_NAME} 
     ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/lib/libOpenNI2.so
 )
 
-# Build TUM Viewer
-add_executable(tumDemo 
-    ${PROJECT_SOURCE_DIR}/Examples/TUMDemo.cpp
+add_executable(asus_recorded 
+    ${PROJECT_SOURCE_DIR}/Examples/asus_recorded.cpp
 )
-target_link_libraries(tumDemo 
+target_link_libraries(asus_recorded
+PRIVATE 
+    ${PROJECT_NAME} 
+)
+
+# Build TUM Viewer
+add_executable(tum_rgbd
+    ${PROJECT_SOURCE_DIR}/Examples/tum_rgbd.cpp
+)
+target_link_libraries(tum_rgbd 
 PRIVATE 
     ${PROJECT_NAME} 
 )

@@ -222,7 +222,7 @@ bool Tracking::Relocalization()
 
     // We perform first an ORB matching with each candidate
     // If enough matches are found we setup a PnP solver
-    ORBMatcher matcher(0.75, true);
+    ORBMatcher matcher(0.75, false);
 
     std::vector<PoseSolver *> vpSim3Solvers(nKFs);
     std::vector<std::vector<MapPoint *>> vvpMapPointMatches(nKFs);
@@ -239,8 +239,9 @@ bool Tracking::Relocalization()
         else
         {
             int nmatches = matcher.SearchByBoW(mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
+            std::cout << "matches for kf: " << iKF << " : " << nmatches << std::endl;
 
-            if (nmatches < 30)
+            if (nmatches < 20)
             {
                 vbDiscarded[iKF] = true;
                 continue;
@@ -248,7 +249,7 @@ bool Tracking::Relocalization()
             else
             {
                 PoseSolver *pSolver = new PoseSolver(&mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
-                pSolver->SetRansacParameters(0.99, (int)floor(0.6 * nmatches), 300);
+                pSolver->SetRansacParameters(0.99, 20, 300);
                 vpSim3Solvers[iKF] = pSolver;
             }
 
@@ -308,6 +309,7 @@ bool Tracking::Relocalization()
                 }
 
                 int nGood = Optimizer::PoseOptimization(mCurrentFrame);
+                std::cout << "after inital pose optimization: " << nGood << std::endl;
                 if (nGood < 10)
                     continue;
 
@@ -323,6 +325,7 @@ bool Tracking::Relocalization()
                     if (nadditional + nGood >= 50)
                     {
                         nGood = Optimizer::PoseOptimization(mCurrentFrame);
+                        std::cout << "nGood after 1st optimization...: " << nGood << std::endl;
 
                         // If many inliers but still not enough, search by projection again in a narrower window
                         // the camera has been already optimized with many points
@@ -333,6 +336,7 @@ bool Tracking::Relocalization()
                                 if (mCurrentFrame.mvpMapPoints[ip])
                                     sFound.insert(mCurrentFrame.mvpMapPoints[ip]);
                             nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 3, 64);
+                            std::cout << "nGood before further optimization...: " << nGood + nadditional << std::endl;
 
                             // Final optimization
                             if (nGood + nadditional >= 50)
@@ -342,6 +346,8 @@ bool Tracking::Relocalization()
                                 for (int io = 0; io < mCurrentFrame.N; io++)
                                     if (mCurrentFrame.mvbOutlier[io])
                                         mCurrentFrame.mvpMapPoints[io] = NULL;
+
+                                std::cout << "nGood after further optimization...: " << nGood << std::endl;
                             }
                         }
                     }

@@ -269,10 +269,7 @@ int ORBMatcher::SearchByBoW(Frame &F, KeyFrame *pKF, std::vector<MapPoint *> &vp
 
                 MapPoint *pMP = vpMapPointsKF[realIdxKF];
 
-                if (!pMP)
-                    continue;
-
-                if (pMP->isBad())
+                if (!pMP || pMP->isBad())
                     continue;
 
                 const cv::Mat &dKF = pKF->mDescriptors.row(realIdxKF);
