@@ -1,4 +1,5 @@
 #include "Map.h"
+#include <fstream>
 
 namespace SLAM
 {
@@ -44,21 +45,6 @@ void Map::AddMapStruct(MapStruct *pMS)
 {
     std::unique_lock<std::mutex> lock(mFractualMutex);
     mspMapStructs.insert(pMS);
-
-    // if (mspMapStructs.size() <= 40)
-    //     return;
-
-    // // We always keep at most 40 maps in device memory
-    // for (auto sit = mspMapStructs.begin(), send = mspMapStructs.end(); sit != send; ++sit)
-    // {
-    //     MapStruct *pMS = *sit;
-    //     if (pMS && !pMS->mbInHibernation)
-    //     {
-    //         pMS->Hibernate();
-    //         pMS->DeleteMesh();
-    //         return;
-    //     }
-    // }
 }
 
 void Map::reset()
@@ -132,6 +118,49 @@ long unsigned int Map::GetMaxKFid()
 {
     std::unique_lock<std::mutex> lock(mMutexMap);
     return mnMaxKFid;
+}
+
+void Map::WriteToFile(const std::string &strFile)
+{
+    std::ofstream file(strFile, std::ios_base::binary);
+    if (file.is_open())
+    {
+        file << mspKeyFrames.size()
+             << mspMapPoints.size();
+
+        for (auto sit = mspKeyFrames.begin(), send = mspKeyFrames.end(); sit != send; ++sit)
+        {
+            KeyFrame *pKF = *sit;
+            if (pKF == nullptr)
+            {
+                std::cout << "error writing files: keyframe shouldn't be nullptr..." << std::endl;
+                continue;
+            }
+
+            auto vpMapPoints = pKF->GetMapPointMatches();
+            for (auto vit = vpMapPoints.begin(), vend = vpMapPoints.end(); vit != vend; ++vit)
+            {
+                MapPoint *pMP = *vit;
+                if (!pMP || pMP->isBad())
+                {
+                    file << -1;
+                }
+                else
+                {
+                    file << pMP->mnId;
+                }
+            }
+        }
+    }
+    else
+    {
+        std::cout << "failed at creating files..." << std::endl;
+        return;
+    }
+}
+
+void Map::ReadFromFile(const std::string &strFile)
+{
 }
 
 } // namespace SLAM

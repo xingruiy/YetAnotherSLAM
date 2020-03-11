@@ -207,7 +207,7 @@ __device__ __forceinline__ bool CreateHashEntry(int *mplHeap, int *mplHeapPtr, c
     if (old > 0)
     {
         int ptr = mplHeap[old];
-        if (ptr != -1 && pEntry != NULL)
+        if (ptr != -1 && pEntry != nullptr)
         {
             pEntry->pos = pos;
             pEntry->ptr = ptr * BlockSize3;
@@ -276,7 +276,7 @@ __device__ __forceinline__ HashEntry *CreateNewBlock(const Eigen::Vector3i &bloc
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 
 __device__ __forceinline__ bool findEntry(const Eigen::Vector3i &blockPos, HashEntry *&out,
@@ -295,7 +295,7 @@ __device__ __forceinline__ bool findEntry(const Eigen::Vector3i &blockPos, HashE
             return true;
     }
 
-    out = NULL;
+    out = nullptr;
     return false;
 }
 

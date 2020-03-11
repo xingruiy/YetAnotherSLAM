@@ -28,8 +28,7 @@ PRIVATE
     FullSystem/src/LoopClosing.cpp
     FullSystem/src/KeyFrameDatabase.cpp
     FullSystem/src/ORBextractor.cpp
-    FullSystem/src/Converter.cpp
-    FullSystem/src/Sim3Solver.cpp
+    FullSystem/src/PoseSolver.cpp
 
     RGBDFusion/src/ImageProc.cu
     RGBDFusion/src/VoxelMap.cu
@@ -57,6 +56,7 @@ PUBLIC
     ${Pangolin_INCLUDE_DIRS}  
     ${PROJECT_SOURCE_DIR}/Thirdparty/
     ${PROJECT_SOURCE_DIR}/RGBDFusion/utils
+    ${PROJECT_SOURCE_DIR}/OptBackend/include
     ${PROJECT_SOURCE_DIR}/RGBDFusion/include
     ${PROJECT_SOURCE_DIR}/FullSystem/include
 )
@@ -75,24 +75,32 @@ PUBLIC
 
 # Build Examples
 # Build Live Viewer
-add_executable(liveDemo 
-    ${PROJECT_SOURCE_DIR}/Examples/LiveDemo.cpp
+add_executable(asus_rgbd
+    ${PROJECT_SOURCE_DIR}/Examples/asus_rgbd.cpp
 )
-target_include_directories(liveDemo 
+target_include_directories(asus_rgbd 
 PRIVATE
     ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/include
 )
-target_link_libraries(liveDemo 
+target_link_libraries(asus_rgbd 
 PRIVATE 
     ${PROJECT_NAME} 
     ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/lib/libOpenNI2.so
 )
 
-# Build TUM Viewer
-add_executable(tumDemo 
-    ${PROJECT_SOURCE_DIR}/Examples/TUMDemo.cpp
+add_executable(asus_recorded 
+    ${PROJECT_SOURCE_DIR}/Examples/asus_recorded.cpp
 )
-target_link_libraries(tumDemo 
+target_link_libraries(asus_recorded
+PRIVATE 
+    ${PROJECT_NAME} 
+)
+
+# Build TUM Viewer
+add_executable(tum_rgbd
+    ${PROJECT_SOURCE_DIR}/Examples/tum_rgbd.cpp
+)
+target_link_libraries(tum_rgbd 
 PRIVATE 
     ${PROJECT_NAME} 
 )

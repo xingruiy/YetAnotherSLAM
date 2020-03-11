@@ -1,7 +1,6 @@
 #include "LocalMapping.h"
 #include "ORBMatcher.h"
 #include "Optimizer.h"
-#include "Converter.h"
 
 namespace SLAM
 {

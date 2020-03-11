@@ -23,7 +23,7 @@ void Viewer::Run()
         pangolin::ProjectionMatrix(640, 480, g_fx[0], g_fy[0], g_cx[0], g_cy[0], 0.1, 1000),
         pangolin::ModelViewLookAtRDF(0, 0, 0, 0, 0, -1, 0, 1, 0));
 
-    auto MenuDividerLeft = pangolin::Attach::Pix(250);
+    auto MenuDividerLeft = pangolin::Attach::Pix(300);
     float RightSideBarDividerLeft = 0.75f;
 
     mpMapView = &pangolin::Display("Map");
@@ -44,23 +44,27 @@ void Viewer::Run()
     mpRightImageBar->AddDisplay(*mpCurrentKFView);
 
     // Create textures
-    mTextureKF.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mTextureColour.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, NULL);
+    mTextureKF.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    mTextureColour.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, nullptr);
 
     // Create menus
     pangolin::CreatePanel("menu").SetBounds(0, 1, 0, MenuDividerLeft);
-    pangolin::Var<bool> varReset = pangolin::Var<bool>("menu.reset", false, false);
-    pangolin::Var<bool> varFuseMap = pangolin::Var<bool>("menu.Fuse Map", false, false);
-    pangolin::Var<bool> varRunning = pangolin::Var<bool>("menu.Running", g_bSystemRunning, true);
+    pangolin::Var<bool> varReset("menu.reset", false, false);
+    pangolin::Var<bool> varFuseMap("menu.Fuse Map", false, false);
+    pangolin::Var<bool> varRunning("menu.Running", g_bSystemRunning, true);
+    pangolin::Var<bool> varShowKeyFrames("menu.Display KeyFrames", true, true);
+    pangolin::Var<bool> varShowKFGraph("menu.Display Covisibility Graph", true, true);
+    pangolin::Var<bool> varShowMapPoints("menu.Display MapPoints", true, true);
+    pangolin::Var<bool> varShowMapStructs("menu.Display MapStructs", false, true);
+    pangolin::Var<int> varPointSize("menu.Point Size", g_pointSize, 1, 10);
+    pangolin::Var<int> varCovMapDensity("menu.Covisibility Map Density", 10, 1, 50);
+    pangolin::Var<int> varDisplayMeshNum("menu.Display Mesh Number", -1, -1, 80);
+    pangolin::Var<bool> varSaveMap("menu.Save Map", false, false);
+    pangolin::Var<bool> varReadMap("menu.Read Map", false, false);
+    pangolin::Var<std::string> strFileName("menu.File Name:", "map.bin");
+
     pangolin::RegisterKeyPressCallback(13, pangolin::ToggleVarFunctor("menu.Running"));
-    pangolin::Var<bool> varShowKeyFrames = pangolin::Var<bool>("menu.Display KeyFrames", true, true);
-    pangolin::Var<bool> varShowKFGraph = pangolin::Var<bool>("menu.Display Covisibility Graph", true, true);
-    pangolin::Var<bool> varShowMapPoints = pangolin::Var<bool>("menu.Display MapPoints", true, true);
-    pangolin::Var<bool> varShowMapStructs = pangolin::Var<bool>("menu.Display MapStructs", false, true);
-    pangolin::Var<int> varPointSize = pangolin::Var<int>("menu.Point Size", g_pointSize, 1, 10);
-    pangolin::Var<int> varCovMapDensity = pangolin::Var<int>("menu.Covisibility Map Density", 10, 1, 50);
-    pangolin::Var<int> varDisplayMeshNum = pangolin::Var<int>("menu.Display Mesh Number", -1, -1, 80);
 
     mpMapDrawer->LinkGlSlProgram();
 
@@ -74,6 +78,9 @@ void Viewer::Run()
 
         if (pangolin::Pushed(varReset))
             mpSystem->reset();
+
+        if (pangolin::Pushed(varSaveMap))
+            mpSystem->WriteToFile(strFileName);
 
         g_bSystemRunning = varRunning;
         RenderImagesToScreen();
@@ -95,7 +102,7 @@ void Viewer::Run()
         pangolin::FinishFrame();
     }
 
-    mpSystem->Kill();
+    mpSystem->Shutdown();
 }
 
 void Viewer::RenderImagesToScreen()
@@ -205,8 +212,7 @@ void Viewer::setLiveImage(const cv::Mat &ImgRGB)
     mbNewImage = true;
 }
 
-void Viewer::setKeyFrameImage(const cv::Mat &im,
-                              std::vector<cv::KeyPoint> vKeys)
+void Viewer::setKeyFrameImage(const cv::Mat &im, std::vector<cv::KeyPoint> vKeys)
 {
     std::unique_lock<std::mutex> lock(mImageMutex);
     mCvImageKF = im;

@@ -127,8 +127,6 @@ void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
         else
             PyrDownDepth(mvCurrentInvDepth[lvl - 1], mvCurrentInvDepth[lvl]);
 
-        // ComputeImageGradientCentralDifference(mvCurrentInvDepth[lvl], mvInvDepthGradientX[lvl], mvInvDepthGradientY[lvl]);
-
         float invfx = 1.0 / mK[lvl](0, 0);
         float invfy = 1.0 / mK[lvl](1, 1);
         float cx = mK[lvl](0, 2);
@@ -137,15 +135,9 @@ void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
         ComputeVertexMap(mvCurrentInvDepth[lvl], mvCurrentVMap[lvl], invfx, invfy, cx, cy, 3.0f);
         ComputeNormalMap(mvCurrentVMap[lvl], mvCurrentNMap[lvl]);
     }
-
-    // cv::Mat vmap(mvCurrentVMap[0]);
-    // cv::Mat nmap(mvCurrentNMap[0]);
-    // cv::imshow("vmap", vmap);
-    // cv::imshow("nmap", nmap);
-    // cv::waitKey(0);
 }
 
-void RGBDTracking::SetReferenceMap(const cv::cuda::GpuMat vmap)
+void RGBDTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
 {
     vmap.copyTo(mvReferenceVMap[0]);
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
@@ -185,7 +177,6 @@ Sophus::SE3d RGBDTracking::GetTransform(const Sophus::SE3d &init, const bool bSw
                 break;
 
             case TrackingModal::RGB_AND_DEPTH:
-                // ComputeSingleStepRGBD(lvl, estimate, hessian.data(), residual.data());
                 ComputeSingleStepRGBDLinear(lvl, estimate, hessian.data(), residual.data());
                 break;
             }
@@ -311,7 +302,7 @@ void RGBDTracking::SwapFrameBuffer()
     }
 }
 
-struct Point2PlaneICPFunctor
+struct IcpStepFunctor
 {
     cv::cuda::PtrStep<Eigen::Vector4f> vmap_curr;
     cv::cuda::PtrStep<Eigen::Vector4f> nmap_curr;
@@ -331,10 +322,10 @@ struct Point2PlaneICPFunctor
     __device__ __forceinline__ void operator()() const;
 };
 
-__device__ __forceinline__ bool Point2PlaneICPFunctor::ProjectPoint(int &x, int &y,
-                                                                    Eigen::Vector3f &v_curr,
-                                                                    Eigen::Vector3f &n_last,
-                                                                    Eigen::Vector3f &v_last) const
+__device__ __forceinline__ bool IcpStepFunctor::ProjectPoint(int &x, int &y,
+                                                             Eigen::Vector3f &v_curr,
+                                                             Eigen::Vector3f &n_last,
+                                                             Eigen::Vector3f &v_last) const
 {
     Eigen::Vector4f v_last_c = vmap_last.ptr(y)[x];
     if (v_last_c(3) < 0)
@@ -364,7 +355,7 @@ __device__ __forceinline__ bool Point2PlaneICPFunctor::ProjectPoint(int &x, int 
     return (angle < angleTH && dist <= distTH && n_last_c(3) > 0 && n_curr_c(3) > 0);
 }
 
-__device__ __forceinline__ void Point2PlaneICPFunctor::GetProduct(int &k, float *sum) const
+__device__ __forceinline__ void IcpStepFunctor::GetProduct(int &k, float *sum) const
 {
     int y = k / cols;
     int x = k - (y * cols);
@@ -389,7 +380,7 @@ __device__ __forceinline__ void Point2PlaneICPFunctor::GetProduct(int &k, float 
     sum[count] = (float)found;
 }
 
-__device__ __forceinline__ void Point2PlaneICPFunctor::operator()() const
+__device__ __forceinline__ void IcpStepFunctor::operator()() const
 {
     float sum[29] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     float val[29];
@@ -423,24 +414,24 @@ void RGBDTracking::ComputeSingleStepDepth(
     int cols = mvWidth[lvl];
     int rows = mvHeight[lvl];
 
-    Point2PlaneICPFunctor P2PIcpFunctor;
-    P2PIcpFunctor.out = mGpuBufferFloat96x29;
-    P2PIcpFunctor.vmap_curr = mvCurrentVMap[lvl];
-    P2PIcpFunctor.nmap_curr = mvCurrentNMap[lvl];
-    P2PIcpFunctor.vmap_last = mvReferenceVMap[lvl];
-    P2PIcpFunctor.nmap_last = mvReferenceNMap[lvl];
-    P2PIcpFunctor.cols = cols;
-    P2PIcpFunctor.rows = rows;
-    P2PIcpFunctor.N = cols * rows;
-    P2PIcpFunctor.T_last_curr = T.cast<float>();
-    P2PIcpFunctor.angleTH = sin(20.f * 3.14159254f / 180.f);
-    P2PIcpFunctor.distTH = 0.01;
-    P2PIcpFunctor.fx = mK[lvl](0, 0);
-    P2PIcpFunctor.fy = mK[lvl](1, 1);
-    P2PIcpFunctor.cx = mK[lvl](0, 2);
-    P2PIcpFunctor.cy = mK[lvl](1, 2);
+    IcpStepFunctor icpStep;
+    icpStep.out = mGpuBufferFloat96x29;
+    icpStep.vmap_curr = mvCurrentVMap[lvl];
+    icpStep.nmap_curr = mvCurrentNMap[lvl];
+    icpStep.vmap_last = mvReferenceVMap[lvl];
+    icpStep.nmap_last = mvReferenceNMap[lvl];
+    icpStep.cols = cols;
+    icpStep.rows = rows;
+    icpStep.N = cols * rows;
+    icpStep.T_last_curr = T.cast<float>();
+    icpStep.angleTH = sin(20.f * 3.14159254f / 180.f);
+    icpStep.distTH = 0.01;
+    icpStep.fx = mK[lvl](0, 0);
+    icpStep.fy = mK[lvl](1, 1);
+    icpStep.cx = mK[lvl](0, 2);
+    icpStep.cy = mK[lvl](1, 2);
 
-    callDeviceFunctor<<<96, 224>>>(P2PIcpFunctor);
+    callDeviceFunctor<<<96, 224>>>(icpStep);
     cv::cuda::reduce(mGpuBufferFloat96x29, mGpuBufferFloat1x29, 0, cv::REDUCE_SUM);
 
     cv::Mat hostData(mGpuBufferFloat1x29);
@@ -561,4 +552,17 @@ cv::cuda::GpuMat RGBDTracking::GetReferenceDepth(const int lvl) const
 bool RGBDTracking::IsTrackingGood() const
 {
     return mbTrackingGood;
+}
+
+void RGBDTracking::WriteDebugImages()
+{
+    cv::Mat out;
+    mvCurrentIntensity[0].download(out);
+    cv::imwrite("curr_image.png", out);
+    mvReferenceIntensity[0].download(out);
+    cv::imwrite("last_image.png", out);
+    mvIntensityGradientX[0].download(out);
+    cv::imwrite("gx.png", out);
+    mvIntensityGradientY[0].download(out);
+    cv::imwrite("gy.png", out);
 }

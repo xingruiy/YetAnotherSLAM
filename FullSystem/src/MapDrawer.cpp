@@ -158,12 +158,26 @@ void MapDrawer::DrawMapPoints(int iPointSize)
 
 void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
 {
-    std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
-    if (N < 0 || vpMapStruct.size() < N)
-        N = vpMapStruct.size();
-    std::vector<MapStruct *> vpMSToDraw = std::vector<MapStruct *>(vpMapStruct.end() - N, vpMapStruct.end());
+    if (N == 0)
+        return;
 
-    for (auto vit = vpMSToDraw.begin(), vend = vpMSToDraw.end(); vit != vend; ++vit)
+    std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
+    std::sort(vpMapStruct.begin(), vpMapStruct.end(), [&](MapStruct *a, MapStruct *b) { return a->mnId < b->mnId; });
+    std::vector<MapStruct *> vpMapsToRender;
+
+    if (N < 0)
+    {
+        vpMapsToRender = vpMapStruct;
+    }
+    else
+    {
+        if (N > vpMapStruct.size())
+            N = vpMapStruct.size();
+
+        vpMapsToRender.push_back(vpMapStruct[N - 1]);
+    }
+
+    for (auto vit = vpMapsToRender.begin(), vend = vpMapsToRender.end(); vit != vend; ++vit)
     {
         MapStruct *pMS = *vit;
         if (pMS && !pMS->mbActive)

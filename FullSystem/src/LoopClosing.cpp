@@ -1,15 +1,14 @@
 #include "LoopClosing.h"
 #include "ORBMatcher.h"
-#include "Sim3Solver.h"
+#include "PoseSolver.h"
 #include "Optimizer.h"
-#include "Converter.h"
 
 namespace SLAM
 {
 
 LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
     : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0),
-      mbFixScale(true), mpThreadGBA(nullptr), mbRunningGBA(false)
+      mpThreadGBA(nullptr), mbRunningGBA(false)
 {
     mnCovisibilityConsistencyTh = 3;
 }
@@ -27,7 +26,7 @@ void LoopClosing::Run()
         {
             if (DetectLoop())
             {
-                if (ComputeSim3())
+                if (ComputeSE3())
                     // Perform loop fusion and pose graph optimization
                     CorrectLoop();
             }
@@ -175,16 +174,16 @@ bool LoopClosing::DetectLoop()
     return false;
 }
 
-bool LoopClosing::ComputeSim3()
+bool LoopClosing::ComputeSE3()
 {
-    // For each consistent loop candidate we try to compute a Sim3
+    // For each consistent loop candidate we try to compute a SE3
     const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
 
     // We compute first ORB matches for each candidate
-    // If enough matches are found, we setup a Sim3Solver
+    // If enough matches are found, we setup a PoseSolver
     ORBMatcher matcher(0.75, true);
 
-    std::vector<Sim3Solver *> vpSim3Solvers;
+    std::vector<PoseSolver *> vpSim3Solvers;
     vpSim3Solvers.resize(nInitialCandidates);
 
     std::vector<std::vector<MapPoint *>> vvpMapPointMatches;
@@ -217,7 +216,7 @@ bool LoopClosing::ComputeSim3()
         }
         else
         {
-            Sim3Solver *pSolver = new Sim3Solver(mpCurrentKF, pKF, vvpMapPointMatches[i], true);
+            PoseSolver *pSolver = new PoseSolver(mpCurrentKF, pKF, vvpMapPointMatches[i], true);
             pSolver->SetRansacParameters(0.99, 20, 300);
             vpSim3Solvers[i] = pSolver;
         }
@@ -243,7 +242,7 @@ bool LoopClosing::ComputeSim3()
             int nInliers;
             bool bNoMore;
 
-            Sim3Solver *pSolver = vpSim3Solvers[i];
+            PoseSolver *pSolver = vpSim3Solvers[i];
 
             Sophus::SE3d T12;
             bool found = pSolver->iterate(5, bNoMore, vbInliers, nInliers, T12);
@@ -258,7 +257,7 @@ bool LoopClosing::ComputeSim3()
             // If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
             if (found)
             {
-                std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint *>(NULL));
+                std::vector<MapPoint *> vpMapPointMatches(vvpMapPointMatches[i].size(), nullptr);
                 for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
                 {
                     if (vbInliers[j])
@@ -271,7 +270,7 @@ bool LoopClosing::ComputeSim3()
                 Sophus::SE3d T21 = T12.inverse();
                 g2o::Sim3 gScm(T21.rotationMatrix(), T21.translation(), 1.0);
 
-                const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
+                const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, true);
 
                 // If optimization is succesful stop ransacs and continue
                 if (nInliers >= 20)
@@ -493,7 +492,7 @@ void LoopClosing::CorrectLoop()
     }
 
     // Optimize graph
-    Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, mbFixScale);
+    Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, true);
 
     mpMap->InformNewBigChange();
 
@@ -522,7 +521,7 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
         KeyFrame *pKF = mit->first;
         Sophus::SE3d CorrectedTcw = mit->second;
 
-        std::vector<MapPoint *> vpReplacePoints(mvpLoopMapPoints.size(), static_cast<MapPoint *>(NULL));
+        std::vector<MapPoint *> vpReplacePoints(mvpLoopMapPoints.size(), nullptr);
         matcher.Fuse(pKF, CorrectedTcw, mvpLoopMapPoints, 4, vpReplacePoints);
 
         // Get Map Mutex

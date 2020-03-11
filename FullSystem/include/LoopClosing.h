@@ -1,14 +1,11 @@
 #ifndef LOOPCLOSING_H
 #define LOOPCLOSING_H
 
-#include <sophus/se3.hpp>
-#include <sophus/sim3.hpp>
-#include <g2o/types/sim3/types_seven_dof_expmap.h>
-
 #include "Map.h"
 #include "Tracking.h"
 #include "LocalMapping.h"
 #include "KeyFrameDatabase.h"
+#include <sophus/se3.hpp>
 
 namespace SLAM
 {
@@ -62,7 +59,7 @@ private:
 
     bool DetectLoop();
 
-    bool ComputeSim3();
+    bool ComputeSE3();
 
     void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap);
 
@@ -92,7 +89,6 @@ private:
     std::vector<MapPoint *> mvpCurrentMatchedPoints;
     std::vector<MapPoint *> mvpLoopMapPoints;
     Sophus::SE3d mTcwNew;
-    g2o::Sim3 mg2oScw;
 
     long unsigned int mLastLoopKFid;
 
@@ -102,10 +98,6 @@ private:
     bool mbStopGBA;
     std::mutex mMutexGBA;
     std::thread *mpThreadGBA;
-
-    // Fix scale in the stereo/RGB-D case
-    bool mbFixScale;
-
     bool mnFullBAIdx;
 };
 

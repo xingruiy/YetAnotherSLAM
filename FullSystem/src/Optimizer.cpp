@@ -10,7 +10,6 @@
 #include <unistd.h>
 
 #include "Optimizer.h"
-#include "Converter.h"
 
 namespace SLAM
 {
@@ -1091,11 +1090,11 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint
         if (e12->chi2() > th2 || e21->chi2() > th2)
         {
             size_t idx = vnIndexEdge[i];
-            vpMatches1[idx] = static_cast<MapPoint *>(NULL);
+            vpMatches1[idx] = nullptr;
             optimizer.removeEdge(e12);
             optimizer.removeEdge(e21);
-            vpEdges12[i] = static_cast<g2o::EdgeSim3ProjectXYZ *>(NULL);
-            vpEdges21[i] = static_cast<g2o::EdgeInverseSim3ProjectXYZ *>(NULL);
+            vpEdges12[i] = static_cast<g2o::EdgeSim3ProjectXYZ *>(nullptr);
+            vpEdges21[i] = static_cast<g2o::EdgeInverseSim3ProjectXYZ *>(nullptr);
             nBad++;
         }
     }
@@ -1110,7 +1109,6 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint
         return 0;
 
     // Optimize again only with inliers
-
     optimizer.initializeOptimization();
     optimizer.optimize(nMoreIterations);
 
@@ -1125,7 +1123,7 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint
         if (e12->chi2() > th2 || e21->chi2() > th2)
         {
             size_t idx = vnIndexEdge[i];
-            vpMatches1[idx] = static_cast<MapPoint *>(NULL);
+            vpMatches1[idx] = nullptr;
         }
         else
             nIn++;

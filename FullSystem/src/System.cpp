@@ -92,7 +92,17 @@ void System::FuseAllMapStruct()
     InitMap->SetActiveFlag(false);
 }
 
-void System::Kill()
+void System::WriteToFile(const std::string &strFile)
+{
+    mpMap->WriteToFile(strFile);
+}
+
+void System::ReadFromFile(const std::string &strFile)
+{
+    mpMap->ReadFromFile(strFile);
+}
+
+void System::Shutdown()
 {
     g_bSystemKilled = true;
 }

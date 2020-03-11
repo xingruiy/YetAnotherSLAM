@@ -1,5 +1,4 @@
 #include "Frame.h"
-#include "Converter.h"
 
 namespace SLAM
 {
@@ -101,7 +100,7 @@ void Frame::ExtractORB()
 
   ComputeStereoFromRGBD();
 
-  mvpMapPoints = std::vector<MapPoint *>(N, static_cast<MapPoint *>(NULL));
+  mvpMapPoints = std::vector<MapPoint *>(N, nullptr);
   mvbOutlier = std::vector<bool>(N, false);
 
   AssignFeaturesToGrid();
@@ -235,7 +234,7 @@ void Frame::ComputeBoW()
 {
   if (mBowVec.empty())
   {
-    std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
+    std::vector<cv::Mat> vCurrentDesc = ToDescriptorVector(mDescriptors);
     mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
   }
 }
@@ -335,9 +334,9 @@ void Frame::CreateRelocalisationPoints()
     ExtractORB();
   }
 
-  mRelocPoints.resize(N);
+  mvRelocPoints.resize(N);
 
-  for (int i = 0; i < N; ++N)
+  for (int i = 0; i < N; ++i)
   {
     if (mvuRight[i] > 0)
     {
@@ -347,7 +346,7 @@ void Frame::CreateRelocalisationPoints()
       PtC(0) = z * invfx * (Key.pt.x - cx);
       PtC(1) = z * invfy * (Key.pt.y - cy);
       PtC(2) = z;
-      mRelocPoints[i] = PtC;
+      mvRelocPoints[i] = PtC;
     }
   }
 }

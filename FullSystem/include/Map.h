@@ -29,6 +29,9 @@ public:
     void EraseMapPoint(MapPoint *pMP);
     void EraseMapStruct(MapStruct *pMS);
 
+    void WriteToFile(const std::string &strFile);
+    void ReadFromFile(const std::string &strFile);
+
     void SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs);
 
     void InformNewBigChange();

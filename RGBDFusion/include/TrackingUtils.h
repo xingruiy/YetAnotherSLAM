@@ -165,7 +165,7 @@ struct se3StepRGBFunctor
         const int y = k / w;
         const int x = k - y * w;
         const Eigen::Vector4f &res = refResidual.ptr(y)[x];
-        float row[7] = {0, 0, 0, 0, 0, 0, 0};
+        Eigen::Matrix<float, 7, 1> row = Eigen::Matrix<float, 7, 1>::Zero();
 
         float wt = 1.0f;
 

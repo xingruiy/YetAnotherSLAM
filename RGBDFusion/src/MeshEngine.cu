@@ -59,7 +59,7 @@ struct MeshificationFunctor
 
     __device__ __forceinline__ float read_sdf(Eigen::Vector3f pt, bool &valid) const
     {
-        Voxel *voxel = NULL;
+        Voxel *voxel = nullptr;
         findVoxel(floor(pt), voxel, mplHashTable, mplVoxelBlocks, bucketSize);
         if (voxel && voxel->wt != 0)
         {
