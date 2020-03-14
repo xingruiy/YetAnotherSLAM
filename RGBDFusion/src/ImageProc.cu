@@ -115,7 +115,7 @@ __global__ void RenderScene_kernel(const cv::cuda::PtrStep<Eigen::Vector4f> vmap
 {
     const int x = threadIdx.x + blockIdx.x * blockDim.x;
     const int y = threadIdx.y + blockIdx.y * blockDim.y;
-    if (x >= dst.cols || y >= dst.rows)
+    if (x >= dst.cols - 1 || y >= dst.rows - 1)
         return;
 
     Eigen::Vector3f point = vmap.ptr(y)[x].head<3>();
@@ -135,7 +135,10 @@ void RenderScene(const cv::cuda::GpuMat vmap,
     dim3 block(8, 8);
     dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
 
-    RenderScene_kernel<<<grid, block>>>(vmap, nmap, Eigen::Vector3f(5, 5, 5), image);
+    RenderScene_kernel<<<grid, block>>>(vmap, nmap, Eigen::Vector3f(-5, -5, -5), image);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
 }
 
 __global__ void DepthToInvDepth_kernel(const cv::cuda::PtrStep<float> depth, cv::cuda::PtrStepSz<float> depth_inv)
@@ -227,7 +230,7 @@ __global__ void ComputeNormalMap_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4
     if (x >= vmap.cols || y >= vmap.rows)
         return;
 
-    if (x == vmap.cols - 1 || y == vmap.rows - 1)
+    if (x == 0 || y == 0 || x == vmap.cols - 1 || y == vmap.rows - 1)
     {
         nmap.ptr(y)[x](3) = -1.f;
         return;
@@ -248,7 +251,7 @@ __global__ void ComputeNormalMap_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4
     }
 }
 
-void ComputeNormalMap(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat nmap)
+void ComputeNormalMap(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &nmap)
 {
     if (nmap.empty())
         nmap.create(vmap.size(), CV_32FC4);
@@ -257,6 +260,9 @@ void ComputeNormalMap(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat nmap)
     dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
 
     ComputeNormalMap_kernel<<<grid, block>>>(vmap, nmap);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
 }
 
 __global__ void VMapToDepth_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,

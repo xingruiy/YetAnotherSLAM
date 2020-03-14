@@ -29,20 +29,19 @@ void LocalBundler::AddKeyFrame(const cv::Mat depth,
 }
 
 __global__ void CheckProjections_kernel(PointShell *points, int N,
-                                        Sophus::SE3f Tinv, int idx,
+                                        Sophus::SE3f *poseMatrix,
                                         int *num_pts, int w, int h,
                                         float fx, float fy,
                                         float cx, float cy)
 {
-    float sum[1] = {0};
-
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
         if (P.state == OK || P.state == Unchecked)
         {
+            const Sophus::SE3f &T(poseMatrix[P.frameIdx]);
             const float z = 1.0 / P.idepth;
-            Eigen::Vector3f pt = Tinv * Eigen::Vector3f(z * (P.x - cx) / fx, z * (P.y - cy) / fy, z);
+            Eigen::Vector3f pt = T * Eigen::Vector3f(z * (P.x - cx) / fx, z * (P.y - cy) / fy, z);
             const float u = fx * pt(0) / pt(2) + cx;
             const float v = fy * pt(1) / pt(2) + cy;
             if (u < 1 || v < 1 || u >= w - 1 || v >= h - 1)
@@ -52,9 +51,21 @@ __global__ void CheckProjections_kernel(PointShell *points, int N,
             else
             {
                 P.state = OK;
-                RawResidual R(P.res[idx]);
-                R.uv = Eigen::Vector2f(u, v);
-                P.numResiduals++;
+                const float invz = pt(2);
+                const float invz2 = invz * invz;
+                P.res.Jpdxi(0, 0) = fx * invz;
+                P.res.Jpdxi(0, 1) = 0;
+                P.res.Jpdxi(0, 2) = -fx * pt(0) * pt(1) * invz2;
+                P.res.Jpdxi(0, 3) = fx + fx * pt(0) * pt(0) * invz2;
+                P.res.Jpdxi(0, 4) = fx + fx * pt(0) * pt(0) * invz2;
+                P.res.Jpdxi(0, 5) = -fx * pt(0) * invz;
+                P.res.Jpdxi(1, 0) = 0;
+                P.res.Jpdxi(1, 1) = fy * invz;
+                P.res.Jpdxi(1, 2) = -fy * pt(1) * invz2;
+                P.res.Jpdxi(1, 3) = -fy - fy * pt(1) * pt(1) * invz2;
+                P.res.Jpdxi(1, 4) = fy * pt(0) * pt(1) * invz2;
+                P.res.Jpdxi(1, 5) = fy * pt(0) * invz;
+                P.res.uv = Eigen::Vector2f(u, v);
             }
         }
     }
@@ -81,6 +92,20 @@ void LocalBundler::BundleAdjust(const int maxIter)
 
 void LocalBundler::CreateNewPoints()
 {
+}
+
+void LocalBundler::UpdatePoseMatrix(FrameShell &F)
+{
+    Sophus::SE3d FTwc = F.Tcw.inverse();
+    Sophus::SE3f poses[NUM_KF];
+
+    for (int i = 0; i < frames.size(); ++i)
+    {
+        FrameShell &F2 = frames[i];
+        poses[i] = (FTwc * F2.Tcw).cast<float>();
+    }
+
+    SafeCall(cudaMemcpy(posesMatrix_dev, &poses[0], sizeof(Sophus::SE3f) * NUM_KF, cudaMemcpyHostToDevice));
 }
 
 void LocalBundler::PopulateOccupancyGrid(FrameShell &F)

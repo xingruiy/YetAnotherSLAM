@@ -10,7 +10,7 @@ void PyrDownDepth(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst);
 void ComputeVertexMap(const cv::cuda::GpuMat depth, cv::cuda::GpuMat vmap, const float invfx,
                       const float invfy, const float cx, const float cy, const float cut_off);
 
-void ComputeNormalMap(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat nmap);
+void ComputeNormalMap(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &nmap);
 
 void DepthToInvDepth(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &invDepth);
 

@@ -5,3 +5,4 @@ build
 ORBvoc.txt
 ORBvoc.bin
 Text2Bin
+*.png

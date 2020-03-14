@@ -35,7 +35,7 @@ struct PointShell
     float idepth;
     float intensity;
     int numResiduals;
-    RawResidual res[NUM_KF];
+    RawResidual res;
 };
 
 struct FrameShell
@@ -66,6 +66,7 @@ private:
     void LineariseAll();
     void Marginalization();
     void CreateNewPoints();
+    void UpdatePoseMatrix(FrameShell &F);
     void CheckProjections(FrameShell &F);
     void PopulateOccupancyGrid(FrameShell &F);
 
