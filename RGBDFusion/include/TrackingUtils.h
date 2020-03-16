@@ -58,9 +58,7 @@ void inline RankUpdateHessian(float *hostData, float *hessian, float *residual)
 }
 
 template <typename T>
-__device__ __forceinline__ T interpolateBiLinear(
-    const cv::cuda::PtrStep<T> &map,
-    const float &x, const float &y)
+__device__ __forceinline__ T interpolateBiLinear(const cv::cuda::PtrStep<T> &map, const float &x, const float &y)
 {
     int u = static_cast<int>(std::floor(x));
     int v = static_cast<int>(std::floor(y));
@@ -83,11 +81,7 @@ struct se3StepRGBResidualFunctor
     mutable cv::cuda::PtrStep<float> out;
     mutable cv::cuda::PtrStep<Eigen::Vector4f> refResidual;
 
-    __device__ __forceinline__ bool findCorresp(
-        const int &x, const int &y,
-        float &residual,
-        float &gx,
-        float &gy) const
+    __device__ __forceinline__ bool findCorresp(const int &x, const int &y, float &residual, float &gx, float &gy) const
     {
         Eigen::Vector4f ptWarped = refPtWarped.ptr(y)[x];
 

@@ -12,6 +12,7 @@ enum PointState
     OOB = -1,
     Unchecked,
     OK,
+    Outlier,
     Discard,
     Marginalized
 };
@@ -21,6 +22,10 @@ struct RawResidual
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     float hw;
+    float r;
+    int targetIdx;
+    bool active;
+    PointState state;
     Eigen::Matrix<float, 2, 1> uv;
     Eigen::Matrix<float, 2, 1> Jpdd;
     Eigen::Matrix<float, 1, 2> JIdp;
@@ -35,7 +40,9 @@ struct PointShell
     float idepth;
     float intensity;
     int numResiduals;
-    RawResidual res;
+    float Hss;
+    float bs;
+    RawResidual res[NUM_KF];
 };
 
 struct FrameShell
@@ -47,6 +54,8 @@ struct FrameShell
     cv::cuda::GpuMat dIdx;
     cv::cuda::GpuMat dIdy;
     cv::cuda::GpuMat OGrid;
+    cv::cuda::GpuMat Hcc;
+    cv::cuda::GpuMat bc;
     Sophus::SE3d Tcw;
 };
 
@@ -64,8 +73,10 @@ public:
 
 private:
     void LineariseAll();
+    void BuildStructureSystem();
+    void BuildCameraSystem();
+
     void Marginalization();
-    void CreateNewPoints();
     void UpdatePoseMatrix(FrameShell &F);
     void CheckProjections(FrameShell &F);
     void PopulateOccupancyGrid(FrameShell &F);
@@ -82,6 +93,9 @@ private:
     int *stackPtr_dev;
     PointShell *points_dev;
     Sophus::SE3f *posesMatrix_dev;
+
+    cv::cuda::GpuMat Hcc;
+    cv::cuda::GpuMat bcc;
 };
 
 #endif

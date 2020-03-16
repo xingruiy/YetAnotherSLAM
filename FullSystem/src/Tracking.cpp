@@ -155,8 +155,8 @@ void Tracking::StereoInitialization()
         mRawDepth.upload(mCurrentFrame.mImDepth);
         mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcw);
 
-        // mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
-        //                            mCurrentFrame.mvKeys);
+        mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
+                                   mCurrentFrame.mvKeys);
     }
 }
 
@@ -168,18 +168,6 @@ bool Tracking::TrackRGBD()
     mpCurrentMapStruct->RayTrace(Tcm);
     auto vmap = mpCurrentMapStruct->GetRayTracingResult();
     mpTracker->SetReferenceModel(vmap);
-
-    cv::cuda::GpuMat nmap, img;
-    ComputeNormalMap(vmap, nmap);
-    RenderScene(vmap, nmap, img);
-    cv::Mat cvImg;
-    if (!img.empty())
-    {
-        img.download(cvImg);
-        std::vector<cv::KeyPoint> pt;
-        if (mpViewer)
-            mpViewer->setKeyFrameImage(cvImg, pt);
-    }
 
     // Set tracking frames
     mpTracker->SetTrackingImage(mCurrentFrame.mImGray);
@@ -730,8 +718,8 @@ void Tracking::CreateNewKeyFrame()
 
     mCurrentFrame.mTcp = Sophus::SE3d();
 
-    // mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
-    //                            mCurrentFrame.mvKeys);
+    mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
+                               mCurrentFrame.mvKeys);
 }
 
 void Tracking::reset()

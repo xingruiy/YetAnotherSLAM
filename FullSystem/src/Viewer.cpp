@@ -44,7 +44,7 @@ void Viewer::Run()
     mpRightImageBar->AddDisplay(*mpCurrentKFView);
 
     // Create textures
-    mTextureKF.Reinitialise(width, height, GL_RGBA, true, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    mTextureKF.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     mTextureColour.Reinitialise(width, height, GL_RGB, true, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     mTextureDepth.Reinitialise(width, height, GL_LUMINANCE, true, 0, GL_LUMINANCE, GL_FLOAT, nullptr);
 
@@ -156,25 +156,25 @@ void Viewer::RenderImagesToScreen()
 
     if (newKF && !imKF.empty())
     {
-        // if (imKF.channels() < 3)
-        //     cv::cvtColor(imKF, imKF, CV_GRAY2RGB);
+        if (imKF.channels() < 3)
+            cv::cvtColor(imKF, imKF, CV_GRAY2RGB);
 
-        // const float r = 5;
-        // const int n = vKeys.size();
-        // for (int i = 0; i < n; i++)
-        // {
-        //     cv::Point2f pt1, pt2;
-        //     pt1.x = vKeys[i].pt.x - r;
-        //     pt1.y = vKeys[i].pt.y - r;
-        //     pt2.x = vKeys[i].pt.x + r;
-        //     pt2.y = vKeys[i].pt.y + r;
+        const float r = 5;
+        const int n = vKeys.size();
+        for (int i = 0; i < n; i++)
+        {
+            cv::Point2f pt1, pt2;
+            pt1.x = vKeys[i].pt.x - r;
+            pt1.y = vKeys[i].pt.y - r;
+            pt2.x = vKeys[i].pt.x + r;
+            pt2.y = vKeys[i].pt.y + r;
 
-        //     cv::rectangle(imKF, pt1, pt2, cv::Scalar(0, 255, 0));
-        //     cv::circle(imKF, vKeys[i].pt, 2, cv::Scalar(0, 255, 0), -1);
-        // }
+            cv::rectangle(imKF, pt1, pt2, cv::Scalar(0, 255, 0));
+            cv::circle(imKF, vKeys[i].pt, 2, cv::Scalar(0, 255, 0), -1);
+        }
 
         mTextureKF.Upload(imKF.data,
-                          GL_RGBA,
+                          GL_RGB,
                           GL_UNSIGNED_BYTE);
     }
 
