@@ -1482,6 +1482,99 @@ int ORBMatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoin
     return nFound;
 }
 
+int ORBMatcher::SearchByBruteForce(Frame &F, KeyFrame *pKF, std::vector<MapPoint *> &vpMapPointMatches)
+{
+    const std::vector<MapPoint *> vpMapPointsKF = pKF->GetMapPointMatches();
+    vpMapPointMatches = std::vector<MapPoint *>(F.N, nullptr);
+
+    int nmatches = 0;
+
+    std::vector<int> rotHist[HISTO_LENGTH];
+    for (int i = 0; i < HISTO_LENGTH; i++)
+        rotHist[i].reserve(500);
+    const float factor = 1.0f / HISTO_LENGTH;
+
+    for (int i = 0; i < F.N; ++i)
+    {
+        const cv::Mat &dF = F.mDescriptors.row(i);
+
+        int bestDist1 = 256;
+        int bestIdxF = -1;
+        int bestDist2 = 256;
+
+        for (int j = 0; j < vpMapPointsKF.size(); ++j)
+        {
+            if (vpMapPointMatches[i])
+                continue;
+
+            MapPoint *pMP = vpMapPointsKF[j];
+
+            if (!pMP || pMP->isBad())
+                continue;
+
+            const cv::Mat &dKF = pKF->mDescriptors.row(j);
+
+            const int dist = DescriptorDistance(dKF, dF);
+
+            if (dist < bestDist1)
+            {
+                bestDist2 = bestDist1;
+                bestDist1 = dist;
+                bestIdxF = j;
+            }
+            else if (dist < bestDist2)
+            {
+                bestDist2 = dist;
+            }
+        }
+
+        if (bestDist1 <= TH_LOW)
+        {
+            if (static_cast<float>(bestDist1) < mfNNratio * static_cast<float>(bestDist2))
+            {
+                vpMapPointMatches[i] = vpMapPointsKF[bestIdxF];
+
+                if (mbCheckOrientation)
+                {
+                    const cv::KeyPoint &kp = pKF->mvKeysUn[bestIdxF];
+
+                    float rot = kp.angle - F.mvKeys[bestIdxF].angle;
+                    if (rot < 0.0)
+                        rot += 360.0f;
+                    int bin = round(rot * factor);
+                    if (bin == HISTO_LENGTH)
+                        bin = 0;
+                    assert(bin >= 0 && bin < HISTO_LENGTH);
+                    rotHist[bin].push_back(bestIdxF);
+                }
+                nmatches++;
+            }
+        }
+    }
+
+    if (mbCheckOrientation)
+    {
+        int ind1 = -1;
+        int ind2 = -1;
+        int ind3 = -1;
+
+        ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
+
+        for (int i = 0; i < HISTO_LENGTH; i++)
+        {
+            if (i == ind1 || i == ind2 || i == ind3)
+                continue;
+            for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
+            {
+                vpMapPointMatches[rotHist[i][j]] = nullptr;
+                nmatches--;
+            }
+        }
+    }
+
+    return nmatches;
+}
+
 void ORBMatcher::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
 {
     int max1 = 0;

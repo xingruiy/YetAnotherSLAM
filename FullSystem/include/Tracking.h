@@ -127,6 +127,7 @@ public:
     RayTraceEngine *mpRayTraceEngine;
     MeshEngine *mpMeshEngine;
     RGBDTracking *mpTracker;
+    RGBDTracking *mpCoarseTracker;
 
     // Voxel Map Structure
     MapStruct *mpCurrentMapStruct;

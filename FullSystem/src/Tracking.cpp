@@ -235,7 +235,7 @@ bool Tracking::Relocalization()
 
     // We perform first an ORB matching with each candidate
     // If enough matches are found we setup a PnP solver
-    ORBMatcher matcher(0.75, false);
+    ORBMatcher matcher(0.9, false);
 
     std::vector<PoseSolver *> vpSim3Solvers(nKFs);
     std::vector<std::vector<MapPoint *>> vvpMapPointMatches(nKFs);
@@ -251,7 +251,7 @@ bool Tracking::Relocalization()
         }
         else
         {
-            int nmatches = matcher.SearchByBoW(mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
+            int nmatches = matcher.SearchByBruteForce(mCurrentFrame, pKF, vvpMapPointMatches[iKF]);
             std::cout << "matches for kf: " << iKF << " : " << nmatches << std::endl;
 
             if (nmatches < 20)
