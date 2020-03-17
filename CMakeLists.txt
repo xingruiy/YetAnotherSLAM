@@ -66,6 +66,7 @@ target_link_libraries(${PROJECT_NAME}
 PUBLIC
     Eigen3::Eigen
     g2o_core 
+    g2o_stuff
     g2o_types_sba
     g2o_types_sim3
     ${OpenCV_LIBS}
@@ -81,12 +82,12 @@ add_executable(asus_rgbd
 )
 target_include_directories(asus_rgbd 
 PRIVATE
-    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/include
+    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI/include
 )
 target_link_libraries(asus_rgbd 
 PRIVATE 
     ${PROJECT_NAME} 
-    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/lib/libOpenNI2.so
+    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI/lib/libOpenNI.so
 )
 
 add_executable(asus_recorded 

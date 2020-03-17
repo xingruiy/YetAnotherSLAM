@@ -6,15 +6,14 @@
 #include <sophus/se3.hpp>
 
 #define NUM_KF 7
+#define IMW 640
+#define IMH 480
 
-enum PointState
+enum ResidualState
 {
     OOB = -1,
-    Unchecked,
     OK,
-    Outlier,
-    Discard,
-    Marginalized
+    Outlier
 };
 
 struct RawResidual
@@ -25,7 +24,7 @@ struct RawResidual
     float r;
     int targetIdx;
     bool active;
-    PointState state;
+    ResidualState state;
     Eigen::Matrix<float, 2, 1> uv;
     Eigen::Matrix<float, 2, 1> Jpdd;
     Eigen::Matrix<float, 1, 2> JIdp;
@@ -34,13 +33,12 @@ struct RawResidual
 
 struct PointShell
 {
-    PointState state;
     int x, y;
     int frameIdx;
     float idepth;
     float intensity;
     int numResiduals;
-    float Hss;
+    float Hs;
     float bs;
     RawResidual res[NUM_KF];
 };
@@ -92,6 +90,7 @@ private:
     int *stack_dev;
     int *stackPtr_dev;
     PointShell *points_dev;
+    Eigen::Vector4f *frameData_dev;
     Sophus::SE3f *posesMatrix_dev;
 
     cv::cuda::GpuMat Hcc;

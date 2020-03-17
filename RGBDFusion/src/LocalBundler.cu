@@ -43,7 +43,7 @@ __global__ void LineariseAll_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.state == OK || P.state == Unchecked)
+        if (P.numResiduals != 0)
         {
             const int &hostIdx = P.frameIdx;
             for (int i = 0; i < NUM_KF; ++i)
@@ -115,7 +115,7 @@ __global__ void BuildCameraSystem_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.state == OK || P.state == Outlier)
+        if (P.numResiduals != 0)
         {
             for (int i = 0; i < NUM_KF; ++i)
             {
@@ -147,7 +147,6 @@ __global__ void BuildCameraSystem_kernel(PointShell *points, int N,
                 }
                 else
                 {
-                    P.state = Outlier;
                 }
             }
         }
@@ -170,12 +169,12 @@ __global__ void BuildCameraSystem_kernel(PointShell *points, int N)
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.state == OK || P.state == Outlier)
+        if (P.numResiduals != 0)
         {
             for (int i = 0; i < NUM_KF; ++i)
             {
                 RawResidual &res(P.res[i]);
-                P.Hss += res.hw * res.JIdp * res.Jpdd;
+                P.Hs += res.hw * res.JIdp * res.Jpdd;
             }
         }
     }
