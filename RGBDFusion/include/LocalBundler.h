@@ -19,22 +19,20 @@ enum ResidualState
 struct RawResidual
 {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    ResidualState state;
 
     float hw;
     float r;
     int targetIdx;
     bool active;
-    ResidualState state;
-    Eigen::Matrix<float, 2, 1> uv;
-    Eigen::Matrix<float, 2, 1> Jpdd;
-    Eigen::Matrix<float, 1, 2> JIdp;
-    Eigen::Matrix<float, 2, 6> Jpdxi;
+    float Jpdd;
+    Eigen::Matrix<float, 1, 6> JIdxi;
 };
 
 struct PointShell
 {
     int x, y;
-    int frameIdx;
+    int hostIdx;
     float idepth;
     float intensity;
     int numResiduals;
@@ -45,8 +43,8 @@ struct PointShell
 
 struct FrameShell
 {
-    int idx_in_array;
-    unsigned long int id;
+    unsigned long KFid;
+    int arrayIdx;
     cv::cuda::GpuMat image;
     cv::cuda::GpuMat depth;
     cv::cuda::GpuMat dIdx;
@@ -63,38 +61,43 @@ public:
     ~LocalBundler();
     LocalBundler(int w, int h, const Eigen::Matrix3f &K);
 
-    void AddKeyFrame(const cv::Mat depth,
-                     const cv::Mat image,
-                     const Sophus::SE3d &Tcw);
-    void BundleAdjust(const int maxIter = 10);
+    void AddKeyFrame(unsigned long KFid, const cv::Mat depth, const cv::Mat image, const Sophus::SE3d &Tcw);
+    void BundleAdjust(int maxIter = 10);
     void Reset();
 
 private:
-    void LineariseAll();
-    void BuildStructureSystem();
-    void BuildCameraSystem();
+    float LineariseAll();
+    void AccumulatePointHessian();
+    void AccumulateFrameHessian();
+    void AccumulateShcurrHessian();
+    void AccumulateShcurrResidual();
 
+    void SolveSystem();
     void Marginalization();
-    void UpdatePoseMatrix(FrameShell &F);
-    void CheckProjections(FrameShell &F);
     void PopulateOccupancyGrid(FrameShell &F);
 
     int width;
     int height;
-    Eigen::Matrix3f calib;
+    Eigen::Matrix3f K;
+    int frameCount;
 
-    unsigned long int frameCount;
-
-    std::vector<FrameShell> frames;
-
-    int *stack_dev;
-    int *stackPtr_dev;
     PointShell *points_dev;
-    Eigen::Vector4f *frameData_dev;
-    Sophus::SE3f *posesMatrix_dev;
+    int *N;
+    int nPoints;
+    Eigen::Vector3f *frameData_dev;
 
-    cv::cuda::GpuMat Hcc;
-    cv::cuda::GpuMat bcc;
+    std::array<FrameShell *, NUM_KF> frame;
+    std::array<Sophus::SE3d, NUM_KF> framePose;
+    std::array<cv::cuda::GpuMat, NUM_KF> frameHessian;
+    std::array<Eigen::Matrix<float, 6, 6>, NUM_KF> frameHesOut;
+    std::array<Eigen::Matrix<float, 6, 1>, NUM_KF> frameResOut;
+
+    cv::cuda::GpuMat FrameHessianR;
+    cv::cuda::GpuMat FrameHessianRFinal;
+    cv::cuda::GpuMat Residual;
+    cv::cuda::GpuMat ResidualFinal;
+    cv::cuda::GpuMat EnergySum;
+    cv::cuda::GpuMat EnergySumFinal;
 };
 
 #endif

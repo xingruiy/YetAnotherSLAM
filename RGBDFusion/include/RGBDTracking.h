@@ -8,7 +8,6 @@
 
 class RGBDTracking
 {
-
 public:
     RGBDTracking(const int &w, const int &h, const Eigen::Matrix3d &K, const bool &bRGB, const bool &bIcp);
 
