@@ -38,6 +38,8 @@ struct PointShell
     int numResiduals;
     float Hs;
     float bs;
+    float x1;
+    float b1;
     RawResidual res[NUM_KF];
 };
 
@@ -63,10 +65,11 @@ public:
 
     void AddKeyFrame(unsigned long KFid, const cv::Mat depth, const cv::Mat image, const Sophus::SE3d &Tcw);
     void AllocatePoints();
+    Sophus::SE3d GetLastKeyFramePose();
     void BundleAdjust(int maxIter = 10);
     void Reset();
 
-private:
+protected:
     float LineariseAll();
     void AccumulatePointHessian();
     void AccumulateFrameHessian();

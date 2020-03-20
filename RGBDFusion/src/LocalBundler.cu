@@ -539,11 +539,12 @@ void LocalBundler::BundleAdjust(int maxIter)
         maxIter = 10;
 
     float lastEnergy = LineariseAll();
+    float energy = lastEnergy;
     float bestEnergy = lastEnergy;
 
     for (int iter = 0; iter < maxIter; ++iter)
     {
-        std::cout << "current energy: " << lastEnergy << std::endl;
+        std::cout << "current energy: " << energy << std::endl;
 
         AccumulatePointHessian();
         AccumulateFrameHessian();
@@ -552,12 +553,15 @@ void LocalBundler::BundleAdjust(int maxIter)
 
         SolveSystem();
 
-        lastEnergy = LineariseAll();
+        float energy = LineariseAll();
+        std::cout << "cost reduce: " << lastEnergy - energy << std::endl;
 
         if (lastEnergy < bestEnergy)
         {
             bestEnergy = lastEnergy;
         }
+
+        lastEnergy = energy;
     }
 
     auto t2 = std::chrono::high_resolution_clock::now();
@@ -639,6 +643,40 @@ void LocalBundler::AllocatePoints()
     SafeCall(cudaMemcpy(&nPoints, N, sizeof(int), cudaMemcpyDeviceToHost));
 }
 
+Sophus::SE3d LocalBundler::GetLastKeyFramePose()
+{
+    FrameShell *F = frame[lastKeyframeIdx];
+    return F->Tcw;
+}
+
+__global__ void BackSubstitution_kernel(PointShell *points, int N, float *x0)
+{
+    const int x = blockDim.x * blockIdx.x + threadIdx.x;
+    if (x >= N)
+        return;
+    PointShell &P(points[x]);
+    // printf("%d\n", P.numResiduals);
+
+    if (P.numResiduals == 0 || P.Hs == 0)
+        return;
+
+    P.b1 = 0;
+    for (int i = 1; i < NUM_KF; ++i)
+    {
+        RawResidual &RES(P.res[i]);
+
+        if (!RES.active)
+            continue;
+
+        Eigen::Map<Eigen::Vector<float, 6>> x0i(&x0[(i - 1) * 6]);
+        P.b1 += RES.hw * RES.JIdxi * RES.Jpdd * x0i;
+    }
+
+    P.x1 = P.b1 / P.Hs;
+    // printf("%a\n", P.x1);
+    P.idepth = 1.0 / (1.0 / P.idepth + P.x1);
+}
+
 void LocalBundler::SolveSystem()
 {
     int nKF = std::min(NUM_KF, frameCount);
@@ -657,6 +695,31 @@ void LocalBundler::SolveSystem()
     auto realb = b.middleRows(6, (nKF - 1) * 6).cast<double>();
 
     Eigen::Vector<double, -1> x0 = realH.ldlt().solve(realb);
+    Eigen::Vector<float, -1> x0_float = x0.cast<float>();
+
+    float *x0_dev;
+    SafeCall(cudaMalloc((void **)&x0_dev, sizeof(float) * (nKF - 1) * 6));
+    SafeCall(cudaMemcpy(x0_dev, x0_float.data(), sizeof(float) * (nKF - 1) * 6, cudaMemcpyHostToDevice));
+
+    dim3 block(1024);
+    dim3 grid(cv::divUp(nPoints, block.x));
+    BackSubstitution_kernel<<<grid, block>>>(points_dev, nPoints, x0_dev);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
+
+    for (int i = 1; i < nKF; ++i)
+    {
+        FrameShell *F = frame[i];
+        if (F == nullptr)
+            continue;
+
+        Eigen::Vector<double, 6> x0i = x0.middleRows<6>((i - 1) * 6);
+        F->Tcw = Sophus::SE3d::exp(x0i) * F->Tcw;
+        framePose[i] = F->Tcw;
+    }
+
+    UpdatePoseMatrix(framePose);
 }
 
 __global__ void PopulateOccupancyGrid_kernel(PointShell *points, int N,

@@ -396,7 +396,7 @@ bool Tracking::TrackLocalMap()
     SearchLocalPoints();
 
     // Optimize Pose
-    Optimizer::PoseOptimization(mCurrentFrame);
+    // Optimizer::PoseOptimization(mCurrentFrame);
     int mnMatchesInliers = 0;
 
     // Update MapPoints Statistics
@@ -730,6 +730,7 @@ void Tracking::CreateNewKeyFrame()
     bundler->AddKeyFrame(pKF->mnId, mCurrentFrame.mImDepth, mCurrentFrame.mImGray, mCurrentFrame.mTcw);
     bundler->BundleAdjust();
     bundler->AllocatePoints();
+    pKF->SetPose(bundler->GetLastKeyFramePose());
 }
 
 void Tracking::reset()

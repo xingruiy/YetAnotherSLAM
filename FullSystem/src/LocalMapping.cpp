@@ -44,11 +44,11 @@ void LocalMapping::Run()
             if (!CheckNewKeyFrames() && !stopRequested())
             {
                 // Local BA
-                if (mpMap->KeyFramesInMap() > 2)
-                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
+                // if (mpMap->KeyFramesInMap() > 2)
+                //     Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
 
                 // Check redundant local Keyframes
-                KeyFrameCulling();
+                // KeyFrameCulling();
             }
 
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
