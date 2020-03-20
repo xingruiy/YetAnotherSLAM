@@ -91,7 +91,10 @@ void Viewer::Run()
         mpMapDrawer->DrawKeyFrames(varShowKeyFrames, varShowKFGraph, varCovMapDensity);
 
         if (varShowMapPoints)
-            mpMapDrawer->DrawMapPoints(varPointSize);
+        {
+            // mpMapDrawer->DrawMapPoints(varPointSize);
+            mpMapDrawer->DrawDebugMap();
+        }
 
         if (varShowMapStructs)
         {

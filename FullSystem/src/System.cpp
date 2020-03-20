@@ -36,6 +36,7 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
         mpViewer = new Viewer(this, mpMapDrawer);
         mpViewerThread = new std::thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
+        mpTracker->SetMapDrawer(mpMapDrawer);
         mpLocalMapper->SetViewer(mpViewer);
     }
 }

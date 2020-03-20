@@ -18,13 +18,15 @@ public:
 
     MapDrawer(Map *pMap);
 
+    void DrawDebugMap();
+
     void DrawMapPoints(int iPointSize);
     void DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int iEdgeWeight);
 
     void DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat);
     void LinkGlSlProgram();
 
-private:
+public:
     Map *mpMap;
     std::mutex mmMutexPose;
     Eigen::Matrix4f mCameraPose;
@@ -33,6 +35,7 @@ private:
     int width, height;
 
     pangolin::GlSlProgram mShader;
+    std::vector<Eigen::Vector3f> debug;
 };
 
 } // namespace SLAM

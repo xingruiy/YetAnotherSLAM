@@ -156,6 +156,13 @@ void MapDrawer::DrawMapPoints(int iPointSize)
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
+void MapDrawer::DrawDebugMap()
+{
+    glColor3f(1.0, 0.0, 0.0);
+    pangolin::glDrawPoints(debug);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
 void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
 {
     if (N == 0)

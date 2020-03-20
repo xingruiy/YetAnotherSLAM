@@ -9,6 +9,7 @@
 #include "GlobalDef.h"
 #include "LoopClosing.h"
 #include "MeshEngine.h"
+#include "MapDrawer.h"
 #include "RGBDTracking.h"
 #include "RayTraceEngine.h"
 #include "KeyFrameDatabase.h"
@@ -34,6 +35,7 @@ public:
     void SetLocalMapper(LocalMapping *pLocalMapper);
     void SetLoopClosing(LoopClosing *pLoopClosing);
     void SetViewer(Viewer *pViewer);
+    void SetMapDrawer(MapDrawer *pMapDrawer);
 
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
@@ -138,6 +140,9 @@ public:
 
     // Raw depth for fusion
     cv::cuda::GpuMat mRawDepth;
+
+    std::vector<KeyFrame *> mvKeyframeHist;
+    MapDrawer *mpMapDrawer;
 };
 
 } // namespace SLAM

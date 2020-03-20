@@ -39,6 +39,11 @@ void Tracking::SetViewer(Viewer *pViewer)
     mpViewer = pViewer;
 }
 
+void Tracking::SetMapDrawer(MapDrawer *pMapDrawer)
+{
+    mpMapDrawer = pMapDrawer;
+}
+
 void Tracking::GrabImageRGBD(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
 {
     mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, mpORBExtractor, mpORBVocabulary);
@@ -180,18 +185,19 @@ bool Tracking::TrackRGBD()
     mpTracker->SetTrackingDepth(mCurrentFrame.mImDepth);
 
     // Calculate the relateive transformation
-    Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
+    // Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
+    Sophus::SE3d DT = mpTracker->GetTransform(mLastFrame.mTcp.inverse(), false);
 
-    if (DT.translation().norm() > 0.1)
-    {
-        std::cout << DT.matrix3x4() << std::endl;
-        std::cout << "frame id: " << mCurrentFrame.mnId << std::endl;
-        mpTracker->WriteDebugImages();
-        return false;
-    }
+    // if (DT.translation().norm() > 0.1)
+    // {
+    //     std::cout << DT.matrix3x4() << std::endl;
+    //     std::cout << "frame id: " << mCurrentFrame.mnId << std::endl;
+    //     mpTracker->WriteDebugImages();
+    //     return false;
+    // }
 
-    mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
-    mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
+    mCurrentFrame.mTcw = mpReferenceKF->GetPose() * DT.inverse();
+    mCurrentFrame.mTcp = DT.inverse();
 
     mRawDepth.upload(mCurrentFrame.mImDepth);
     mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcp);
@@ -613,9 +619,9 @@ bool Tracking::NeedNewKeyFrame()
     bool bCreateNew = false;
     Sophus::SE3d DT = mCurrentFrame.mTcp;
 
-    if (DT.log().topRows<3>().norm() > 0.15)
+    if (DT.log().topRows<3>().norm() > 0.1)
         bCreateNew = true;
-    else if (DT.log().bottomRows<3>().norm() > 0.15)
+    else if (DT.log().bottomRows<3>().norm() > 0.1)
         bCreateNew = true;
 
     return bCreateNew;
@@ -632,6 +638,8 @@ void Tracking::CreateNewKeyFrame()
 
     if (!TrackLocalMap())
         return;
+
+    mvKeyframeHist.push_back(mpReferenceKF);
 
     KeyFrame *pKF = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
 
@@ -728,9 +736,29 @@ void Tracking::CreateNewKeyFrame()
                                mCurrentFrame.mvKeys);
 
     bundler->AddKeyFrame(pKF->mnId, mCurrentFrame.mImDepth, mCurrentFrame.mImGray, mCurrentFrame.mTcw);
-    bundler->BundleAdjust();
+    bundler->BundleAdjust(5);
     bundler->AllocatePoints();
-    pKF->SetPose(bundler->GetLastKeyFramePose());
+
+    for (int i = 1; i < 7; ++i)
+    {
+        if (!bundler->frame[i])
+            continue;
+        unsigned long KFid = bundler->frame[i]->KFid;
+        Sophus::SE3d Tcw = bundler->framePose[i].inverse();
+
+        for (int i = 0; i < mvKeyframeHist.size(); ++i)
+        {
+            if (mvKeyframeHist[i]->mnId == KFid)
+            {
+                mvKeyframeHist[i]->SetPose(Tcw);
+                break;
+            }
+        }
+    }
+
+    mpMapDrawer->debug = bundler->GetDebugPoints();
+
+    mpTracker->SwapFrameBuffer();
 }
 
 void Tracking::reset()

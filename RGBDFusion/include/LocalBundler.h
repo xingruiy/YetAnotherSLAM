@@ -23,7 +23,6 @@ struct RawResidual
 
     float hw;
     float r;
-    int targetIdx;
     bool active;
     float Jpdd;
     Eigen::Matrix<float, 1, 6> JIdxi;
@@ -63,13 +62,14 @@ public:
     ~LocalBundler();
     LocalBundler(int w, int h, const Eigen::Matrix3f &K);
 
+    std::vector<Eigen::Vector3f> GetDebugPoints();
     void AddKeyFrame(unsigned long KFid, const cv::Mat depth, const cv::Mat image, const Sophus::SE3d &Tcw);
     void AllocatePoints();
     Sophus::SE3d GetLastKeyFramePose();
     void BundleAdjust(int maxIter = 10);
     void Reset();
 
-protected:
+public:
     float LineariseAll();
     void AccumulatePointHessian();
     void AccumulateFrameHessian();
@@ -99,7 +99,7 @@ protected:
     std::array<cv::cuda::GpuMat, NUM_KF> ReduceResidual;
     std::array<cv::cuda::GpuMat, NUM_KF * NUM_KF> reduceHessian;
     std::array<Eigen::Matrix<float, 6, 6>, NUM_KF> frameHesOut;
-    std::array<Eigen::Matrix<float, 6, 1>, NUM_KF> frameResOut;
+    std::array<Eigen::Vector<float, 6>, NUM_KF> frameResOut;
     Eigen::Matrix<float, 6 * NUM_KF, 6 * NUM_KF> reduceHessianOut;
     Eigen::Vector<float, 6 * NUM_KF> ReduceResidualOut;
 
