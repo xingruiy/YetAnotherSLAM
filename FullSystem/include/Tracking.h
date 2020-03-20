@@ -13,6 +13,8 @@
 #include "RayTraceEngine.h"
 #include "KeyFrameDatabase.h"
 
+class LocalBundler;
+
 namespace SLAM
 {
 
@@ -130,6 +132,9 @@ public:
 
     // Voxel Map Structure
     MapStruct *mpCurrentMapStruct;
+
+    // Local bundler
+    LocalBundler *bundler;
 
     // Raw depth for fusion
     cv::cuda::GpuMat mRawDepth;

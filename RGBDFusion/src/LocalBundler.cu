@@ -3,19 +3,17 @@
 #include "ImageProc.h"
 #include "TrackingUtils.h"
 
-__constant__ Sophus::SE3f *constPoseMat;
-
-__device__ Sophus::SE3f GetPoseFromMatrix(int hostIdx, int targetIdx)
+__device__ Sophus::SE3f GetPoseFromMatrix(Sophus::SE3f *constPoseMat, int hostIdx, int targetIdx)
 {
     return constPoseMat[hostIdx * NUM_KF + targetIdx];
 }
 
-__device__ void SetPoseMatrix(const Sophus::SE3f &T, int hostIdx, int targetIdx)
+__device__ void SetPoseMatrix(Sophus::SE3f *constPoseMat, const Sophus::SE3f &T, int hostIdx, int targetIdx)
 {
     constPoseMat[hostIdx * NUM_KF + targetIdx] = T;
 }
 
-void UpdatePoseMatrix(std::array<Sophus::SE3d, NUM_KF> &poses)
+void LocalBundler::UpdatePoseMatrix(std::array<Sophus::SE3d, NUM_KF> &poses)
 {
     Sophus::SE3f poses_host[NUM_KF * NUM_KF];
     for (int i = 0; i < poses.size(); ++i)
@@ -23,25 +21,70 @@ void UpdatePoseMatrix(std::array<Sophus::SE3d, NUM_KF> &poses)
             if (i != j)
                 poses_host[i * NUM_KF + j] = (poses[j].inverse() * poses[i]).cast<float>();
 
-    SafeCall(cudaMemcpyToSymbol(constPoseMat, poses_host, sizeof(Sophus::SE3f) * NUM_KF * NUM_KF));
+    SafeCall(cudaMemcpy(constPoseMat, &poses_host[0], sizeof(Sophus::SE3f) * NUM_KF * NUM_KF, cudaMemcpyHostToDevice));
 }
 
-LocalBundler::LocalBundler(int w, int h, const Eigen::Matrix3f &K) : K(K), width(w), height(h), frameCount(0)
+__global__ void InitializePoints(PointShell *points, int *stack, int *ptr, int N)
+{
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    if (x >= N)
+        return;
+
+    if (threadIdx.x == 0)
+        ptr[0] = 0;
+
+    stack[x] = x;
+
+    PointShell &P(points[N]);
+    P.hostIdx = -1;
+    P.Hs = 0;
+    P.bs = 0;
+    P.numResiduals = 0;
+#pragma unroll
+    for (int i = 0; i < NUM_KF; ++i)
+    {
+        P.res[i].active = false;
+        P.res[i].targetIdx = -1;
+    }
+}
+
+LocalBundler::LocalBundler(int w, int h, const Eigen::Matrix3f &K)
+    : K(K), width(w), height(h), frameCount(0), nPoints(0), lastKeyframeIdx(0)
 {
     // This is for the reduced camera system
     FrameHessianR.create(96, 21 * NUM_KF * NUM_KF, CV_32FC1);
     FrameHessianRFinal.create(1, 21 * NUM_KF * NUM_KF, CV_32FC1);
     Residual.create(96, NUM_KF * 6, CV_32FC1);
     ResidualFinal.create(1, NUM_KF * 6, CV_32FC1);
+    EnergySum.create(96, 2, CV_32FC1);
+    EnergySumFinal.create(1, 2, CV_32FC1);
 
+    SafeCall(cudaMalloc((void **)&N, sizeof(int)));
+    SafeCall(cudaMemset(N, 0, sizeof(int)));
+
+    SafeCall(cudaMalloc((void **)&stack, sizeof(int) * w * h));
+    SafeCall(cudaMalloc((void **)&points_dev, sizeof(PointShell) * w * h));
     SafeCall(cudaMalloc((void **)&constPoseMat, sizeof(Sophus::SE3f) * NUM_KF * NUM_KF));
     SafeCall(cudaMalloc((void **)&frameData_dev, sizeof(Eigen::Vector3f) * w * h * NUM_KF));
+
+    dim3 block(1024);
+    dim3 grid(cv::divUp(w * h, block.x));
+    InitializePoints<<<grid, block>>>(points_dev, stack, N, w * h);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
 
     // initialize the frame array
     for (int i = 0; i < NUM_KF; ++i)
     {
         frame[i] = nullptr;
         frameHessian[i].create(96, 27, CV_32FC1);
+        ReduceResidual[i].create(96, 6, CV_32FC1);
+    }
+
+    for (int i = 0; i < NUM_KF * NUM_KF; ++i)
+    {
+        reduceHessian[i].create(96, 21, CV_32FC1);
     }
 
     Reset();
@@ -82,27 +125,39 @@ void LocalBundler::AddKeyFrame(unsigned long KFid, const cv::Mat depth, const cv
 
     for (int i = 0; i < NUM_KF; ++i)
     {
-        if (frame[i] == nullptr)
+        // std::cout << (frame[i] == nullptr) << std::endl;
+
+        if (!frame[i])
         {
             F->arrayIdx = i;
             frame[i] = F;
             framePose[i] = Tcw;
+            lastKeyframeIdx = i;
+            break;
         }
     }
 
     if (F->arrayIdx == -1)
     {
         std::cout << "array idx non positive!" << std::endl;
+        return;
     }
 
     frameCount++;
-    F->image = cv::cuda::GpuMat(image);
+    cv::Mat imFloat;
+    image.convertTo(imFloat, CV_32FC1);
+
+    F->image = cv::cuda::GpuMat(imFloat);
     F->depth = cv::cuda::GpuMat(depth);
 
     // TODO: upload frame data to the global memory
     dim3 block(8, 8);
     dim3 grid(cv::divUp(width, block.x), cv::divUp(height, block.y));
     uploadFrameData_kernel<<<grid, block>>>(frameData_dev + F->arrayIdx * width * height, width, height, F->image);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
+
     UpdatePoseMatrix(framePose);
 }
 
@@ -120,6 +175,7 @@ __device__ Eigen::Vector3f GetInterpolateElement33(Eigen::Vector3f *I, float x, 
 }
 
 __global__ void LinearizeAll_kernel(PointShell *points, int N,
+                                    Sophus::SE3f *poseMatrix,
                                     Eigen::Vector3f *frameData,
                                     cv::cuda::PtrStep<float> out,
                                     int w, int h,
@@ -133,6 +189,7 @@ __global__ void LinearizeAll_kernel(PointShell *points, int N,
         PointShell &P(points[x]);
         if (P.numResiduals == 0)
             continue;
+        // printf("res: %d, frame: %d\n", P.numResiduals, P.hostIdx);
 
         Eigen::Matrix<float, 2, 6> Jpdxi;
         Eigen::Matrix<float, 2, 3> Jhdp;
@@ -140,10 +197,10 @@ __global__ void LinearizeAll_kernel(PointShell *points, int N,
         for (int iRes = 0; iRes < NUM_KF; ++iRes)
         {
             RawResidual &res(P.res[iRes]);
-            if (!res.active || iRes == P.hostIdx || res.state != OK)
+            if (!res.active || res.state != OK)
                 continue;
 
-            const Sophus::SE3f &T(GetPoseFromMatrix(P.hostIdx, res.targetIdx));
+            const Sophus::SE3f &T(GetPoseFromMatrix(poseMatrix, P.hostIdx, res.targetIdx));
             const float z = 1.0 / P.idepth;
             Eigen::Vector3f Point((P.x - cx) / fx, (P.y - cy) / fy, 1);
             Eigen::Vector3f PointScaled = T * Point * z;
@@ -187,10 +244,15 @@ __global__ void LinearizeAll_kernel(PointShell *points, int N,
 
             res.JIdxi = dI.tail<2>().transpose() * Jpdxi;
             res.Jpdd = dI.tail<2>().transpose() * Jhdp * PointRot;
+            // printf("jpdd: %f\n", res.Jpdd);
             res.r = dI(0) - P.intensity;
             res.hw = fabs(res.r) < 9 ? 1 : 9 / fabs(res.r);
 
+            // if (res.Jpdd > 100)
+            //     printf("%f, %f,%f, %f,%f\n", PointRot(0), PointRot(1), PointRot(2), dI(1), dI(2));
+
             ++sum[1];
+            // printf("id: %d, hw: %f, i: %f, i2: %f\n", x, res.hw, dI(0), P.intensity);
             sum[0] += res.hw * res.r * res.r;
         }
     }
@@ -205,12 +267,20 @@ __global__ void LinearizeAll_kernel(PointShell *points, int N,
 
 float LocalBundler::LineariseAll()
 {
-    dim3 block(1024);
-    dim3 grid(cv::divUp(nPoints, block.x));
-    LinearizeAll_kernel<<<grid, block>>>(points_dev, nPoints, frameData_dev, EnergySum,
-                                         width, height, K(0, 0), K(1, 1), K(0, 2), K(1, 2));
+    if (nPoints == 0)
+        return 0;
+
+    // std::cout << "Now we have " << nPoints << " points" << std::endl;
+
+    LinearizeAll_kernel<<<96, 224>>>(points_dev, nPoints, constPoseMat, frameData_dev, EnergySum,
+                                     width, height, K(0, 0), K(1, 1), K(0, 2), K(1, 2));
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
+
     cv::cuda::reduce(EnergySum, EnergySumFinal, 0, cv::REDUCE_SUM);
     cv::Mat out(EnergySumFinal);
+    // std::cout << "num residual: " << out.at<float>(1) << std::endl;
     return out.at<float>(0);
 }
 
@@ -219,7 +289,7 @@ void LocalBundler::Marginalization()
 }
 
 __global__ void AccumulateFrameHessian_kernel(PointShell *points, int N,
-                                              int targetIdx,
+                                              int frameIdx,
                                               cv::cuda::PtrStep<float> out)
 {
     float sum[27];
@@ -228,10 +298,10 @@ __global__ void AccumulateFrameHessian_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.hostIdx == targetIdx || P.numResiduals == 0)
+        if (P.numResiduals == 0)
             continue;
 
-        RawResidual &res(P.res[targetIdx]);
+        RawResidual &res(P.res[frameIdx]);
         if (!res.active)
             continue;
 
@@ -243,9 +313,9 @@ __global__ void AccumulateFrameHessian_kernel(PointShell *points, int N,
             for (int j = i; j < 7; ++j)
             {
                 if (j == 6)
-                    sum[count++] = res.hw * res.JIdxi(i) * res.r;
+                    sum[count++] += res.hw * res.JIdxi(i) * res.r;
                 else
-                    sum[count++] = res.hw * res.JIdxi(i) * res.JIdxi(j);
+                    sum[count++] += res.hw * res.JIdxi(i) * res.JIdxi(j);
             }
         }
     }
@@ -268,6 +338,11 @@ void LocalBundler::AccumulateFrameHessian()
         cv::cuda::reduce(frameHessian[i], hessianOut, 0, cv::REDUCE_SUM);
         cv::Mat hostData(hessianOut);
         RankUpdateHessian<6, 7>(hostData.ptr<float>(), frameHesOut[i].data(), frameResOut[i].data());
+
+        // std::cout << frameHesOut[i] << std::endl;
+
+        SafeCall(cudaDeviceSynchronize());
+        SafeCall(cudaGetLastError());
     }
 }
 
@@ -281,7 +356,7 @@ __global__ void AccumulateShcurrHessian_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.hostIdx == hostIdx || P.hostIdx == targetIdx || P.numResiduals == 0)
+        if (P.numResiduals == 0)
             continue;
 
         RawResidual &res(P.res[hostIdx]);
@@ -289,14 +364,20 @@ __global__ void AccumulateShcurrHessian_kernel(PointShell *points, int N,
         if (!res.active || !res2.active)
             continue;
 
-        float iHs = 1.0f / P.Hs;
+        if (P.Hs == 0)
+            continue;
+
+        float iHs = 1.0 / P.Hs;
+
+        // if (isnan(iHs) || !isfinite(iHs))
+        //     printf("Hs: %a\n", iHs);
 
         int count = 0;
 #pragma unroll
         for (int i = 0; i < 6; ++i)
 #pragma unroll
             for (int j = i; j < 6; ++j)
-                sum[count++] = res.hw * res.JIdxi(i) * iHs * res2.hw * res2.JIdxi(j);
+                sum[count++] += res.hw * res.JIdxi(i) * iHs * res2.hw * res2.JIdxi(j);
     }
 
     BlockReduceSum<float, 21>(sum);
@@ -309,12 +390,40 @@ __global__ void AccumulateShcurrHessian_kernel(PointShell *points, int N,
 
 void LocalBundler::AccumulateShcurrHessian()
 {
+    for (int i = 0; i < NUM_KF * NUM_KF; ++i)
+        reduceHessian[i].setTo(0);
+
+    cv::cuda::GpuMat out;
     int nKF = std::min(NUM_KF, frameCount);
     for (int i = 0; i < nKF; ++i)
+    {
         for (int j = i; j < nKF; ++j)
-            AccumulateShcurrHessian_kernel<<<96, 224>>>(points_dev, nPoints, i, j, FrameHessianR);
+        {
+            AccumulateShcurrHessian_kernel<<<96, 224>>>(points_dev, nPoints, i, j, reduceHessian[i * NUM_KF + j]);
 
-    cv::cuda::reduce(FrameHessianR, FrameHessianRFinal, 0, cv::REDUCE_SUM);
+            SafeCall(cudaDeviceSynchronize());
+            SafeCall(cudaGetLastError());
+
+            cv::cuda::reduce(reduceHessian[i * NUM_KF + j], out, 0, cv::REDUCE_SUM);
+            cv::Mat hostData(out);
+            Eigen::Matrix<float, 6, 6> hessian;
+
+            int count = 0;
+            for (int ii = 0; ii < 6; ++ii)
+                for (int jj = ii; jj < 6; ++jj)
+                {
+                    hessian(ii, jj) = hessian(jj, ii) = hostData.ptr<float>()[count++];
+                }
+            // std::cout << "i: " << i << " j: " << j << std::endl
+            //           << hessian << std::endl;
+            reduceHessianOut.block<6, 6>(i * 6, j * 6) = hessian;
+            reduceHessianOut.block<6, 6>(j * 6, i * 6) = hessian.transpose();
+        }
+    }
+
+    // std::cout << reduceHessianOut.topLeftCorner(nKF * 6, nKF * 6) << std::endl;
+
+    // cv::cuda::reduce(FrameHessianR, FrameHessianRFinal, 0, cv::REDUCE_SUM);
 }
 
 __global__ void AccumulateShcurrResidual_kernel(PointShell *points, int N,
@@ -327,7 +436,7 @@ __global__ void AccumulateShcurrResidual_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.hostIdx != hostIdx || P.numResiduals == 0)
+        if (P.numResiduals == 0 || P.Hs == 0)
             continue;
 
         float iHs = 1.0f / P.Hs;
@@ -353,17 +462,29 @@ __global__ void AccumulateShcurrResidual_kernel(PointShell *points, int N,
     if (threadIdx.x == 0)
 #pragma unroll
         for (int k = 0; k < 6; ++k)
-            out.ptr(blockIdx.x)[hostIdx * 6 + k] = sum[k];
+            out.ptr(blockIdx.x)[k] = sum[k];
 }
 
 void LocalBundler::AccumulateShcurrResidual()
 {
-    for (int i = 0; i < NUM_KF; ++i)
+    int nKF = std::min(NUM_KF, frameCount);
+    for (int i = 0; i < nKF; ++i)
     {
-        AccumulateShcurrResidual_kernel<<<96, 224>>>(points_dev, nPoints, i, Residual);
+        AccumulateShcurrResidual_kernel<<<96, 224>>>(points_dev, nPoints, i, ReduceResidual[i]);
+        cv::cuda::reduce(ReduceResidual[i], ResidualFinal, 0, cv::REDUCE_SUM);
+
+        cv::Mat out(ResidualFinal);
+        // std::cout << out << std::endl;
+        for (int k = 0; k < 6; ++k)
+            ReduceResidualOut.middleRows<6>(i * 6)[k] = out.at<float>(k);
+
+        SafeCall(cudaDeviceSynchronize());
+        SafeCall(cudaGetLastError());
     }
 
-    cv::cuda::reduce(Residual, ResidualFinal, 0, cv::REDUCE_SUM);
+    // std::cout << ReduceResidualOut.head<18>() << std::endl;
+
+    // std::cout << ReduceResidualOut << std::endl;
 }
 
 __global__ void AccumulatePointHessian_kernel(PointShell *points, int N)
@@ -376,33 +497,46 @@ __global__ void AccumulatePointHessian_kernel(PointShell *points, int N)
 
         for (int i = 0; i < NUM_KF; ++i)
         {
-            RawResidual &res(P.res[i]);
-            if (!res.active)
+            RawResidual &RES(P.res[i]);
+            if (!RES.active)
                 continue;
 
-            P.Hs += res.hw * res.Jpdd * res.Jpdd;
-            P.bs += res.hw * res.Jpdd * res.r;
+            P.Hs += RES.hw * RES.Jpdd * RES.Jpdd;
+            P.bs += RES.hw * RES.Jpdd * RES.r;
         }
     }
 }
 
 void LocalBundler::AccumulatePointHessian()
 {
-    // TODO: need to be called before accumulating frame hessian
+    if (nPoints == 0)
+        return;
+
     dim3 block(1024);
     dim3 grid(cv::divUp(nPoints, block.x));
 
     AccumulatePointHessian_kernel<<<grid, block>>>(points_dev, nPoints);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
 }
 
 void LocalBundler::BundleAdjust(int maxIter)
 {
+    auto t1 = std::chrono::high_resolution_clock::now();
+    if (frameCount != 1)
+    {
+        FrameShell *F = frame[lastKeyframeIdx];
+        if (F != nullptr)
+            PopulateOccupancyGrid(F);
+    }
+
     if (frameCount <= 2)
         return;
     else if (frameCount == 3)
-        maxIter = 20;
-    else if (frameCount == 4)
         maxIter = 15;
+    else if (frameCount == 4)
+        maxIter = 10;
 
     float lastEnergy = LineariseAll();
     float bestEnergy = lastEnergy;
@@ -425,12 +559,147 @@ void LocalBundler::BundleAdjust(int maxIter)
             bestEnergy = lastEnergy;
         }
     }
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+}
+
+__global__ void AllocatePoints_kernel(int *stack, int *N,
+                                      PointShell *points_dev,
+                                      int frameIdx, int w, int h,
+                                      cv::cuda::PtrStep<char> grid,
+                                      cv::cuda::PtrStep<float> image,
+                                      cv::cuda::PtrStep<float> depth)
+{
+    const int x = blockDim.x * blockIdx.x + threadIdx.x;
+    const int y = blockDim.y * blockIdx.y + threadIdx.y;
+    if (x >= w - 1 || y >= h - 1)
+        return;
+
+    int u0 = x / 3;
+    int v0 = y / 3;
+    bool occupied = (grid.ptr(v0)[u0] == 1);
+
+    if (occupied)
+        return;
+
+    float z = depth.ptr(y)[x];
+    float im = image.ptr(y)[x];
+    float dx = (image.ptr(y)[x + 1] - image.ptr(y)[x - 1]) * 0.5;
+    float dy = (image.ptr(y + 1)[x] - image.ptr(y - 1)[x]) * 0.5;
+
+    // printf("x: %d, y:%d, itensity: %f, dx: %f, dy: %f\n", x, y, im, dx, dy);
+
+    if (z == z && im == im && z > 0.2 && z < 8.f && (dx * dx + dy * dy) > 4)
+    {
+        int idx = atomicAdd(N, 1);
+        int realIdx = stack[idx];
+        PointShell &P(points_dev[realIdx]);
+        P.x = x;
+        P.y = y;
+        P.intensity = im;
+        P.numResiduals = 0;
+        P.idepth = 1.f / z;
+        P.hostIdx = frameIdx;
+    }
+}
+
+void LocalBundler::AllocatePoints()
+{
+    FrameShell *F = frame[lastKeyframeIdx];
+    if (F == nullptr)
+    {
+        std::cerr << "FATAL: Frame is null" << std::endl;
+        return;
+    }
+
+    if (F->KFid == 0)
+    {
+        F->OGrid.create(height / 3, width / 3, CV_8SC1);
+        F->OGrid.setTo(0);
+    }
+    // else
+    // {
+    //     PopulateOccupancyGrid(F);
+    // }
+
+    // cv::Mat out(F->image);
+    // double minval, maxval;
+    // cv::minMaxIdx(out, &minval, &maxval);
+    // std::cout << "min:" << minval << "max:" << maxval << std::endl;
+    // cv::imshow("debug", out);
+    // cv::waitKey(0);
+
+    dim3 block(8, 8);
+    dim3 grid(cv::divUp(width, block.x), cv::divUp(height, block.y));
+    AllocatePoints_kernel<<<grid, block>>>(stack, N, points_dev, F->arrayIdx, width, height, F->OGrid, F->image, F->depth);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
+
+    SafeCall(cudaMemcpy(&nPoints, N, sizeof(int), cudaMemcpyDeviceToHost));
 }
 
 void LocalBundler::SolveSystem()
 {
+    int nKF = std::min(NUM_KF, frameCount);
+    Eigen::Matrix<float, -1, -1> H(nKF * 6, nKF * 6);
+    H.setZero();
+    for (int i = 0; i < nKF; ++i)
+        H.block<6, 6>(i * 6, i * 6) = frameHesOut[i];
+    H -= reduceHessianOut.topLeftCorner(nKF * 6, nKF * 6);
+
+    Eigen::Vector<float, -1> b(nKF * 6);
+    for (int i = 0; i < nKF; ++i)
+        b.middleRows(i * 6, 6) = frameResOut[i];
+    b -= ReduceResidualOut.leftCols(6 * nKF);
+
+    auto realH = H.block(6, 6, (nKF - 1) * 6, (nKF - 1) * 6).cast<double>();
+    auto realb = b.middleRows(6, (nKF - 1) * 6).cast<double>();
+
+    Eigen::Vector<double, -1> x0 = realH.ldlt().solve(realb);
 }
 
-void LocalBundler::PopulateOccupancyGrid(FrameShell &F)
+__global__ void PopulateOccupancyGrid_kernel(PointShell *points, int N,
+                                             Sophus::SE3f *poseMatrix,
+                                             int frameIdx, int w, int h,
+                                             float fx, float fy, float cx, float cy,
+                                             cv::cuda::PtrStep<char> grid)
 {
+    for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += blockDim.x * gridDim.x)
+    {
+        PointShell &P(points[x]);
+        Sophus::SE3f T(GetPoseFromMatrix(poseMatrix, P.hostIdx, frameIdx));
+
+        float z = 1.0 / P.idepth;
+        Eigen::Vector3f pt = T * Eigen::Vector3f(z * (P.x - cx) / fx, z * (P.y - cy) / fy, z);
+        float u = fx * pt(0) / pt(2) + cx;
+        float v = fy * pt(1) / pt(2) + cy;
+        // printf("u: %f, v: %f\n", u, v);
+
+        if (u < 2 || v < 2 || u > w - 2 || v > h - 2)
+            continue;
+        P.numResiduals++;
+
+        RawResidual &RES(P.res[frameIdx]);
+        RES.active = true;
+        RES.state = OK;
+        RES.targetIdx = frameIdx;
+
+        int u0 = static_cast<int>(u) / 3;
+        int v0 = static_cast<int>(v) / 3;
+        grid.ptr(v0)[u0] = 1;
+    }
+}
+
+void LocalBundler::PopulateOccupancyGrid(FrameShell *F)
+{
+    F->OGrid.create(height / 3, width / 3, CV_8SC1);
+    F->OGrid.setTo(0);
+
+    PopulateOccupancyGrid_kernel<<<96, 224>>>(points_dev, nPoints, constPoseMat, F->arrayIdx,
+                                              width, height, K(0, 0), K(1, 1),
+                                              K(0, 2), K(1, 2), F->OGrid);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
 }

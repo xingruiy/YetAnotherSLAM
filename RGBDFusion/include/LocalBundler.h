@@ -62,6 +62,7 @@ public:
     LocalBundler(int w, int h, const Eigen::Matrix3f &K);
 
     void AddKeyFrame(unsigned long KFid, const cv::Mat depth, const cv::Mat image, const Sophus::SE3d &Tcw);
+    void AllocatePoints();
     void BundleAdjust(int maxIter = 10);
     void Reset();
 
@@ -74,7 +75,7 @@ private:
 
     void SolveSystem();
     void Marginalization();
-    void PopulateOccupancyGrid(FrameShell &F);
+    void PopulateOccupancyGrid(FrameShell *F);
 
     int width;
     int height;
@@ -84,13 +85,20 @@ private:
     PointShell *points_dev;
     int *N;
     int nPoints;
+    int *stack;
+    int lastKeyframeIdx;
     Eigen::Vector3f *frameData_dev;
+    Sophus::SE3f *constPoseMat;
 
     std::array<FrameShell *, NUM_KF> frame;
     std::array<Sophus::SE3d, NUM_KF> framePose;
     std::array<cv::cuda::GpuMat, NUM_KF> frameHessian;
+    std::array<cv::cuda::GpuMat, NUM_KF> ReduceResidual;
+    std::array<cv::cuda::GpuMat, NUM_KF * NUM_KF> reduceHessian;
     std::array<Eigen::Matrix<float, 6, 6>, NUM_KF> frameHesOut;
     std::array<Eigen::Matrix<float, 6, 1>, NUM_KF> frameResOut;
+    Eigen::Matrix<float, 6 * NUM_KF, 6 * NUM_KF> reduceHessianOut;
+    Eigen::Vector<float, 6 * NUM_KF> ReduceResidualOut;
 
     cv::cuda::GpuMat FrameHessianR;
     cv::cuda::GpuMat FrameHessianRFinal;
@@ -98,6 +106,8 @@ private:
     cv::cuda::GpuMat ResidualFinal;
     cv::cuda::GpuMat EnergySum;
     cv::cuda::GpuMat EnergySumFinal;
+
+    void UpdatePoseMatrix(std::array<Sophus::SE3d, NUM_KF> &poses);
 };
 
 #endif

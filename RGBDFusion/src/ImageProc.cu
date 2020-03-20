@@ -220,6 +220,9 @@ void ComputeVertexMap(const cv::cuda::GpuMat depth_inv, cv::cuda::GpuMat vmap, c
     dim3 grid(cv::divUp(depth_inv.cols, block.x), cv::divUp(depth_inv.rows, block.y));
 
     ComputeVertexMap_kernel<<<grid, block>>>(depth_inv, vmap, invfx, invfy, cx, cy, cut_off);
+
+    SafeCall(cudaDeviceSynchronize());
+    SafeCall(cudaGetLastError());
 }
 
 __global__ void ComputeNormalMap_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,

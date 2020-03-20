@@ -3,6 +3,7 @@
 #include "Optimizer.h"
 #include "PoseSolver.h"
 #include "ImageProc.h"
+#include "LocalBundler.h"
 
 namespace SLAM
 {
@@ -19,6 +20,8 @@ Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *pMap, KeyFrameData
     mpMeshEngine = new MeshEngine(20000000);
     mpRayTraceEngine = new RayTraceEngine(w, h, g_calib[0]);
     mpORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
+
+    bundler = new LocalBundler(w, h, calib);
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -157,6 +160,9 @@ void Tracking::StereoInitialization()
 
         mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
                                    mCurrentFrame.mvKeys);
+
+        bundler->AddKeyFrame(pKFini->mnId, mCurrentFrame.mImDepth, mCurrentFrame.mImGray, mCurrentFrame.mTcw);
+        bundler->AllocatePoints();
     }
 }
 
@@ -720,6 +726,10 @@ void Tracking::CreateNewKeyFrame()
 
     mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
                                mCurrentFrame.mvKeys);
+
+    bundler->AddKeyFrame(pKF->mnId, mCurrentFrame.mImDepth, mCurrentFrame.mImGray, mCurrentFrame.mTcw);
+    bundler->BundleAdjust();
+    bundler->AllocatePoints();
 }
 
 void Tracking::reset()
