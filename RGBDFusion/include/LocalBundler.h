@@ -6,6 +6,7 @@
 #include <sophus/se3.hpp>
 
 #define NUM_KF 7
+#define NUM_RES 7
 #define IMW 640
 #define IMH 480
 
@@ -24,7 +25,9 @@ struct RawResidual
     float hw;
     float r;
     bool active;
+    bool init;
     float Jpdd;
+    float u0, v0, u, v;
     Eigen::Matrix<float, 1, 6> JIdxi;
 };
 
@@ -39,7 +42,7 @@ struct PointShell
     float bs;
     float x1;
     float b1;
-    RawResidual res[NUM_KF];
+    RawResidual res[NUM_RES];
 };
 
 struct FrameShell
@@ -77,6 +80,7 @@ public:
     void AccumulateShcurrResidual();
 
     void SolveSystem();
+    void RemoveOutliers();
     void Marginalization();
     void PopulateOccupancyGrid(FrameShell *F);
 

@@ -41,10 +41,11 @@ __global__ void InitializePoints(PointShell *points, int *stack, int *ptr, int N
     P.bs = 0;
     P.numResiduals = 0;
 #pragma unroll
-    for (int i = 0; i < NUM_KF; ++i)
+    for (int i = 0; i < NUM_RES; ++i)
     {
         P.res[i].active = false;
         P.res[i].state = OK;
+        P.res[i].init = true;
     }
 }
 
@@ -131,6 +132,8 @@ std::vector<Eigen::Vector3f> LocalBundler::GetDebugPoints()
     for (int i = 0; i < nPoints; ++i)
     {
         PointShell &P(hostData[i]);
+        if (P.numResiduals <= 0)
+            continue;
         float z = 1.0 / P.idepth;
         Eigen::Vector3d gpt = framePose[P.hostIdx].inverse() * Eigen::Vector3d(z * (P.x - cx) / fx, z * (P.y - cy) / fy, z);
         points.push_back(gpt.cast<float>());
@@ -233,14 +236,15 @@ __global__ void LinearizeAll_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.numResiduals == 0)
+        if (P.numResiduals <= 0)
             continue;
         // printf("res: %d, frame: %d\n", P.numResiduals, P.hostIdx);
 
         Eigen::Matrix<float, 2, 6> Jpdxi;
         Eigen::Matrix<float, 2, 3> Jhdp;
 
-        for (int iRes = 0; iRes < NUM_KF; ++iRes)
+#pragma unroll
+        for (int iRes = 0; iRes < NUM_RES; ++iRes)
         {
             RawResidual &res(P.res[iRes]);
             if (!res.active || iRes == P.hostIdx || res.state == OOB)
@@ -253,7 +257,21 @@ __global__ void LinearizeAll_kernel(PointShell *points, int N,
 
             const float u = fx * PointScaled(0) / PointScaled(2) + cx;
             const float v = fy * PointScaled(1) / PointScaled(2) + cy;
-            if (u < 1 || v < 1 || u >= w - 1 || v >= h - 1)
+
+            // if (res.init)
+            // {
+            //     res.init = false;
+            //     res.u0 = u;
+            //     res.v0 = v;
+            // }
+            // else
+            // {
+            //     float disp = (Eigen::Vector2f(u, v) - Eigen::Vector2f(res.u0, res.v0)).norm();
+            //     if (disp < 25)
+            //         printf("displacement: %f\n", disp);
+            // }
+
+            if (u < 1 || v < 1 || u >= w - 1 || v >= h - 1 || PointScaled(2) < 0)
             {
                 res.state = OOB;
                 res.active = false;
@@ -278,27 +296,37 @@ __global__ void LinearizeAll_kernel(PointShell *points, int N,
 
             Eigen::Vector3f dI = GetInterpolateElement33(frameData + iRes * w * h, u, v, w);
 
-            if (!isfinite(dI(0)) || !isfinite(dI(1)) || !isfinite(dI(2)) || dI.tail<2>().squaredNorm() < 16)
+            if (!isfinite(dI(0)) || !isfinite(dI(1)) || !isfinite(dI(2)))
             {
                 res.state = Outlier;
                 continue;
             }
 
-            // Jhdp(0, 0) = fx * invz;
-            // Jhdp(0, 1) = 0;
-            // Jhdp(0, 2) = -PointScaled(0) * fx * invz2;
-            // Jhdp(1, 0) = 0;
-            // Jhdp(1, 1) = fy * invz;
-            // Jhdp(1, 2) = -PointScaled(1) * fy * invz2;
+            Jhdp(0, 0) = fx * invz;
+            Jhdp(0, 1) = 0;
+            Jhdp(0, 2) = -PointScaled(0) * fx * invz2;
+            Jhdp(1, 0) = 0;
+            Jhdp(1, 1) = fy * invz;
+            Jhdp(1, 2) = -PointScaled(1) * fy * invz2;
+
+            Eigen::Vector3f temp = Eigen::Vector3f((P.x - cx) / fx, (P.y - cy) / fy, 1);
 
             // Eigen::Vector3f PointRot = T.so3() * Point;
-
+            res.r = dI(0) - P.intensity;
+            // if (fabs(res.r) > 25)
+            // {
+            //     res.state = Outlier;
+            //     res.active = false;
+            //     P.numResiduals--;
+            //     continue;
+            // }
             res.state = OK;
             res.JIdxi = dI.tail<2>().transpose() * Jpdxi;
+            // res.Jpdd = dI.tail<2>().transpose() * Jhdp * (T.rotationMatrix() * temp * (-1 / (P.idepth * P.idepth)));
             // res.Jpdd = dI.tail<2>().transpose() * Jhdp * PointRot;
             // printf("jpdd: %f\n", res.Jpdd);
-            res.r = dI(0) - P.intensity;
-            float huberTh = 25;
+
+            float huberTh = 9;
             res.hw = fabs(res.r) < huberTh ? 1 : huberTh / fabs(res.r);
 
             // if (res.Jpdd > 100)
@@ -352,7 +380,7 @@ __global__ void AccumulateFrameHessian_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.hostIdx == frameIdx || P.numResiduals == 0)
+        if (P.hostIdx == frameIdx || P.numResiduals <= 0)
             continue;
 
         RawResidual &res(P.res[frameIdx]);
@@ -416,7 +444,7 @@ __global__ void AccumulateShcurrHessian_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.hostIdx == hostIdx || P.hostIdx == targetIdx || P.numResiduals == 0)
+        if (P.hostIdx == hostIdx || P.hostIdx == targetIdx || P.numResiduals <= 0)
             continue;
 
         RawResidual &res(P.res[hostIdx]);
@@ -437,7 +465,7 @@ __global__ void AccumulateShcurrHessian_kernel(PointShell *points, int N,
         for (int i = 0; i < 6; ++i)
 #pragma unroll
             for (int j = i; j < 6; ++j)
-                sum[count++] += res.hw * res.JIdxi(i) * iHs * res2.hw * res2.JIdxi(j);
+                sum[count++] += sqrtf(res.hw) * res.JIdxi(i) * iHs * sqrtf(res2.hw) * res2.JIdxi(j);
     }
 
     BlockReduceSum<float, 21>(sum);
@@ -496,13 +524,13 @@ __global__ void AccumulateShcurrResidual_kernel(PointShell *points, int N,
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.hostIdx == hostIdx || P.numResiduals == 0 || P.Hs == 0)
+        if (P.hostIdx == hostIdx || P.numResiduals <= 0 || P.Hs == 0)
             continue;
 
         float iHs = 1.0f / P.Hs;
 
 #pragma unroll
-        for (int i = 0; i < NUM_KF; ++i)
+        for (int i = 0; i < NUM_RES; ++i)
         {
             if (i == hostIdx)
                 continue;
@@ -552,10 +580,11 @@ __global__ void AccumulatePointHessian_kernel(PointShell *points, int N)
     for (int x = blockDim.x * blockIdx.x + threadIdx.x; x < N; x += gridDim.x * blockDim.x)
     {
         PointShell &P(points[x]);
-        if (P.numResiduals == 0)
+        if (P.numResiduals <= 0)
             continue;
 
-        for (int i = 0; i < NUM_KF; ++i)
+#pragma unroll
+        for (int i = 0; i < NUM_RES; ++i)
         {
             RawResidual &RES(P.res[i]);
             if (!RES.active)
@@ -600,11 +629,9 @@ void LocalBundler::BundleAdjust(int maxIter)
 
     float lastEnergy = LineariseAll();
     float energy = lastEnergy;
-    float bestEnergy = lastEnergy;
 
     for (int iter = 0; iter < maxIter; ++iter)
     {
-        std::cout << "current energy: " << energy << std::endl;
 
         AccumulatePointHessian();
         AccumulateFrameHessian();
@@ -613,16 +640,13 @@ void LocalBundler::BundleAdjust(int maxIter)
 
         SolveSystem();
 
-        float energy = LineariseAll();
-        std::cout << "cost reduce: " << lastEnergy - energy << std::endl;
-
-        if (lastEnergy < bestEnergy)
-        {
-            bestEnergy = lastEnergy;
-        }
+        energy = LineariseAll();
+        std::cout << "current energy: " << energy << ",last Energy: " << lastEnergy << ",cost reduction: " << lastEnergy - energy << std::endl;
 
         lastEnergy = energy;
     }
+
+    RemoveOutliers();
 }
 
 __global__ void AllocatePoints_kernel(int *stack, int *N,
@@ -651,7 +675,7 @@ __global__ void AllocatePoints_kernel(int *stack, int *N,
 
     // printf("x: %d, y:%d, itensity: %f, dx: %f, dy: %f\n", x, y, im, dx, dy);
 
-    if (z == z && im == im && z > 0.2 && z < 8.f && (dx * dx + dy * dy) > 36)
+    if (z == z && im == im && z > 0.2 && z < 8.f && (dx * dx + dy * dy) > 144)
     {
         int idx = atomicAdd(N, 1);
         int realIdx = stack[idx];
@@ -659,13 +683,13 @@ __global__ void AllocatePoints_kernel(int *stack, int *N,
         P.x = x;
         P.y = y;
         P.intensity = im;
-        P.numResiduals = 1;
+        P.numResiduals = 0;
         P.idepth = 1.f / z;
         P.hostIdx = frameIdx;
 
-        RawResidual &RES(P.res[frameIdx]);
-        RES.active = true;
-        RES.state = OK;
+        // RawResidual &RES(P.res[frameIdx]);
+        // RES.active = true;
+        // RES.state = OK;
     }
 }
 
@@ -720,23 +744,26 @@ __global__ void BackSubstitution_kernel(PointShell *points, int N, float *x0)
     PointShell &P(points[x]);
     // printf("%d\n", P.numResiduals);
 
-    if (P.numResiduals == 0 || P.Hs == 0)
+    if (P.numResiduals <= 0 || P.Hs == 0)
         return;
 
-    for (int i = 1; i < NUM_KF; ++i)
+#pragma unroll
+    for (int i = 1; i < NUM_RES; ++i)
     {
         RawResidual &RES(P.res[i]);
 
-        if (!RES.active)
+        if (!RES.active && RES.state != OK)
             continue;
 
         Eigen::Map<Eigen::Vector<float, 6>> x0i(&x0[(i - 1) * 6]);
-        P.bs += RES.hw * RES.JIdxi * RES.Jpdd * x0i;
+        P.bs -= RES.hw * RES.JIdxi * RES.Jpdd * x0i;
     }
 
     P.x1 = P.bs / P.Hs;
-    // printf("%a\n", P.x1);
-    P.idepth = 1.0 / (1.0 / P.idepth + P.x1);
+    // if (P.x1 > 0.05)
+    //     printf("%f\n", P.x1);
+    // P.idepth = 1.0 / (1.0 / P.idepth + P.x1);
+    P.idepth += P.x1;
 }
 
 void LocalBundler::SolveSystem()
@@ -845,4 +872,38 @@ void LocalBundler::PopulateOccupancyGrid(FrameShell *F)
 
     SafeCall(cudaDeviceSynchronize());
     SafeCall(cudaGetLastError());
+}
+
+__global__ void RemoveOutliers_kernel(PointShell *points, int N, float OutlierTH)
+{
+    const int x = blockDim.x * blockIdx.x + threadIdx.x;
+    if (x >= N)
+        return;
+    PointShell &P(points[x]);
+
+#pragma unroll
+    for (int i = 1; i < NUM_RES; ++i)
+    {
+        RawResidual &RES(P.res[i]);
+        if (!RES.active || i == P.hostIdx)
+            continue;
+
+        if (RES.state == Outlier || RES.state == OOB || RES.r > OutlierTH)
+        {
+            RES.active = false;
+            P.numResiduals--;
+        }
+    }
+
+    if (P.numResiduals <= 0)
+    {
+        P.idepth = 0;
+    }
+}
+
+void LocalBundler::RemoveOutliers()
+{
+    dim3 block(1024);
+    dim3 grid(cv::divUp(nPoints, block.x));
+    RemoveOutliers_kernel<<<grid, block>>>(points_dev, nPoints, 12);
 }
