@@ -158,8 +158,10 @@ void MapDrawer::DrawMapPoints(int iPointSize)
 
 void MapDrawer::DrawDebugMap()
 {
+    glPointSize(3);
     glColor3f(1.0, 0.0, 0.0);
     pangolin::glDrawPoints(debug);
+    glPointSize(1);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 

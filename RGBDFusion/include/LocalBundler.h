@@ -10,6 +10,8 @@
 #define IMW 640
 #define IMH 480
 
+#define PATTERN_NUM 5
+
 enum ResidualState
 {
     OOB = -1,
@@ -31,24 +33,44 @@ struct RawResidual
     Eigen::Matrix<float, 1, 6> JIdxi;
 };
 
+struct RawResidualEvolved
+{
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    bool active;
+    bool init;
+    float u0, v0;
+    float resEnergy;
+    ResidualState state;
+    float resEnergyNew;
+    ResidualState stateNew;
+
+    Eigen::Vector<float, PATTERN_NUM> r;
+    Eigen::Matrix<float, 1, 2> dIdp[PATTERN_NUM];
+    Eigen::Matrix<float, 2, 6> Jpdxi;
+    Eigen::Matrix<float, 2, 1> Jpdd;
+};
+
 struct PointShell
 {
     int x, y;
     int hostIdx;
     float idepth;
-    float intensity;
-    int numResiduals;
+    int NumRes;
     float Hs;
     float bs;
     float x1;
     float b1;
-    RawResidual res[NUM_RES];
+
+    Eigen::Vector<float, PATTERN_NUM> intensity;
+    RawResidualEvolved res[NUM_RES];
 };
 
 struct FrameShell
 {
     unsigned long KFid;
     int arrayIdx;
+    bool hasPoints = false;
     cv::cuda::GpuMat image;
     cv::cuda::GpuMat depth;
     cv::cuda::GpuMat dIdx;
