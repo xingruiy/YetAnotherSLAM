@@ -2,11 +2,12 @@
 #include "ORBMatcher.h"
 #include "Optimizer.h"
 #include "PoseSolver.h"
+#include "MapManager.h"
 
 namespace SLAM
 {
 
-Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *pMap, KeyFrameDatabase *pKFDB)
+Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB)
     : mState(SYSTEM_NOT_READY), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
       mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastRelocFrameId(0)
 {
@@ -95,10 +96,11 @@ void Tracking::StereoInitialization()
         mCurrentFrame.SetPose(Sophus::SE3d(Eigen::Matrix4d::Identity()));
 
         // Create KeyFrame
-        KeyFrame *pKFini = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
+        Map *pMap = mpMap->GetActiveMap();
+        KeyFrame *pKFini = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
 
         // Insert KeyFrame in the map
-        mpMap->AddKeyFrame(pKFini);
+        pMap->AddKeyFrame(pKFini);
 
         // Create MapPoints and asscoiate to KeyFrame
         for (int i = 0; i < mCurrentFrame.N; i++)
@@ -107,18 +109,18 @@ void Tracking::StereoInitialization()
             if (z > 0)
             {
                 Eigen::Vector3d x3D = pKFini->UnprojectStereo(i);
-                MapPoint *pNewMP = new MapPoint(x3D, pKFini, mpMap);
+                MapPoint *pNewMP = new MapPoint(x3D, pKFini, pMap);
                 pNewMP->AddObservation(pKFini, i);
                 pKFini->AddMapPoint(pNewMP, i);
                 pNewMP->ComputeDistinctiveDescriptors();
                 pNewMP->UpdateNormalAndDepth();
-                mpMap->AddMapPoint(pNewMP);
+                pMap->AddMapPoint(pNewMP);
 
                 mCurrentFrame.mvpMapPoints[i] = pNewMP;
             }
         }
 
-        std::cout << "New map created with " << mpMap->MapPointsInMap() << " points" << std::endl;
+        std::cout << "New map created with " << pMap->MapPointsInMap() << " points" << std::endl;
 
         mpLocalMapper->InsertKeyFrame(pKFini);
 
@@ -126,13 +128,13 @@ void Tracking::StereoInitialization()
         mpLastKeyFrame = pKFini;
 
         mvpLocalKeyFrames.push_back(pKFini);
-        mvpLocalMapPoints = mpMap->GetAllMapPoints();
+        mvpLocalMapPoints = pMap->GetAllMapPoints();
         mpReferenceKF = pKFini;
         mCurrentFrame.mpReferenceKF = pKFini;
 
-        mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
+        pMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
-        mpMap->mvpKeyFrameOrigins.push_back(pKFini);
+        pMap->mvpKeyFrameOrigins.push_back(pKFini);
 
         mState = OK;
 
@@ -466,7 +468,8 @@ void Tracking::UpdateLocalMap()
     UpdateLocalPoints();
 
     // This is for visualization
-    mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
+    Map *pMap = mpMap->GetActiveMap();
+    pMap->SetReferenceMapPoints(mvpLocalMapPoints);
 }
 
 void Tracking::UpdateLocalPoints()
@@ -626,7 +629,8 @@ void Tracking::CreateNewKeyFrame()
     if (!TrackLocalMap())
         return;
 
-    KeyFrame *pKF = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
+    Map *pMap = mpMap->GetActiveMap();
+    KeyFrame *pKF = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
 
     mpReferenceKF = pKF;
     mCurrentFrame.mpReferenceKF = pKF;
@@ -670,12 +674,12 @@ void Tracking::CreateNewKeyFrame()
             if (bCreateNew)
             {
                 Eigen::Vector3d x3D = pKF->UnprojectStereo(i);
-                MapPoint *pNewMP = new MapPoint(x3D, pKF, mpMap);
+                MapPoint *pNewMP = new MapPoint(x3D, pKF, pMap);
                 pNewMP->AddObservation(pKF, i);
                 pKF->AddMapPoint(pNewMP, i);
                 pNewMP->ComputeDistinctiveDescriptors();
                 pNewMP->UpdateNormalAndDepth();
-                mpMap->AddMapPoint(pNewMP);
+                pMap->AddMapPoint(pNewMP);
 
                 mCurrentFrame.mvpMapPoints[i] = pNewMP;
                 nPoints++;
@@ -701,7 +705,7 @@ void Tracking::CreateNewKeyFrame()
     // Update Pose References
     mReferenceFramePose = mCurrentFrame.mTcw;
     mpCurrentMapStruct->SetActiveFlag(false);
-    mpMap->AddMapStruct(mpCurrentMapStruct);
+    pMap->AddMapStruct(mpCurrentMapStruct);
 
     // Create a new MapStruct
     mpCurrentMapStruct = new MapStruct(g_calib[0]);

@@ -2,11 +2,12 @@
 #include "ORBMatcher.h"
 #include "PoseSolver.h"
 #include "Optimizer.h"
+#include "MapManager.h"
 
 namespace SLAM
 {
 
-LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
+LoopClosing::LoopClosing(MapManager *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
     : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0),
       mpThreadGBA(nullptr), mbRunningGBA(false)
 {
@@ -386,9 +387,11 @@ void LoopClosing::CorrectLoop()
     CorrectedSim3[mpCurrentKF] = mTcwNew;
     Sophus::SE3d Twc1 = mpCurrentKF->GetPoseInverse();
 
+    Map *pMap = mpMap->GetActiveMap();
+
     {
         // Get Map Mutex
-        std::unique_lock<std::mutex> lock(mpMap->mMutexMapUpdate);
+        std::unique_lock<std::mutex> lock(pMap->mMutexMapUpdate);
 
         for (auto vit = mvpCurrentConnectedKFs.begin(), vend = mvpCurrentConnectedKFs.end(); vit != vend; vit++)
         {
@@ -492,9 +495,9 @@ void LoopClosing::CorrectLoop()
     }
 
     // Optimize graph
-    Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, true);
+    Optimizer::OptimizeEssentialGraph(pMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, true);
 
-    mpMap->InformNewBigChange();
+    pMap->InformNewBigChange();
 
     // Add loop edge
     mpMatchedKF->AddLoopEdge(mpCurrentKF);
@@ -515,6 +518,7 @@ void LoopClosing::CorrectLoop()
 void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
 {
     ORBMatcher matcher(0.8);
+    Map *pMap = mpMap->GetActiveMap();
 
     for (auto mit = CorrectedPosesMap.begin(), mend = CorrectedPosesMap.end(); mit != mend; mit++)
     {
@@ -525,7 +529,7 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
         matcher.Fuse(pKF, CorrectedTcw, mvpLoopMapPoints, 4, vpReplacePoints);
 
         // Get Map Mutex
-        std::unique_lock<std::mutex> lock(mpMap->mMutexMapUpdate);
+        std::unique_lock<std::mutex> lock(pMap->mMutexMapUpdate);
         const int nLP = mvpLoopMapPoints.size();
         for (int i = 0; i < nLP; i++)
         {
@@ -541,9 +545,10 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
 void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 {
     std::cout << "Starting Global Bundle Adjustment" << std::endl;
+    Map *pMap = mpMap->GetActiveMap();
 
     int idx = mnFullBAIdx;
-    Optimizer::GlobalBundleAdjustemnt(mpMap, 10, &mbStopGBA, nLoopKF, false);
+    Optimizer::GlobalBundleAdjustemnt(pMap, 10, &mbStopGBA, nLoopKF, false);
 
     // Update all MapPoints and KeyFrames
     // Local Mapping was active during BA, that means that there might be new keyframes
@@ -567,10 +572,10 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
             }
 
             // Get Map Mutex
-            std::unique_lock<std::mutex> lock(mpMap->mMutexMapUpdate);
+            std::unique_lock<std::mutex> lock(pMap->mMutexMapUpdate);
 
             // Correct keyframes starting at map first keyframe
-            std::list<KeyFrame *> lpKFtoCheck(mpMap->mvpKeyFrameOrigins.begin(), mpMap->mvpKeyFrameOrigins.end());
+            std::list<KeyFrame *> lpKFtoCheck(pMap->mvpKeyFrameOrigins.begin(), pMap->mvpKeyFrameOrigins.end());
 
             while (!lpKFtoCheck.empty())
             {
@@ -596,7 +601,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
             }
 
             // Correct MapPoints
-            const auto vpMPs = mpMap->GetAllMapPoints();
+            const auto vpMPs = pMap->GetAllMapPoints();
 
             for (size_t i = 0; i < vpMPs.size(); i++)
             {
@@ -626,7 +631,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
                 }
             }
 
-            mpMap->InformNewBigChange();
+            pMap->InformNewBigChange();
 
             mpLocalMapper->Release();
 

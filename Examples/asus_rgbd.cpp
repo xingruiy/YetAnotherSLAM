@@ -1,5 +1,5 @@
 #include "System.h"
-#include "Camera.h"
+#include "OpenNI/include/Camera.h"
 
 int main(int argc, char **argv)
 {

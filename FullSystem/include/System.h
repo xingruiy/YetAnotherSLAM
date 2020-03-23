@@ -22,6 +22,7 @@ namespace SLAM
 class Viewer;
 class Tracking;
 class MapViewer;
+class MapManager;
 class LoopClosing;
 class LocalMapping;
 
@@ -34,6 +35,7 @@ public:
     void Shutdown();
     void reset();
     void FuseAllMapStruct();
+    void DisplayNextMap();
 
     void WriteToFile(const std::string &strFile);
     void ReadFromFile(const std::string &strFile);
@@ -46,7 +48,7 @@ private:
     std::thread *mpViewerThread;
     std::thread *mpLoopThread;
 
-    Map *mpMap;
+    // Map *mpMap;
     Tracking *mpTracker;
     Viewer *mpViewer;
     LocalMapping *mpLocalMapper;
@@ -58,6 +60,8 @@ private:
 
     cv::Mat grayScale;
     cv::Mat depthFloat;
+
+    MapManager *mpMapManager;
 };
 
 } // namespace SLAM

@@ -13,7 +13,7 @@ fi
 echo -e "CMAKE_BUILD_TYPE is set to: ${RED}$BuildType${NC}"
 echo "Configuring and Building Thirdparty/OpenNI2 ..."
 
-cd ./Thirdparty/OpenNI2
+cd ./Thirdparty/OpenNI
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j

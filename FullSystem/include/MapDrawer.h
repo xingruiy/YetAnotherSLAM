@@ -6,17 +6,18 @@
 #include "KeyFrame.h"
 #include "MapPoint.h"
 #include "VoxelMap.h"
-#include "Map.h"
 
 namespace SLAM
 {
+
+class MapManager;
 
 class MapDrawer
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    MapDrawer(Map *pMap);
+    MapDrawer(MapManager *pMap);
 
     void DrawMapPoints(int iPointSize);
     void DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int iEdgeWeight);
@@ -25,7 +26,7 @@ public:
     void LinkGlSlProgram();
 
 private:
-    Map *mpMap;
+    MapManager *mpMap;
     std::mutex mmMutexPose;
     Eigen::Matrix4f mCameraPose;
 

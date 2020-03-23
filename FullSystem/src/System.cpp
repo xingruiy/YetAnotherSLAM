@@ -1,4 +1,5 @@
 #include "System.h"
+#include "MapManager.h"
 
 namespace SLAM
 {
@@ -13,22 +14,22 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     loadORBVocabulary(strVocFile);
 
     //Create the Map
-    mpMap = new Map();
-    mpMapDrawer = new MapDrawer(mpMap);
+    mpMapManager = new MapManager();
+    mpMapDrawer = new MapDrawer(mpMapManager);
 
     //Create KeyFrame Database
     mpKeyFrameDB = new KeyFrameDatabase(*mpORBVocabulary);
 
-    mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, mpORBVocabulary);
+    mpLoopClosing = new LoopClosing(mpMapManager, mpKeyFrameDB, mpORBVocabulary);
     mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
 
-    mpLocalMapper = new LocalMapping(mpORBVocabulary, mpMap);
+    mpLocalMapper = new LocalMapping(mpORBVocabulary, mpMapManager);
     mpLocalMapper->SetLoopCloser(mpLoopClosing);
     mpLoopClosing->SetLocalMapper(mpLocalMapper);
     mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
 
     //Initialize the Tracking thread
-    mpTracker = new Tracking(this, mpORBVocabulary, mpMap, mpKeyFrameDB);
+    mpTracker = new Tracking(this, mpORBVocabulary, mpMapManager, mpKeyFrameDB);
     mpTracker->SetLocalMapper(mpLocalMapper);
 
     if (g_bEnableViewer)
@@ -67,12 +68,13 @@ void System::TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp)
 void System::reset()
 {
     mpTracker->reset();
-    mpMap->reset();
+    // mpMap->reset();
 }
 
 void System::FuseAllMapStruct()
 {
-    auto vpMSs = mpMap->GetAllVoxelMaps();
+    Map *pMap = mpMapManager->GetActiveMap();
+    auto vpMSs = pMap->GetAllVoxelMaps();
     if (vpMSs.size() == 0)
         return;
 
@@ -86,20 +88,24 @@ void System::FuseAllMapStruct()
             continue;
 
         InitMap->Fuse(pMS);
-        mpMap->EraseMapStruct(pMS);
+        pMap->EraseMapStruct(pMS);
     }
 
     InitMap->SetActiveFlag(false);
 }
 
+void System::DisplayNextMap()
+{
+}
+
 void System::WriteToFile(const std::string &strFile)
 {
-    mpMap->WriteToFile(strFile);
+    // mpMap->WriteToFile(strFile);
 }
 
 void System::ReadFromFile(const std::string &strFile)
 {
-    mpMap->ReadFromFile(strFile);
+    // mpMap->ReadFromFile(strFile);
 }
 
 void System::Shutdown()
@@ -113,7 +119,7 @@ System::~System()
     mpViewerThread->join();
     mpLocalMappingThread->join();
 
-    delete mpMap;
+    // delete mpMap;
     delete mpViewer;
     delete mpTracker;
     delete mpLoopThread;

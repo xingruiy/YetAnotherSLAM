@@ -3,8 +3,8 @@
 int main(int argc, char **argv)
 {
     SLAM::System system(argv[1], argv[2]);
-    std::string base = "/home/xyang/images/";
-    for (int i = 0; i < 2487; ++i)
+    std::string base = "/home/xingrui/Downloads/images/";
+    for (int i = 0; i < 3038; ++i)
     {
         if (SLAM::g_bSystemKilled)
             return -1;

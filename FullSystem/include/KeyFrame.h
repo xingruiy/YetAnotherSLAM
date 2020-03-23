@@ -197,6 +197,8 @@ public:
     // Dense Maps contained
     MapStruct *mpVoxelStruct;
     bool mbVoxelStructMarginalized;
+
+    unsigned long int mMapId;
 };
 
 } // namespace SLAM

@@ -1,11 +1,12 @@
 #include "LocalMapping.h"
 #include "ORBMatcher.h"
 #include "Optimizer.h"
+#include "MapManager.h"
 
 namespace SLAM
 {
 
-LocalMapping::LocalMapping(ORBVocabulary *pVoc, Map *pMap)
+LocalMapping::LocalMapping(ORBVocabulary *pVoc, MapManager *pMap)
     : mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
       mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false),
       mbAcceptKeyFrames(true)
@@ -44,8 +45,9 @@ void LocalMapping::Run()
             if (!CheckNewKeyFrames() && !stopRequested())
             {
                 // Local BA
-                if (mpMap->KeyFramesInMap() > 2)
-                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
+                Map *pMap = mpMap->GetActiveMap();
+                if (pMap->KeyFramesInMap() > 2)
+                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, pMap);
 
                 // Check redundant local Keyframes
                 KeyFrameCulling();
@@ -162,7 +164,8 @@ void LocalMapping::ProcessNewKeyFrame()
     mpCurrentKeyFrame->UpdateConnections();
 
     // Insert Keyframe in Map
-    mpMap->AddKeyFrame(mpCurrentKeyFrame);
+    Map *pMap = mpMap->GetActiveMap();
+    pMap->AddKeyFrame(mpCurrentKeyFrame);
 }
 
 void LocalMapping::MapPointCulling()

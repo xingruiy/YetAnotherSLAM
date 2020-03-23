@@ -28,6 +28,7 @@ PRIVATE
     FullSystem/src/LoopClosing.cpp
     FullSystem/src/KeyFrameDatabase.cpp
     FullSystem/src/ORBextractor.cpp
+    FullSystem/src/MapManager.cpp
     FullSystem/src/PoseSolver.cpp
 
     RGBDFusion/src/ImageProc.cu
@@ -85,7 +86,7 @@ PRIVATE
 target_link_libraries(asus_rgbd 
 PRIVATE 
     ${PROJECT_NAME} 
-    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/lib/libOpenNI2.so
+    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI/lib/libOpenNI.so
 )
 
 add_executable(asus_recorded 

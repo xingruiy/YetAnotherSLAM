@@ -4,8 +4,16 @@
 namespace SLAM
 {
 
-Map::Map() : mnBigChangeIdx(0)
+long unsigned int Map::nextId = 0;
+
+Map::Map() : mnBigChangeIdx(0), mnMaxKFid(0)
 {
+    mMapId = nextId++;
+}
+
+long unsigned int Map::GetMapId()
+{
+    return mMapId;
 }
 
 std::vector<MapPoint *> Map::GetAllMapPoints()

@@ -78,6 +78,14 @@ protected:
     std::mutex mMutexMap;
 
     std::mutex mFractualMutex;
+
+public:
+    long unsigned int GetMapId();
+
+protected:
+    long unsigned int mMapId;
+    static long unsigned int nextId;
 };
+
 
 } // namespace SLAM

@@ -36,12 +36,13 @@ namespace SLAM
 {
 
 class Viewer;
+class MapManager;
 class LoopClosing;
 
 class LocalMapping
 {
 public:
-    LocalMapping(ORBVocabulary *pVoc, Map *pMap);
+    LocalMapping(ORBVocabulary *pVoc, MapManager *pMap);
 
     void SetLoopCloser(LoopClosing *pLoopCloser);
 
@@ -102,7 +103,8 @@ private:
     bool mbFinished;
     std::mutex mMutexFinish;
 
-    Map *mpMap;
+    // Map *mpMap;
+    MapManager *mpMap;
 
     LoopClosing *mpLoopCloser;
 

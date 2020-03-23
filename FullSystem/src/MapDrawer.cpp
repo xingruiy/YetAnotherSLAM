@@ -1,9 +1,10 @@
 #include "MapDrawer.h"
+#include "MapManager.h"
 
 namespace SLAM
 {
 
-MapDrawer::MapDrawer(Map *pMap) : mpMap(pMap)
+MapDrawer::MapDrawer(MapManager *pMap) : mpMap(pMap)
 {
     mCalibInv = g_calibInv[0];
     width = g_width[0];
@@ -59,7 +60,8 @@ void MapDrawer::LinkGlSlProgram()
 
 void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 {
-    const auto vpKFs = mpMap->GetAllKeyFrames();
+    Map *pMap = mpMap->GetActiveMap();
+    const auto vpKFs = pMap->GetAllKeyFrames();
 
     if (bDrawKF)
     {
@@ -117,8 +119,9 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 
 void MapDrawer::DrawMapPoints(int iPointSize)
 {
-    const auto &vpMPs = mpMap->GetAllMapPoints();
-    const auto &vpRefMPs = mpMap->GetReferenceMapPoints();
+    Map *pMap = mpMap->GetActiveMap();
+    const auto &vpMPs = pMap->GetAllMapPoints();
+    const auto &vpRefMPs = pMap->GetReferenceMapPoints();
 
     std::set<MapPoint *> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
 
@@ -161,7 +164,8 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
     if (N == 0)
         return;
 
-    std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
+    Map *pMap = mpMap->GetActiveMap();
+    std::vector<MapStruct *> vpMapStruct = pMap->GetAllVoxelMaps();
     std::sort(vpMapStruct.begin(), vpMapStruct.end(), [&](MapStruct *a, MapStruct *b) { return a->mnId < b->mnId; });
     std::vector<MapStruct *> vpMapsToRender;
 
