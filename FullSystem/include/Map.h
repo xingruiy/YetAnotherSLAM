@@ -51,6 +51,7 @@ public:
     void reset();
 
     std::vector<KeyFrame *> mvpKeyFrameOrigins;
+    MapStruct *mpMapStructOrigin;
 
     std::mutex mMutexMapUpdate;
     std::mutex mPointCreateMutex;

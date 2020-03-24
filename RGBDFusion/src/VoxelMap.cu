@@ -399,11 +399,11 @@ void MapStruct::Fuse(MapStruct *pMapStruct)
 
     DeleteMesh();
 
-    int nHashEntryCom = (hashTableSize + pMapStruct->hashTableSize);
-    int nBucektCom = static_cast<int>(0.8 * nHashEntryCom);
-    int nVoxelBlockCom = (voxelBlockSize + pMapStruct->voxelBlockSize);
+    // int nHashEntryCom = (hashTableSize + pMapStruct->hashTableSize);
+    // int nBucektCom = static_cast<int>(0.8 * nHashEntryCom);
+    // int nVoxelBlockCom = (voxelBlockSize + pMapStruct->voxelBlockSize);
 
-    Reserve(nHashEntryCom, nBucektCom, nVoxelBlockCom);
+    // Reserve(nHashEntryCom, nBucektCom, nVoxelBlockCom);
 
     CreateBlockFunctor step1;
     step1.plDstEntry = mplHashTable;
@@ -438,8 +438,6 @@ void MapStruct::Fuse(MapStruct *pMapStruct)
     grid = dim3(hashTableSize);
     callDeviceFunctor<<<grid, block>>>(step2);
 
-    SafeCall(cudaDeviceSynchronize());
-
     pMapStruct->Release();
 }
 
@@ -473,11 +471,11 @@ __device__ __forceinline__ void ResizeMapStructFunctor::operator()() const
     Eigen::Vector3i blockPos = plCurrEntry[x].pos;
 
     HashEntry *pNewEntry = nullptr;
-    // while (!pNewEntry)
-    pNewEntry = CreateNewBlock(
-        blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
-        plDstBucketMutex, pDstLinkedListPtr,
-        dstHashTableSize, dstBucketSize);
+    while (!pNewEntry)
+        pNewEntry = CreateNewBlock(
+            blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
+            plDstBucketMutex, pDstLinkedListPtr,
+            dstHashTableSize, dstBucketSize);
 
     Voxel *dst = &plDstVoxels[pNewEntry->ptr];
     memcpy(dst, src, sizeof(Voxel) * BlockSize3);

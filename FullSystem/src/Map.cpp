@@ -7,7 +7,7 @@ namespace SLAM
 
 long unsigned int Map::nextId = 0;
 
-Map::Map() : mnBigChangeIdx(0), mnMaxKFid(0)
+Map::Map() : mnBigChangeIdx(0), mnMaxKFid(0), mpMapStructOrigin(nullptr)
 {
     mMapId = nextId++;
 }
@@ -54,6 +54,9 @@ void Map::AddMapStruct(MapStruct *pMS)
 {
     std::unique_lock<std::mutex> lock(mFractualMutex);
     mspMapStructs.insert(pMS);
+
+    if (!mpMapStructOrigin)
+        mpMapStructOrigin = pMS;
 }
 
 void Map::reset()
@@ -209,6 +212,8 @@ void Map::FuseMap(Map *pMap)
             if (pKF)
                 pKF->mMapId = mMapId;
         }
+
+        mpMapStructOrigin = mpMapStructOrigin->mnId < pMap->mpMapStructOrigin->mnId ? mpMapStructOrigin : pMap->mpMapStructOrigin;
     }
 
     pMap->reset();

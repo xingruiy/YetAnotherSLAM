@@ -74,24 +74,25 @@ void System::reset()
 void System::FuseAllMapStruct()
 {
     Map *pMap = mpMapManager->GetActiveMap();
-    auto vpMSs = pMap->GetAllVoxelMaps();
-    if (vpMSs.size() == 0)
+    std::vector<MapStruct *> mapStructs = pMap->GetAllVoxelMaps();
+
+    MapStruct *pMSini = pMap->mpMapStructOrigin;
+    pMSini->Reserve(800000, 600000, 800000);
+    if (!pMSini || mapStructs.size() == 0)
         return;
 
-    auto InitMap = vpMSs[0];
-    InitMap->SetActiveFlag(true);
+    // auto InitMap = vpMSs[0];
+    // InitMap->SetActiveFlag(true);
 
-    for (int i = 1; i < vpMSs.size(); ++i)
+    for (auto vit = mapStructs.begin(), vend = mapStructs.end(); vit != vend; ++vit)
     {
-        MapStruct *pMS = vpMSs[i];
-        if (pMS->isActive())
+        MapStruct *pMS = *vit;
+        if (pMSini == pMS || !pMS || pMS->isActive())
             continue;
 
-        InitMap->Fuse(pMS);
+        pMSini->Fuse(pMS);
         pMap->EraseMapStruct(pMS);
     }
-
-    InitMap->SetActiveFlag(false);
 }
 
 void System::DisplayNextMap()
