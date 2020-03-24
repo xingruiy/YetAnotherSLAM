@@ -719,6 +719,7 @@ void Tracking::CreateNewKeyFrame()
     // Update Pose References
     mpCurrentMapStruct->SetActiveFlag(false);
     pMap->AddMapStruct(mpCurrentMapStruct);
+    mpCurrentMapStruct->Hibernate();
 
     // Create a new MapStruct
     mpCurrentMapStruct = new MapStruct(g_calib[0]);

@@ -90,7 +90,13 @@ void System::FuseAllMapStruct()
         if (pMSini == pMS || !pMS || pMS->isActive())
             continue;
 
+        if (pMS->mbInHibernation)
+            pMS->ReActivate();
+
         pMSini->Fuse(pMS);
+        pMS->Release();
+        pMS->mbSubsumed = true;
+        pMS->mpParent = pMSini;
         pMap->EraseMapStruct(pMS);
     }
 }

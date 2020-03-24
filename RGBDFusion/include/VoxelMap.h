@@ -141,6 +141,9 @@ public:
 
     Sophus::SE3d mTcw;
     std::mutex mMutexPose;
+
+    bool mbSubsumed;
+    MapStruct *mpParent;
 };
 
 #endif

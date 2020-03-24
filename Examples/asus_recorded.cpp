@@ -3,8 +3,8 @@
 int main(int argc, char **argv)
 {
     SLAM::System system(argv[1], argv[2]);
-    std::string base = "/home/xingrui/Downloads/images2/";
-    for (int i = 0; i < 1374; ++i)
+    std::string base = "/home/xingrui/Downloads/images3/";
+    for (int i = 0; i < 2081; ++i)
     {
         if (SLAM::g_bSystemKilled)
             return -1;
@@ -23,8 +23,8 @@ int main(int argc, char **argv)
         system.TrackRGBD(im, imDepth, 0);
     }
 
-    base = "/home/xingrui/Downloads/images3/";
-    for (int i = 0; i < 2116; ++i)
+    base = "/home/xingrui/Downloads/images2/";
+    for (int i = 0; i < 2419; ++i)
     {
         if (SLAM::g_bSystemKilled)
             return -1;
@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     }
 
     base = "/home/xingrui/Downloads/images/";
-    for (int i = 0; i < 2207; ++i)
+    for (int i = 0; i < 2340; ++i)
     {
         if (SLAM::g_bSystemKilled)
             return -1;

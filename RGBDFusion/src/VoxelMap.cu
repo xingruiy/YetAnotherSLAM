@@ -85,7 +85,7 @@ MapStruct::MapStruct(const Eigen::Matrix3f &K)
       mbHasMesh(false), mpMeshEngine(nullptr), mplHeap(nullptr),
       mplHeapPtr(nullptr), mplBucketMutex(nullptr), mplHashTable(nullptr),
       mplVoxelBlocks(nullptr), mpLinkedListHead(nullptr), mK(K),
-      mbVertexBufferCreated(false)
+      mbVertexBufferCreated(false), mbSubsumed(false), mpParent(nullptr)
 {
     // Get a random colour taint for visualization
     mColourTaint = 255 * rand() / (double)RAND_MAX;
@@ -471,12 +471,14 @@ __device__ __forceinline__ void ResizeMapStructFunctor::operator()() const
     Eigen::Vector3i blockPos = plCurrEntry[x].pos;
 
     HashEntry *pNewEntry = nullptr;
-    while (!pNewEntry)
-        pNewEntry = CreateNewBlock(
-            blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
-            plDstBucketMutex, pDstLinkedListPtr,
-            dstHashTableSize, dstBucketSize);
+    // while (!pNewEntry)
+    pNewEntry = CreateNewBlock(
+        blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
+        plDstBucketMutex, pDstLinkedListPtr,
+        dstHashTableSize, dstBucketSize);
 
+    if (pNewEntry == nullptr)
+        return;
     Voxel *dst = &plDstVoxels[pNewEntry->ptr];
     memcpy(dst, src, sizeof(Voxel) * BlockSize3);
 }
