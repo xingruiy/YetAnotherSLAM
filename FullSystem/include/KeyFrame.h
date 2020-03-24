@@ -83,6 +83,10 @@ public:
 
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
 
+public:
+    Map *GetMap();
+    long unsigned int GetMapId();
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 public:
     static long unsigned int nNextId;

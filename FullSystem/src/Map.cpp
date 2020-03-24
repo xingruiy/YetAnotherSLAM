@@ -1,5 +1,6 @@
 #include "Map.h"
 #include <fstream>
+#include <algorithm>
 
 namespace SLAM
 {
@@ -60,6 +61,7 @@ void Map::reset()
     std::unique_lock<std::mutex> lock(mMutexMap);
     mspKeyFrames.clear();
     mspMapPoints.clear();
+    mspMapStructs.clear();
 }
 
 void Map::EraseMapPoint(MapPoint *pMP)
@@ -169,6 +171,47 @@ void Map::WriteToFile(const std::string &strFile)
 
 void Map::ReadFromFile(const std::string &strFile)
 {
+}
+
+void Map::FuseMap(Map *pMap)
+{
+    {
+        std::unique_lock<std::mutex> lock(mMutexMap);
+        std::unique_lock<std::mutex> lock2(pMap->mMutexMap);
+
+        std::set<KeyFrame *> keyFrames;
+        std::set<MapPoint *> mapPoints;
+        std::set<MapStruct *> mapStructs;
+
+        std::set_union(mspKeyFrames.begin(), mspKeyFrames.end(),
+                       pMap->mspKeyFrames.begin(), pMap->mspKeyFrames.end(),
+                       std::inserter(keyFrames, std::begin(keyFrames)));
+
+        std::set_union(mspMapPoints.begin(), mspMapPoints.end(),
+                       pMap->mspMapPoints.begin(), pMap->mspMapPoints.end(),
+                       std::inserter(mapPoints, std::begin(mapPoints)));
+
+        std::set_union(mspMapStructs.begin(), mspMapStructs.end(),
+                       pMap->mspMapStructs.begin(), pMap->mspMapStructs.end(),
+                       std::inserter(mapStructs, std::begin(mapStructs)));
+
+        mspKeyFrames = keyFrames;
+        mspMapPoints = mapPoints;
+        mspMapStructs = mapStructs;
+
+        // Update max keyframe id
+        mnMaxKFid = std::max(mnMaxKFid, pMap->mnMaxKFid);
+
+        // Update keyframe reference id
+        for (auto sit = mspKeyFrames.begin(), send = mspKeyFrames.end(); sit != send; ++sit)
+        {
+            KeyFrame *pKF = *sit;
+            if (pKF)
+                pKF->mMapId = mMapId;
+        }
+    }
+
+    pMap->reset();
 }
 
 } // namespace SLAM

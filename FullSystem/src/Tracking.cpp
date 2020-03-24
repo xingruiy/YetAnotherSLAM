@@ -74,13 +74,14 @@ void Tracking::Track()
 
     case LOST:
         std::cout << "tracking failed, trying to relocalise..." << std::endl;
-        bOK = Relocalization();
+        mState = SYSTEM_NOT_READY;
+        // bOK = Relocalization();
 
-        if (bOK)
-        {
-            mState = OK;
-            break;
-        }
+        // if (bOK)
+        // {
+        //     mState = OK;
+        //     break;
+        // }
     }
 
     mLastProcessedState = mState;
@@ -92,11 +93,12 @@ void Tracking::StereoInitialization()
     mCurrentFrame.ExtractORB();
     if (mCurrentFrame.N > 500)
     {
+        Map *pMap = new Map();
+
         // Set Frame pose to the origin
         mCurrentFrame.SetPose(Sophus::SE3d(Eigen::Matrix4d::Identity()));
 
         // Create KeyFrame
-        Map *pMap = mpMap->GetActiveMap();
         KeyFrame *pKFini = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
 
         // Insert KeyFrame in the map
@@ -119,6 +121,15 @@ void Tracking::StereoInitialization()
                 mCurrentFrame.mvpMapPoints[i] = pNewMP;
             }
         }
+
+        if (pMap->MapPointsInMap() < 300)
+        {
+            mState = SYSTEM_NOT_READY;
+            delete pMap;
+            return;
+        }
+
+        mpMap->MakeNewMap(pMap);
 
         std::cout << "New map created with " << pMap->MapPointsInMap() << " points" << std::endl;
 
@@ -193,7 +204,10 @@ bool Tracking::TrackRGBD()
     g_nTrackedFrame++;
 
     if (mpViewer)
-        mpViewer->setLivePose(mCurrentFrame.mTcw.matrix());
+    {
+        Sophus::SE3d Tcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
+        mpViewer->setLivePose(Tcw.matrix());
+    }
 
     return true;
 }
@@ -703,7 +717,6 @@ void Tracking::CreateNewKeyFrame()
     mpLastKeyFrame = pKF;
 
     // Update Pose References
-    mReferenceFramePose = mCurrentFrame.mTcw;
     mpCurrentMapStruct->SetActiveFlag(false);
     pMap->AddMapStruct(mpCurrentMapStruct);
 

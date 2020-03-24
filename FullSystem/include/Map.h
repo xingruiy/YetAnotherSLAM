@@ -53,6 +53,9 @@ public:
     std::vector<KeyFrame *> mvpKeyFrameOrigins;
 
     std::mutex mMutexMapUpdate;
+    std::mutex mPointCreateMutex;
+
+    friend class MapManager;
 
 protected:
     struct cmp
@@ -81,11 +84,11 @@ protected:
 
 public:
     long unsigned int GetMapId();
+    void FuseMap(Map *pMap);
 
 protected:
     long unsigned int mMapId;
     static long unsigned int nextId;
 };
-
 
 } // namespace SLAM

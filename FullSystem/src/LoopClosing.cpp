@@ -320,7 +320,7 @@ bool LoopClosing::ComputeSE3()
         }
     }
 
-    // Find more matches projecting with the computed Sim3
+    // Find more matches projecting with the computed pose
     matcher.SearchByProjection(mpCurrentKF, mTcwNew, mvpLoopMapPoints, mvpCurrentMatchedPoints, 10);
 
     // If enough matches accept Loop
@@ -376,6 +376,27 @@ void LoopClosing::CorrectLoop()
         usleep(1000);
     }
 
+    Map *pMap = mpMap->GetActiveMap();
+    // if (mpMatchedKF->GetMapId() != mpCurrentKF->GetMapId())
+    // {
+    //     // Update all keyframes in the map;
+    //     Map *pMap2 = mpMap->GetMap(mpCurrentKF->GetMapId());
+    //     Sophus::SE3d Tcw = mpCurrentKF->GetPoseInverse();
+    //     std::vector<KeyFrame *> vpKeyFrames = pMap2->GetAllKeyFrames();
+
+    //     for (auto vit = vpKeyFrames.begin(), vend = vpKeyFrames.end(); vit != vend; ++vit)
+    //     {
+    //         KeyFrame *pKFi = *vit;
+
+    //         Sophus::SE3d TKFi2KF = Tcw * pKFi->GetPose();
+    //         pKFi->SetPose(mTcwNew * TKFi2KF);
+    //     }
+
+    //     mpMap->FuseMap(mpMatchedKF->GetMapId(), mpCurrentKF->GetMapId());
+    //     pMap = mpMap->GetActiveMap();
+    //     mTcwNew = Sophus::SE3d();
+    // }
+
     // Ensure current keyframe is updated
     mpCurrentKF->UpdateConnections();
 
@@ -383,11 +404,11 @@ void LoopClosing::CorrectLoop()
     mvpCurrentConnectedKFs = mpCurrentKF->GetVectorCovisibleKeyFrames();
     mvpCurrentConnectedKFs.push_back(mpCurrentKF);
 
-    KeyFrameAndPose CorrectedSim3, NonCorrectedSim3;
-    CorrectedSim3[mpCurrentKF] = mTcwNew;
+    KeyFrameAndPose CorrectedPose, NonCorrectedPose;
+    CorrectedPose[mpCurrentKF] = mTcwNew;
     Sophus::SE3d Twc1 = mpCurrentKF->GetPoseInverse();
 
-    Map *pMap = mpMap->GetActiveMap();
+    // Map *pMap = mpMap->GetActiveMap();
 
     {
         // Get Map Mutex
@@ -402,24 +423,24 @@ void LoopClosing::CorrectLoop()
             if (pKFi != mpCurrentKF)
             {
                 //Pose corrected with the Sim3 of the loop closure
-                Sophus::SE3d T21 = Twc1 * Tcw2;
-                Sophus::SE3d CorrectedScw = mTcwNew * T21;
-                CorrectedSim3[pKFi] = CorrectedScw;
+                Sophus::SE3d TKFi2KF = Twc1 * Tcw2;
+                Sophus::SE3d CorrectedScw = mTcwNew * TKFi2KF;
+                CorrectedPose[pKFi] = CorrectedScw;
             }
 
             //Pose without correction
-            NonCorrectedSim3[pKFi] = Tcw2;
+            NonCorrectedPose[pKFi] = Tcw2;
         }
 
         // Correct all MapPoints obsrved by current keyframe and neighbors, so that they align with the other side of the loop
-        for (auto mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
+        for (auto mit = CorrectedPose.begin(), mend = CorrectedPose.end(); mit != mend; mit++)
         {
             KeyFrame *pKFi = mit->first;
 
             Sophus::SE3d CorrectedTcw = mit->second;
-            Sophus::SE3d CorrectedTwc = CorrectedTcw.inverse();
+            // Sophus::SE3d CorrectedTwc = CorrectedTcw.inverse();
 
-            Sophus::SE3d NonCorrectedTcw = NonCorrectedSim3[pKFi];
+            Sophus::SE3d NonCorrectedTwc = NonCorrectedPose[pKFi].inverse();
 
             std::vector<MapPoint *> vpMPsi = pKFi->GetMapPointMatches();
             for (size_t iMP = 0, endMPi = vpMPsi.size(); iMP < endMPi; iMP++)
@@ -434,7 +455,7 @@ void LoopClosing::CorrectLoop()
 
                 // Project with non-corrected pose and project back with corrected pose
                 Eigen::Vector3d eigP3Dw = pMPi->GetWorldPos();
-                Eigen::Vector3d eigCorrectedP3Dw = CorrectedTwc * NonCorrectedTcw * eigP3Dw;
+                Eigen::Vector3d eigCorrectedP3Dw = CorrectedTcw * NonCorrectedTwc * eigP3Dw;
 
                 pMPi->SetWorldPos(eigCorrectedP3Dw);
                 pMPi->mnCorrectedByKF = mpCurrentKF->mnId;
@@ -471,7 +492,7 @@ void LoopClosing::CorrectLoop()
     // Project MapPoints observed in the neighborhood of the loop keyframe
     // into the current keyframe and neighbors using corrected poses.
     // Fuse duplications.
-    SearchAndFuse(CorrectedSim3);
+    SearchAndFuse(CorrectedPose);
 
     // After the MapPoint fusion, new links in the covisibility graph will appear attaching both sides of the loop
     std::map<KeyFrame *, std::set<KeyFrame *>> LoopConnections;
@@ -494,8 +515,19 @@ void LoopClosing::CorrectLoop()
         }
     }
 
+    // std::cout << "Mapped KF map id: " << mpMatchedKF->GetMapId() << std::endl;
+    // std::cout << "Current KF map id: " << mpCurrentKF->GetMapId() << std::endl;
+
+    if (mpMatchedKF->GetMapId() != mpCurrentKF->GetMapId())
+    {
+        mpMap->FuseMap(mpMatchedKF->GetMapId(), mpCurrentKF->GetMapId());
+        pMap = mpMap->GetActiveMap();
+    }
+
+    // std::cout << "Active map id: " << pMap->GetMapId() << std::endl;
+
     // Optimize graph
-    Optimizer::OptimizeEssentialGraph(pMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, true);
+    Optimizer::OptimizeEssentialGraph(pMap, mpMatchedKF, mpCurrentKF, NonCorrectedPose, CorrectedPose, LoopConnections, true);
 
     pMap->InformNewBigChange();
 

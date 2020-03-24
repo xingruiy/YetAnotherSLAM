@@ -61,6 +61,8 @@ void MapDrawer::LinkGlSlProgram()
 void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 {
     Map *pMap = mpMap->GetActiveMap();
+    if (!pMap)
+        return;
     const auto vpKFs = pMap->GetAllKeyFrames();
 
     if (bDrawKF)
@@ -79,12 +81,12 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
     if (bDrawGraph)
     {
         glLineWidth(1);
-        glColor4f(0.5f, 1.0f, 0.0f, 1.0f);
         glBegin(GL_LINES);
 
         for (size_t i = 0; i < vpKFs.size(); i++)
         {
             // Covisibility Graph
+            glColor4f(0.5f, 1.0f, 0.0f, 1.0f);
             const auto vCovKFs = vpKFs[i]->GetBestCovisibilityKeyFrames(N);
             Eigen::Vector3f Ow = vpKFs[i]->GetTranslation().cast<float>();
             if (!vCovKFs.empty())
@@ -100,7 +102,8 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
                 }
             }
 
-            // Loops
+            // Loops edge
+            glColor4f(0.0f, 0.5f, 1.0f, 1.0f);
             std::set<KeyFrame *> sLoopKFs = vpKFs[i]->GetLoopEdges();
             for (auto sit = sLoopKFs.begin(), send = sLoopKFs.end(); sit != send; sit++)
             {
@@ -120,6 +123,8 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 void MapDrawer::DrawMapPoints(int iPointSize)
 {
     Map *pMap = mpMap->GetActiveMap();
+    if (!pMap)
+        return;
     const auto &vpMPs = pMap->GetAllMapPoints();
     const auto &vpRefMPs = pMap->GetReferenceMapPoints();
 
@@ -165,6 +170,8 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
         return;
 
     Map *pMap = mpMap->GetActiveMap();
+    if (!pMap)
+        return;
     std::vector<MapStruct *> vpMapStruct = pMap->GetAllVoxelMaps();
     std::sort(vpMapStruct.begin(), vpMapStruct.end(), [&](MapStruct *a, MapStruct *b) { return a->mnId < b->mnId; });
     std::vector<MapStruct *> vpMapsToRender;

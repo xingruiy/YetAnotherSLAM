@@ -14,6 +14,7 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
       mpReplaced(nullptr), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), mWorldPos(pos),
       mAvgViewingDir(Eigen::Vector3d::Zero()), mnTrackReferenceForFrame(0), mnLastFrameSeen(pRefKF->mnFrameId)
 {
+    std::unique_lock<std::mutex> lock(pMap->mPointCreateMutex);
     mnId = nNextId++;
 }
 
@@ -23,7 +24,10 @@ MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, cons
       mnVisible(1), mnFound(1), mbBad(false), mpReplaced(nullptr), mpMap(pMap), mWorldPos(pos),
       mnTrackReferenceForFrame(0), mnLastFrameSeen(pRefKF->mnFrameId)
 {
-    mnId = nNextId++;
+    {
+        std::unique_lock<std::mutex> lock(pMap->mPointCreateMutex);
+        mnId = nNextId++;
+    }
 
     Eigen::Vector3d Ow = pRefKF->GetPose().matrix().topRightCorner(3, 1);
     mAvgViewingDir = mWorldPos - Ow;

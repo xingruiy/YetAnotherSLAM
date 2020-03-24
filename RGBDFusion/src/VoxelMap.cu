@@ -257,10 +257,10 @@ __device__ __forceinline__ void CreateBlockFunctor::operator()() const
         if (!found)
         {
             dstEntry = nullptr;
-            while (!dstEntry)
-                dstEntry = CreateNewBlock(blockPos, plHeap, plHeapPtr, plDstEntry,
-                                          plBucketMutex, pLinkedListPtr,
-                                          dstHashTableSize, dstBucketSize);
+            // while (!dstEntry)
+            dstEntry = CreateNewBlock(blockPos, plHeap, plHeapPtr, plDstEntry,
+                                      plBucketMutex, pLinkedListPtr,
+                                      dstHashTableSize, dstBucketSize);
         }
     }
 }
@@ -473,11 +473,11 @@ __device__ __forceinline__ void ResizeMapStructFunctor::operator()() const
     Eigen::Vector3i blockPos = plCurrEntry[x].pos;
 
     HashEntry *pNewEntry = nullptr;
-    while (!pNewEntry)
-        pNewEntry = CreateNewBlock(
-            blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
-            plDstBucketMutex, pDstLinkedListPtr,
-            dstHashTableSize, dstBucketSize);
+    // while (!pNewEntry)
+    pNewEntry = CreateNewBlock(
+        blockPos, plDstHeap, plDstHeapPtr, plDstEntry,
+        plDstBucketMutex, pDstLinkedListPtr,
+        dstHashTableSize, dstBucketSize);
 
     Voxel *dst = &plDstVoxels[pNewEntry->ptr];
     memcpy(dst, src, sizeof(Voxel) * BlockSize3);
@@ -537,10 +537,10 @@ struct CreateBlockLineTracingFunctor
     __device__ __forceinline__ void allocateBlock(const Eigen::Vector3i &blockPos) const
     {
         HashEntry *pEntry = nullptr;
-        while (!pEntry)
-            pEntry = CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable,
-                                    mplBucketMutex, mpLinkedListHead,
-                                    hashTableSize, bucketSize);
+        // while (!pEntry)
+        pEntry = CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable,
+                                mplBucketMutex, mpLinkedListHead,
+                                hashTableSize, bucketSize);
     }
 
     // Allocate Blocks on the ray direction with a certain range

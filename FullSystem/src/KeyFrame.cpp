@@ -11,7 +11,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap, KeyFrameDatabase *pKFDB)
       mfGridElementWidthInv(F.mfGridElementWidthInv), mfGridElementHeightInv(F.mfGridElementHeightInv),
       mnTrackReferenceForFrame(0), mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),
       mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0), mnBAGlobalForKF(0),
-      fx(F.fx), fy(F.fy), cx(F.cx), cy(F.cy), invfx(F.invfx), invfy(F.invfy),
+      fx(F.fx), fy(F.fy), cx(F.cx), cy(F.cy), invfx(F.invfx), invfy(F.invfy), mMapId(pMap->GetMapId()),
       mbf(F.mbf), mb(F.mb), mThDepth(F.mThDepth), N(F.N), mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn),
       mvuRight(F.mvuRight), mvDepth(F.mvDepth), mDescriptors(F.mDescriptors.clone()),
       mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
@@ -50,7 +50,7 @@ void KeyFrame::SetPose(const Sophus::SE3d &Tcw)
   std::unique_lock<std::mutex> lock(mMutexPose);
   mTcw = Tcw;
 
-  if (mpVoxelStruct && !mpVoxelStruct->isActive())
+  if (mpVoxelStruct)
     mpVoxelStruct->SetPose(mTcw);
 }
 
@@ -621,6 +621,11 @@ Eigen::Vector3d KeyFrame::UnprojectStereo(int i)
   {
     return Eigen::Vector3d(0, 0, 0);
   }
+}
+
+long unsigned int KeyFrame::GetMapId()
+{
+  return mMapId;
 }
 
 } // namespace SLAM
