@@ -81,7 +81,7 @@ void MapStruct::create(
 }
 
 MapStruct::MapStruct(const Eigen::Matrix3f &K)
-    : mFootPrintInMB(0), mbInHibernation(false), mbActive(true),
+    : mbInHibernation(false), mbActive(true),
       mbHasMesh(false), mpMeshEngine(nullptr), mplHeap(nullptr),
       mplHeapPtr(nullptr), mplBucketMutex(nullptr), mplHashTable(nullptr),
       mplVoxelBlocks(nullptr), mpLinkedListHead(nullptr), mK(K),
@@ -90,15 +90,6 @@ MapStruct::MapStruct(const Eigen::Matrix3f &K)
     // Get a random colour taint for visualization
     mColourTaint = 255 * rand() / (double)RAND_MAX;
     mnId = nNextId++;
-}
-
-MapStruct::MapStruct(int SizeInMB)
-{
-    // int nHashEntry = 0;  // 160kb
-    // int nVoxelBlock = 0; // 3072kb
-    // int nBucket = 0;
-    // float voxelSize = 0.005;
-    // float TruncationDist = 0.02;
 }
 
 void MapStruct::Release()
@@ -144,6 +135,8 @@ void MapStruct::GenerateMesh()
 {
     if (!mbHasMesh && mpMeshEngine && !mbInHibernation)
     {
+        std::unique_lock<std::mutex> lock(mutexDeviceMem);
+
         mpMeshEngine->Meshify(this);
         mbHasMesh = true;
     }
@@ -188,14 +181,14 @@ void MapStruct::Swap(MapStruct *pMapStruct)
     swap(voxelSize, pMapStruct->voxelSize);
     swap(truncationDist, pMapStruct->truncationDist);
 
-    swap(mbInHibernation, pMapStruct->mbInHibernation);
-    swap(mbVertexBufferCreated, pMapStruct->mbVertexBufferCreated);
-    swap(mnId, pMapStruct->mnId);
-    swap(mK, pMapStruct->mK);
-    swap(mbHasMesh, pMapStruct->mbHasMesh);
-    swap(mplPoint, pMapStruct->mplPoint);
-    swap(mplNormal, pMapStruct->mplNormal);
-    swap(N, pMapStruct->N);
+    // swap(mbInHibernation, pMapStruct->mbInHibernation);
+    // swap(mbVertexBufferCreated, pMapStruct->mbVertexBufferCreated);
+    // swap(mnId, pMapStruct->mnId);
+    // swap(mK, pMapStruct->mK);
+    // swap(mbHasMesh, pMapStruct->mbHasMesh);
+    // swap(mplPoint, pMapStruct->mplPoint);
+    // swap(mplNormal, pMapStruct->mplNormal);
+    // swap(N, pMapStruct->N);
 }
 
 uint MapStruct::GetNumVisibleBlocks()
@@ -391,6 +384,8 @@ void MapStruct::Fuse(MapStruct *pMapStruct)
     if (!pMapStruct || pMapStruct->Empty())
         return;
 
+    std::unique_lock<std::mutex> lock(mutexDeviceMem);
+
     if (Empty())
     {
         this->Swap(pMapStruct);
@@ -489,6 +484,7 @@ void MapStruct::Reserve(int hSize, int bSize, int vSize)
         return;
 
     MapStruct *pNewMS = new MapStruct(mK);
+    pNewMS->mTcw = this->mTcw;
     pNewMS->create(hSize, bSize, vSize, voxelSize, truncationDist);
     pNewMS->Reset();
 
@@ -536,11 +532,9 @@ struct CreateBlockLineTracingFunctor
     // Allocate Blocks on the GPU memory
     __device__ __forceinline__ void allocateBlock(const Eigen::Vector3i &blockPos) const
     {
-        HashEntry *pEntry = nullptr;
-        // while (!pEntry)
-        pEntry = CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable,
-                                mplBucketMutex, mpLinkedListHead,
-                                hashTableSize, bucketSize);
+        CreateNewBlock(blockPos, mplHeap, mplHeapPtr, mplHashTable,
+                       mplBucketMutex, mpLinkedListHead,
+                       hashTableSize, bucketSize);
     }
 
     // Allocate Blocks on the ray direction with a certain range
@@ -824,6 +818,8 @@ uint MapStruct::CheckNumVisibleBlocks(int cols, int rows, const Sophus::SE3d &Tc
 
 void MapStruct::Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm)
 {
+    std::unique_lock<std::mutex> lock(mutexDeviceMem);
+
     float fx = mK(0, 0);
     float fy = mK(1, 1);
     float cx = mK(0, 2);
@@ -895,6 +891,7 @@ void MapStruct::Hibernate()
 {
     if (mbInHibernation || Empty())
         return;
+    std::unique_lock<std::mutex> lock(mutexDeviceMem);
 
     mpLinkedListHeadHib = new int[1];
     mplHeapPtrHib = new int[1];
@@ -926,6 +923,7 @@ void MapStruct::ReActivate()
 {
     if (!mbInHibernation || Empty())
         return;
+    std::unique_lock<std::mutex> lock(mutexDeviceMem);
 
     SafeCall(cudaMalloc((void **)&mpLinkedListHead, sizeof(int)));
     SafeCall(cudaMalloc((void **)&mplHeapPtr, sizeof(int)));

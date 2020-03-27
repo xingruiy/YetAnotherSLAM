@@ -124,13 +124,16 @@ protected:
 
     // The following sections are added
 public:
+    bool needNewVoxelMap();
+    void createNewVoxelMap();
+
     // Dense Tracking And Mapping
     RayTraceEngine *mpRayTraceEngine;
     MeshEngine *mpMeshEngine;
     RGBDTracking *mpTracker;
 
     // Voxel Map Structure
-    MapStruct *mpCurrentMapStruct;
+    MapStruct *mpCurrVoxelMap;
 
     // Raw depth for fusion
     cv::cuda::GpuMat mRawDepth;

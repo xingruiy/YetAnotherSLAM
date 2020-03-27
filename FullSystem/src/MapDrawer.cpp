@@ -188,9 +188,8 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
         vpMapsToRender.push_back(vpMapStruct[N - 1]);
     }
 
-    for (auto vit = vpMapsToRender.begin(), vend = vpMapsToRender.end(); vit != vend; ++vit)
+    for (auto pMS : vpMapsToRender)
     {
-        MapStruct *pMS = *vit;
         if (pMS && !pMS->mbActive)
         {
             if (pMS->mbInHibernation)

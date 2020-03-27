@@ -150,13 +150,13 @@ void Tracking::StereoInitialization()
         mState = OK;
 
         // Create dense map struct
-        mpCurrentMapStruct = new MapStruct(g_calib[0]);
-        mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
-        mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-        mpCurrentMapStruct->create(5000, 4000, 4500, 0.01, 0.03);
-        mpCurrentMapStruct->Reset();
+        mpCurrVoxelMap = new MapStruct(g_calib[0]);
+        mpCurrVoxelMap->SetMeshEngine(mpMeshEngine);
+        mpCurrVoxelMap->SetRayTraceEngine(mpRayTraceEngine);
+        mpCurrVoxelMap->create(5000, 4000, 4500, 0.01, 0.03);
+        mpCurrVoxelMap->Reset();
 
-        pKFini->mpVoxelStruct = mpCurrentMapStruct;
+        pKFini->mpVoxelStruct = mpCurrVoxelMap;
         pKFini->mbVoxelStructMarginalized = false;
 
         // Set up Dense Tracker
@@ -165,7 +165,7 @@ void Tracking::StereoInitialization()
 
         // Fuse the first depth image
         mRawDepth.upload(mCurrentFrame.mImDepth);
-        mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcw);
+        mpCurrVoxelMap->Fuse(mRawDepth, mCurrentFrame.mTcw);
 
         mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
                                    mCurrentFrame.mvKeys);
@@ -174,11 +174,11 @@ void Tracking::StereoInitialization()
 
 bool Tracking::TrackRGBD()
 {
-    Sophus::SE3d Tmw = mpCurrentMapStruct->mTcw;
+    Sophus::SE3d Tmw = mpCurrVoxelMap->mTcw;
     Sophus::SE3d Tcm = Tmw.inverse() * mLastFrame.mTcw;
 
-    mpCurrentMapStruct->RayTrace(Tcm);
-    auto vmap = mpCurrentMapStruct->GetRayTracingResult();
+    mpCurrVoxelMap->RayTrace(Tcm);
+    auto vmap = mpCurrVoxelMap->GetRayTracingResult();
     mpTracker->SetReferenceModel(vmap);
 
     // Set tracking frames
@@ -192,7 +192,7 @@ bool Tracking::TrackRGBD()
     {
         std::cout << DT.matrix3x4() << std::endl;
         std::cout << "frame id: " << mCurrentFrame.mnId << std::endl;
-        mpTracker->WriteDebugImages();
+        // mpTracker->WriteDebugImages();
         return false;
     }
 
@@ -200,7 +200,7 @@ bool Tracking::TrackRGBD()
     mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
 
     mRawDepth.upload(mCurrentFrame.mImDepth);
-    mpCurrentMapStruct->Fuse(mRawDepth, mCurrentFrame.mTcp);
+    mpCurrVoxelMap->Fuse(mRawDepth, mCurrentFrame.mTcp);
     g_nTrackedFrame++;
 
     if (mpViewer)
@@ -388,8 +388,8 @@ bool Tracking::Relocalization()
     {
         std::cout << "relocalisation success! " << std::endl;
         mpReferenceKF = pMatchedKF;
-        mpCurrentMapStruct = pMatchedKF->mpVoxelStruct;
-        mpCurrentMapStruct->DeleteMesh();
+        mpCurrVoxelMap = pMatchedKF->mpVoxelStruct;
+        mpCurrVoxelMap->DeleteMesh();
         mnLastRelocFrameId = mCurrentFrame.mnId;
         mCurrentFrame.mTcp = pMatchedKF->GetPoseInverse() * mCurrentFrame.mTcw;
         return true;
@@ -636,7 +636,7 @@ void Tracking::CreateNewKeyFrame()
     if (!mpLocalMapper->SetNotStop(true))
         return;
 
-    mCurrentFrame.mImDepth = cv::Mat(mpCurrentMapStruct->GetRayTracingResultDepth());
+    mCurrentFrame.mImDepth = cv::Mat(mpCurrVoxelMap->GetRayTracingResultDepth());
     mCurrentFrame.ExtractORB();
     mCurrentFrame.mTcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
 
@@ -709,39 +709,42 @@ void Tracking::CreateNewKeyFrame()
         }
     }
 
+    mCurrentFrame.mTcp = Sophus::SE3d();
     mpLocalMapper->InsertKeyFrame(pKF);
-
     mpLocalMapper->SetNotStop(false);
 
-    mnLastKeyFrameId = mCurrentFrame.mnId;
-    mpLastKeyFrame = pKF;
+    if (mpViewer)
+        mpViewer->setKeyFrameImage(mCurrentFrame.mImGray, mCurrentFrame.mvKeys);
 
-    // Update Pose References
-    mpCurrentMapStruct->SetActiveFlag(false);
-    pMap->AddMapStruct(mpCurrentMapStruct);
-    mpCurrentMapStruct->Hibernate();
-
-    // Create a new MapStruct
-    mpCurrentMapStruct = new MapStruct(g_calib[0]);
-    mpCurrentMapStruct->SetMeshEngine(mpMeshEngine);
-    mpCurrentMapStruct->SetRayTraceEngine(mpRayTraceEngine);
-    mpCurrentMapStruct->create(5000, 4000, 4500, 0.01, 0.03);
-    mpCurrentMapStruct->Reset();
-    mpCurrentMapStruct->SetPose(mCurrentFrame.mTcw);
-
-    pKF->mpVoxelStruct = mpCurrentMapStruct;
-    pKF->mbVoxelStructMarginalized = false;
-    mpCurrentMapStruct->mTcw = pKF->GetPose();
-
-    mCurrentFrame.mTcp = Sophus::SE3d();
-
-    mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
-                               mCurrentFrame.mvKeys);
+    createNewVoxelMap();
 }
 
 void Tracking::reset()
 {
     mState = SYSTEM_NOT_READY;
+}
+
+bool Tracking::needNewVoxelMap()
+{
+    return true;
+}
+
+void Tracking::createNewVoxelMap()
+{
+    Map *pMap = mpMap->GetActiveMap();
+    pMap->AddMapStruct(mpCurrVoxelMap);
+    mpCurrVoxelMap->SetActiveFlag(false);
+    mpCurrVoxelMap->Hibernate();
+
+    // Create a new MapStruct
+    mpCurrVoxelMap = new MapStruct(g_calib[0]);
+    mpCurrVoxelMap->SetActiveFlag(true);
+    mpCurrVoxelMap->SetMeshEngine(mpMeshEngine);
+    mpCurrVoxelMap->SetRayTraceEngine(mpRayTraceEngine);
+    mpCurrVoxelMap->create(5000, 4000, 4500, 0.01, 0.03);
+    mpCurrVoxelMap->Reset();
+    mpReferenceKF->mpVoxelStruct = mpCurrVoxelMap;
+    mpCurrVoxelMap->mTcw = mpReferenceKF->GetPose();
 }
 
 } // namespace SLAM

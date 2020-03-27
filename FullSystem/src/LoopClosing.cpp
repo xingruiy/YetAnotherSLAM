@@ -9,7 +9,7 @@ namespace SLAM
 
 LoopClosing::LoopClosing(MapManager *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
     : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0),
-      mpThreadGBA(nullptr), mbRunningGBA(false)
+      mpThreadGBA(nullptr), mbRunningGBA(false), mnFullBAIdx(0)
 {
     mnCovisibilityConsistencyTh = 3;
 }

@@ -55,8 +55,10 @@ void Map::AddMapStruct(MapStruct *pMS)
     std::unique_lock<std::mutex> lock(mFractualMutex);
     mspMapStructs.insert(pMS);
 
-    if (!mpMapStructOrigin)
+    if (mpMapStructOrigin == nullptr)
+    {
         mpMapStructOrigin = pMS;
+    }
 }
 
 void Map::reset()

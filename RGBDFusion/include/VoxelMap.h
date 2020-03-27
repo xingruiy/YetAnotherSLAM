@@ -32,10 +32,13 @@ struct Voxel
 class MapStruct
 {
 public:
-    void create(int hashTableSize, int bucketSize, int voxelBlockSize, float voxelSize, float truncationDist);
-
-public:
     MapStruct(const Eigen::Matrix3f &K);
+
+    void create(int hashTableSize,
+                int bucketSize,
+                int voxelBlockSize,
+                float voxelSize,
+                float truncationDist);
 
     Sophus::SE3d GetPose();
     void SetPose(Sophus::SE3d &Tcw);
@@ -48,18 +51,12 @@ public:
     void Release();
     void Swap(MapStruct *pMapStruct);
 
-    // TODO: create map based on the desired memory space
-    MapStruct(int SizeInMB);
-    void Create(int SizeInMB);
-    int mFootPrintInMB;
-
     // Map fusion
     void ResetNumVisibleBlocks();
     uint GetNumVisibleBlocks();
     uint CheckNumVisibleBlocks(int cols, int rows, const Sophus::SE3d &Tcm);
     void Fuse(MapStruct *pMapStruct);
     void Fuse(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
-    void FuseNoVisibilityCheck(cv::cuda::GpuMat depth, const Sophus::SE3d &Tcm);
 
     // TODO: Save the map to RAM/HardDisk
     void SaveToFile(std::string &strFileName);
@@ -105,6 +102,9 @@ public:
 public:
     long unsigned int mnId;
     static long unsigned int nNextId;
+
+    //============ Changed by map fusion, hibernation and reserve ==============//
+    std::mutex mutexDeviceMem;
 
     // Heap memory stores the pointers to the actual voxel space.
     // It is in descending order, so the first element has the value N-1.

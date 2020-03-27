@@ -68,37 +68,44 @@ void System::TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp)
 void System::reset()
 {
     mpTracker->reset();
+    mpMapManager->Reset();
     // mpMap->reset();
 }
 
 void System::FuseAllMapStruct()
 {
     Map *pMap = mpMapManager->GetActiveMap();
-    std::vector<MapStruct *> mapStructs = pMap->GetAllVoxelMaps();
+    auto mapStructs = pMap->GetAllVoxelMaps();
 
     MapStruct *pMSini = pMap->mpMapStructOrigin;
+    if (pMSini->mbInHibernation)
+        pMSini->ReActivate();
+
     pMSini->Reserve(800000, 600000, 800000);
+    pMSini->SetActiveFlag(false);
     if (!pMSini || mapStructs.size() == 0)
         return;
 
     // auto InitMap = vpMSs[0];
     // InitMap->SetActiveFlag(true);
 
-    for (auto vit = mapStructs.begin(), vend = mapStructs.end(); vit != vend; ++vit)
+    for (auto vit : mapStructs)
     {
-        MapStruct *pMS = *vit;
-        if (pMSini == pMS || !pMS || pMS->isActive())
+        if (pMSini == vit || !vit || vit->isActive())
             continue;
 
-        if (pMS->mbInHibernation)
-            pMS->ReActivate();
+        if (vit->mbInHibernation)
+            vit->ReActivate();
 
-        pMSini->Fuse(pMS);
-        pMS->Release();
-        pMS->mbSubsumed = true;
-        pMS->mpParent = pMSini;
-        pMap->EraseMapStruct(pMS);
+        pMSini->Fuse(vit);
+        vit->Release();
+        vit->mbSubsumed = true;
+        vit->mpParent = pMSini;
+        pMap->EraseMapStruct(vit);
     }
+
+    pMSini->GenerateMesh();
+    pMSini->SetActiveFlag(false);
 }
 
 void System::DisplayNextMap()

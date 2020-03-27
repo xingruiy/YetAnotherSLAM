@@ -7,6 +7,8 @@ class MapManager
 {
 public:
     MapManager();
+    void Reset();
+    int MapsInSystem();
     void MakeNewMap(Map *pMap);
     Map *GetActiveMap();
     Map *GetMap(long unsigned int id);

@@ -13,6 +13,19 @@ void MapManager::MakeNewMap(Map *pMap)
     mpMaps[mActiveId] = pMap;
 }
 
+void MapManager::Reset()
+{
+    for (auto mit : mpMaps)
+        mit.second->reset();
+    mpMaps.clear();
+    Map::nextId = 0;
+}
+
+int MapManager::MapsInSystem()
+{
+    return mpMaps.size();
+}
+
 Map *MapManager::GetActiveMap()
 {
     return mpMaps[mActiveId];
@@ -37,6 +50,12 @@ void MapManager::FuseMap(long unsigned int id, long unsigned int id2)
 
 std::vector<Map *> MapManager::GetAllMaps()
 {
+    std::vector<Map *> allMaps;
+    for (auto mit : mpMaps)
+    {
+        allMaps.push_back(mit.second);
+    }
+    return allMaps;
 }
 
 }; // namespace SLAM

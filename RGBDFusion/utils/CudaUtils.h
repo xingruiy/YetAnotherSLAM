@@ -10,8 +10,6 @@
 #define SafeCall(expr) ___SafeCall(expr, __FILE__, __LINE__)
 #endif
 
-
-
 static inline void error(const char *error_string, const char *file, const int line, const char *func)
 {
     std::cout << "Error: " << error_string << "\t" << file << ":" << line << std::endl;
@@ -29,6 +27,5 @@ __global__ void callDeviceFunctor(const T functor)
 {
     functor();
 }
-
 
 #endif

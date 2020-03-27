@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(YetAnotherSLAM CXX CUDA)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/lib)
-
 find_package(OpenCV 3.4 REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(Pangolin 0.5 REQUIRED)

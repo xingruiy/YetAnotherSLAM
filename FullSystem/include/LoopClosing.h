@@ -99,7 +99,7 @@ private:
     bool mbStopGBA;
     std::mutex mMutexGBA;
     std::thread *mpThreadGBA;
-    bool mnFullBAIdx;
+    int mnFullBAIdx;
 };
 
 } // namespace SLAM
