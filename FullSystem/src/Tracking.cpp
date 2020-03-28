@@ -9,7 +9,8 @@ namespace SLAM
 
 Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB)
     : mState(SYSTEM_NOT_READY), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
-      mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastRelocFrameId(0)
+      mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastSuccessRelocFrameId(0),
+      mnNumRelocRuns(0), mTriesBeforeReloc(0)
 {
     int w = g_width[0];
     int h = g_height[0];
@@ -64,7 +65,15 @@ void Tracking::Track()
         }
         else
         {
+            if (mTriesBeforeReloc < mMaxTriesBeforeReloc)
+            {
+                mTriesBeforeReloc++;
+                return;
+            }
+
             bOK = Relocalization();
+            mTriesBeforeReloc = 0;
+
             if (!bOK)
             {
                 mState = LOST;
@@ -73,15 +82,27 @@ void Tracking::Track()
         break;
 
     case LOST:
-        std::cout << "tracking failed, trying to relocalise..." << std::endl;
-        mState = SYSTEM_NOT_READY;
-        // bOK = Relocalization();
+        if (mnNumRelocRuns < 30)
+        {
+            std::cout << "tracking failed, trying to relocalise..." << std::endl;
+            bOK = Relocalization();
 
-        // if (bOK)
-        // {
-        //     mState = OK;
-        //     break;
-        // }
+            if (bOK)
+            {
+                mState = OK;
+                mnNumRelocRuns = 0;
+            }
+            else
+                mnNumRelocRuns++;
+
+            break;
+        }
+        else
+        {
+            mnNumRelocRuns = 0;
+            mState = SYSTEM_NOT_READY;
+            break;
+        }
     }
 
     mLastProcessedState = mState;
@@ -157,7 +178,6 @@ void Tracking::StereoInitialization()
         mpCurrVoxelMap->Reset();
 
         pKFini->mpVoxelStruct = mpCurrVoxelMap;
-        pKFini->mbVoxelStructMarginalized = false;
 
         // Set up Dense Tracker
         mpTracker->SetReferenceImage(mCurrentFrame.mImGray);
@@ -167,8 +187,8 @@ void Tracking::StereoInitialization()
         mRawDepth.upload(mCurrentFrame.mImDepth);
         mpCurrVoxelMap->Fuse(mRawDepth, mCurrentFrame.mTcw);
 
-        mpViewer->setKeyFrameImage(mCurrentFrame.mImGray,
-                                   mCurrentFrame.mvKeys);
+        if (mpViewer)
+            mpViewer->setKeyFrameImage(mCurrentFrame.mImGray, mCurrentFrame.mvKeys);
     }
 }
 
@@ -190,6 +210,7 @@ bool Tracking::TrackRGBD()
 
     if (DT.translation().norm() > 0.1)
     {
+        std::cout << DT.translation().norm() << std::endl;
         std::cout << DT.matrix3x4() << std::endl;
         std::cout << "frame id: " << mCurrentFrame.mnId << std::endl;
         // mpTracker->WriteDebugImages();
@@ -390,7 +411,7 @@ bool Tracking::Relocalization()
         mpReferenceKF = pMatchedKF;
         mpCurrVoxelMap = pMatchedKF->mpVoxelStruct;
         mpCurrVoxelMap->DeleteMesh();
-        mnLastRelocFrameId = mCurrentFrame.mnId;
+        mnLastSuccessRelocFrameId = mCurrentFrame.mnId;
         mCurrentFrame.mTcp = pMatchedKF->GetPoseInverse() * mCurrentFrame.mTcw;
         return true;
     }
@@ -435,7 +456,7 @@ bool Tracking::TrackLocalMap()
 
     // Decide if the tracking was succesful
     // More restrictive if there was a relocalization recently
-    if (mCurrentFrame.mnId < mnLastRelocFrameId + mMaxFrames && mnMatchesInliers < 50)
+    if (mCurrentFrame.mnId < mnLastSuccessRelocFrameId + mMaxFrames && mnMatchesInliers < 50)
         return false;
 
     if (mnMatchesInliers < 30)
@@ -468,7 +489,7 @@ void Tracking::SearchLocalPoints()
         ORBMatcher matcher(0.8);
         int th = 1;
         // If the camera has been relocalised recently, perform a coarser search
-        if (mCurrentFrame.mnId - mnLastRelocFrameId <= 1)
+        if (mCurrentFrame.mnId - mnLastSuccessRelocFrameId <= 1)
             th = 3;
 
         matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
@@ -631,24 +652,9 @@ bool Tracking::NeedNewKeyFrame()
     return bCreateNew;
 }
 
-void Tracking::CreateNewKeyFrame()
+void Tracking::CreateNewMapPoints()
 {
-    if (!mpLocalMapper->SetNotStop(true))
-        return;
-
-    mCurrentFrame.mImDepth = cv::Mat(mpCurrVoxelMap->GetRayTracingResultDepth());
-    mCurrentFrame.ExtractORB();
-    mCurrentFrame.mTcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
-
-    if (!TrackLocalMap())
-        return;
-
     Map *pMap = mpMap->GetActiveMap();
-    KeyFrame *pKF = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
-
-    mpReferenceKF = pKF;
-    mCurrentFrame.mpReferenceKF = pKF;
-
     // We sort points by the measured depth by the stereo/RGBD sensor.
     // We create all those MapPoints whose depth < mThDepth.
     // If there are less than 100 close points we create the 100 closest.
@@ -687,10 +693,10 @@ void Tracking::CreateNewKeyFrame()
 
             if (bCreateNew)
             {
-                Eigen::Vector3d x3D = pKF->UnprojectStereo(i);
-                MapPoint *pNewMP = new MapPoint(x3D, pKF, pMap);
-                pNewMP->AddObservation(pKF, i);
-                pKF->AddMapPoint(pNewMP, i);
+                Eigen::Vector3d x3D = mpReferenceKF->UnprojectStereo(i);
+                MapPoint *pNewMP = new MapPoint(x3D, mpReferenceKF, pMap);
+                pNewMP->AddObservation(mpReferenceKF, i);
+                mpReferenceKF->AddMapPoint(pNewMP, i);
                 pNewMP->ComputeDistinctiveDescriptors();
                 pNewMP->UpdateNormalAndDepth();
                 pMap->AddMapPoint(pNewMP);
@@ -708,9 +714,30 @@ void Tracking::CreateNewKeyFrame()
                 break;
         }
     }
+}
+
+void Tracking::CreateNewKeyFrame()
+{
+    if (!mpLocalMapper->SetNotStop(true))
+        return;
+
+    mpCurrVoxelMap->RayTrace(mCurrentFrame.mTcp);
+    mCurrentFrame.mImDepth = cv::Mat(mpCurrVoxelMap->GetRayTracingResultDepth());
+    mCurrentFrame.ExtractORB();
+    mCurrentFrame.mTcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
+
+    if (!TrackLocalMap())
+        return;
+
+    Map *pMap = mpMap->GetActiveMap();
+    mpReferenceKF = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
+
+    CreateNewMapPoints();
+
+    mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
     mCurrentFrame.mTcp = Sophus::SE3d();
-    mpLocalMapper->InsertKeyFrame(pKF);
+    mpLocalMapper->InsertKeyFrame(mpReferenceKF);
     mpLocalMapper->SetNotStop(false);
 
     if (mpViewer)

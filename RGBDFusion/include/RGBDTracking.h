@@ -10,7 +10,14 @@ class RGBDTracking
 {
 
 public:
-    RGBDTracking(const int &w, const int &h, const Eigen::Matrix3d &K, const bool &bRGB, const bool &bIcp);
+    RGBDTracking(int w, int h,
+                 const Eigen::Matrix3f &K,
+                 int minLvl, int maxLvl,
+                 bool bRGB, bool bIcp);
+
+    RGBDTracking(int w, int h,
+                 const Eigen::Matrix3d &K,
+                 bool bRGB, bool bIcp);
 
     bool IsTrackingGood() const;
 
@@ -28,6 +35,8 @@ public:
     void SwapFrameBuffer();
 
     cv::cuda::GpuMat GetReferenceDepth(const int lvl = 0) const;
+
+    Eigen::Matrix<double, 6, 6> GetCovarianceMatrix();
 
 private:
     enum class TrackingModal
@@ -97,6 +106,10 @@ private:
     cv::cuda::GpuMat mvReferenceVMap[NUM_PYR];
     cv::cuda::GpuMat mvReferenceNMap[NUM_PYR];
 
+    // Surface Curvature
+    cv::cuda::GpuMat mvReferenceCurvature[NUM_PYR];
+    cv::cuda::GpuMat mvCurrentCurvature[NUM_PYR];
+
     // Transformed Reference Points in Current Space
     cv::cuda::GpuMat mvReferencePointTransformed[NUM_PYR];
 
@@ -104,4 +117,6 @@ private:
     float iResidualSum;
     float dResidualSum;
     float numResidual;
+
+    Eigen::Matrix<float, 6, 6> mHessian;
 };

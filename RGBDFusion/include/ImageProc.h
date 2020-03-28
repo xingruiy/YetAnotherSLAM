@@ -22,3 +22,7 @@ void TransformReferencePoint(const cv::cuda::GpuMat depth, cv::cuda::GpuMat &vma
                              const Eigen::Matrix3d &K, const Sophus::SE3d &T);
 
 void VMapToDepth(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &depth);
+
+void ComputeNormalAndMeanCurvature(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &nmap, cv::cuda::GpuMat &curvature);
+
+void ComputeCurvature(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat &nmap, cv::cuda::GpuMat &curvature);

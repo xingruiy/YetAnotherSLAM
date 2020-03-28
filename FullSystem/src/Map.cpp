@@ -212,7 +212,7 @@ void Map::FuseMap(Map *pMap)
         {
             KeyFrame *pKF = *sit;
             if (pKF)
-                pKF->mMapId = mMapId;
+                pKF->mpMap = this;
         }
 
         mpMapStructOrigin = mpMapStructOrigin->mnId < pMap->mpMapStructOrigin->mnId ? mpMapStructOrigin : pMap->mpMapStructOrigin;

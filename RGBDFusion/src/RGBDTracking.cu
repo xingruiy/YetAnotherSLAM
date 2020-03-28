@@ -1,12 +1,26 @@
 #include "RGBDTracking.h"
 #include "TrackingUtils.h"
 #include "ImageProc.h"
+#include "svd3.h"
 
-RGBDTracking::RGBDTracking(const int &w, const int &h,
-                           const Eigen::Matrix3d &K,
-                           const bool &bRGB, const bool &bDepth)
+RGBDTracking::RGBDTracking(int w, int h,
+                           const Eigen::Matrix3f &K,
+                           int minLvl, int maxLvl,
+                           bool bRGB, bool bIcp)
 {
-    if (bRGB && bDepth)
+    if (bRGB && bIcp)
+        mModal = TrackingModal::RGB_AND_DEPTH;
+    else if (bRGB)
+        mModal = TrackingModal::RGB_ONLY;
+    else
+        mModal = TrackingModal::DEPTH_ONLY;
+}
+
+RGBDTracking::RGBDTracking(int w, int h,
+                           const Eigen::Matrix3d &K,
+                           bool bRGB, bool bIcp)
+{
+    if (bRGB && bIcp)
         mModal = TrackingModal::RGB_AND_DEPTH;
     else if (bRGB)
         mModal = TrackingModal::RGB_ONLY;
@@ -47,6 +61,9 @@ RGBDTracking::RGBDTracking(const int &w, const int &h,
         mvCurrentNMap[lvl].create(hLvl, wLvl, CV_32FC4);
         mvReferenceVMap[lvl].create(hLvl, wLvl, CV_32FC4);
         mvReferenceNMap[lvl].create(hLvl, wLvl, CV_32FC4);
+
+        mvCurrentCurvature[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvReferenceCurvature[lvl].create(hLvl, wLvl, CV_32FC1);
     }
 
     // Create temporary buffers
@@ -67,6 +84,19 @@ void RGBDTracking::SetReferenceImage(const cv::Mat &imGray)
 {
     cv::Mat imGrayFloat;
     imGray.convertTo(imGrayFloat, CV_32FC1);
+
+    // auto t1 = std::chrono::high_resolution_clock::now();
+    // int w = imGray.cols;
+    // int h = imGray.rows;
+    // float *pImage = (float *)aligned_alloc(16, w * h * 4 * sizeof(float));
+    // __m128 *pImageSSE = (__m128 *)pImage;
+    // for (int i = 0; i < w * h; ++i)
+    // {
+    //     pImageSSE[i] = _mm_set_ps(4.0f, 3.0f, 2.0f, 1.0f);
+    // }
+
+    // auto t2 = std::chrono::high_resolution_clock::now();
+    // std::cout << "time cost: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
 
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
@@ -96,7 +126,14 @@ void RGBDTracking::SetReferenceDepth(const cv::Mat &imDepth)
 
         ComputeVertexMap(mvReferenceInvDepth[lvl], mvReferenceVMap[lvl], invfx, invfy, cx, cy, 3.0f);
         ComputeNormalMap(mvReferenceVMap[lvl], mvReferenceNMap[lvl]);
+        ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
+        // ComputeNormalAndMeanCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
     }
+
+    // cv::cuda::GpuMat curvature(mvReferenceVMap[0].size(), CV_32FC1);
+    // cv::Mat out(mvReferenceNMap[0]);
+    // cv::imshow("out", out);
+    // cv::waitKey(0);
 }
 
 void RGBDTracking::SetTrackingImage(const cv::Mat &imGray)
@@ -134,6 +171,9 @@ void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
 
         ComputeVertexMap(mvCurrentInvDepth[lvl], mvCurrentVMap[lvl], invfx, invfy, cx, cy, 3.0f);
         ComputeNormalMap(mvCurrentVMap[lvl], mvCurrentNMap[lvl]);
+        ComputeCurvature(mvCurrentVMap[lvl], mvCurrentNMap[lvl], mvCurrentCurvature[lvl]);
+
+        // ComputeNormalAndMeanCurvature(mvCurrentVMap[lvl], mvCurrentNMap[lvl], mvCurrentCurvature[lvl]);
     }
 }
 
@@ -143,9 +183,11 @@ void RGBDTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
         if (lvl != 0)
+            // cv::cuda::pyrDown(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
             PyrDownDepth(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
 
         ComputeNormalMap(mvReferenceVMap[lvl], mvReferenceNMap[lvl]);
+        ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
     }
 }
 
@@ -308,6 +350,8 @@ struct IcpStepFunctor
     cv::cuda::PtrStep<Eigen::Vector4f> nmap_curr;
     cv::cuda::PtrStep<Eigen::Vector4f> vmap_last;
     cv::cuda::PtrStep<Eigen::Vector4f> nmap_last;
+    cv::cuda::PtrStep<float> curv_last;
+    cv::cuda::PtrStep<float> curv_curr;
     int cols, rows, N;
     float fx, fy, cx, cy;
     float angleTH, distTH;
@@ -334,8 +378,8 @@ __device__ __forceinline__ bool IcpStepFunctor::ProjectPoint(int &x, int &y,
     v_last = T_last_curr * v_last_c.head<3>();
 
     float invz = 1.0 / v_last(2);
-    int u = __float2int_rd(fx * v_last(0) * invz + cx + 0.5);
-    int v = __float2int_rd(fy * v_last(1) * invz + cy + 0.5);
+    int u = __float2int_rd(fx * v_last(0) * invz + cx);
+    int v = __float2int_rd(fy * v_last(1) * invz + cy);
     if (u < 0 || v < 0 || u >= cols || v >= rows)
         return false;
 
@@ -350,9 +394,14 @@ __device__ __forceinline__ bool IcpStepFunctor::ProjectPoint(int &x, int &y,
     Eigen::Vector4f n_curr_c = nmap_curr.ptr(v)[u];
 
     float dist = (v_last - v_curr).norm();
-    float angle = n_curr_c.head<3>().cross(n_last).norm();
+    float angle = n_curr_c.head<3>().dot(n_last);
 
-    return (angle < angleTH && dist <= distTH && n_last_c(3) > 0 && n_curr_c(3) > 0);
+    float c_last = curv_last.ptr(y)[x];
+    float c_curr = curv_curr.ptr(v)[u];
+    float cdiff = fabs(log(c_last) - log(c_curr));
+
+    return (angle >= 0.6 && dist < 0.3 && cdiff < 2 && n_last_c(3) > 0 && n_curr_c(3) > 0);
+    // return (angle < angleTH && dist < distTH && cdiff < 2 && n_last_c(3) > 0 && n_curr_c(3) > 0);
 }
 
 __device__ __forceinline__ void IcpStepFunctor::GetProduct(int &k, float *sum) const
@@ -366,9 +415,11 @@ __device__ __forceinline__ void IcpStepFunctor::GetProduct(int &k, float *sum) c
 
     if (found)
     {
-        *(Eigen::Vector3f *)&row[0] = n_last;
-        *(Eigen::Vector3f *)&row[3] = v_last.cross(n_last);
         row[6] = n_last.dot(v_curr - v_last);
+        float hw = 1; //fabs(row[6]) < 0.3 ? 1 : 0.3 / fabs(row[6]);
+        row[6] *= hw;
+        *(Eigen::Vector3f *)&row[0] = hw * n_last;
+        *(Eigen::Vector3f *)&row[3] = hw * v_last.cross(n_last);
     }
 
     int count = 0;
@@ -420,6 +471,8 @@ void RGBDTracking::ComputeSingleStepDepth(
     icpStep.nmap_curr = mvCurrentNMap[lvl];
     icpStep.vmap_last = mvReferenceVMap[lvl];
     icpStep.nmap_last = mvReferenceNMap[lvl];
+    icpStep.curv_last = mvReferenceCurvature[lvl];
+    icpStep.curv_curr = mvCurrentCurvature[lvl];
     icpStep.cols = cols;
     icpStep.rows = rows;
     icpStep.N = cols * rows;
@@ -542,6 +595,8 @@ void RGBDTracking::ComputeSingleStepRGBDLinear(
 
     hessianMapped += 100 * hessianBuffer;
     residualMapped += 10 * residualBuffer;
+
+    mHessian = hessianMapped;
 }
 
 cv::cuda::GpuMat RGBDTracking::GetReferenceDepth(const int lvl) const
@@ -565,4 +620,11 @@ void RGBDTracking::WriteDebugImages()
     cv::imwrite("gx.png", out);
     mvIntensityGradientY[0].download(out);
     cv::imwrite("gy.png", out);
+    cv::imshow("out", out);
+    cv::waitKey(0);
+}
+
+Eigen::Matrix<double, 6, 6> RGBDTracking::GetCovarianceMatrix()
+{
+    return mHessian.cast<double>().lu().inverse();
 }

@@ -86,6 +86,7 @@ protected:
 
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
+    void CreateNewMapPoints();
 
     // Other Thread Pointers
     LocalMapping *mpLocalMapper;
@@ -105,7 +106,6 @@ protected:
 
     //Drawers
     Viewer *mpViewer;
-    Sophus::SE3d mReferenceFramePose;
 
     //Map
     MapManager *mpMap;
@@ -114,13 +114,17 @@ protected:
     int mMinFrames;
     int mMaxFrames;
 
+    int mTriesBeforeReloc;
+    const int mMaxTriesBeforeReloc = 5;
+
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame *mpCurrentKeyFrame;
     KeyFrame *mpLastKeyFrame;
     Frame mLastFrame;
     ORBextractor *mpORBExtractor;
     unsigned int mnLastKeyFrameId;
-    unsigned int mnLastRelocFrameId;
+    unsigned int mnNumRelocRuns;
+    unsigned int mnLastSuccessRelocFrameId;
 
     // The following sections are added
 public:

@@ -83,10 +83,6 @@ public:
 
     bool IsInFrustum(MapPoint *pMP, float viewingCosLimit);
 
-public:
-    Map *GetMap();
-    long unsigned int GetMapId();
-
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 public:
     static long unsigned int nNextId;
@@ -191,18 +187,18 @@ protected:
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
 
-    Map *mpMap;
-
     // The following variables are newly added
 public:
+    Map *mpMap;
+
+    long unsigned int GetMapId();
+
     // The original image for visualization
     cv::Mat mImg;
+    cv::Mat mDepth;
 
     // Dense Maps contained
     MapStruct *mpVoxelStruct;
-    bool mbVoxelStructMarginalized;
-
-    unsigned long int mMapId;
 };
 
 } // namespace SLAM

@@ -167,25 +167,28 @@ struct se3StepRGBFunctor
         const Eigen::Vector4f &res = refResidual.ptr(y)[x];
         Eigen::Matrix<float, 7, 1> row = Eigen::Matrix<float, 7, 1>::Zero();
 
-        float wt = 1.0f;
-
         if (res(3) > 0)
         {
             Eigen::Vector3f pt = refPtWarped.ptr(y)[x].head<3>();
             float zInv = 1.0f / pt(2);
+            float wt = 1.0f;
 
             if (abs(res(0)) > huberTh)
             {
                 wt = huberTh / abs(res(0));
             }
 
-            row[0] = res(1) * fx * zInv;
-            row[1] = res(2) * fy * zInv;
+            float dx = wt * res(1);
+            float dy = wt * res(2);
+            float r = wt * res(0);
+
+            row[0] = dx * fx * zInv;
+            row[1] = dy * fy * zInv;
             row[2] = -(row[0] * pt(0) + row[1] * pt(1)) * zInv;
-            row[3] = row[2] * pt(1) - res(2) * fy;
-            row[4] = -row[2] * pt(0) + res(1) * fx;
+            row[3] = row[2] * pt(1) - dy * fy;
+            row[4] = -row[2] * pt(0) + dx * fx;
             row[5] = -row[0] * pt(1) + row[1] * pt(0);
-            row[6] = -res(0);
+            row[6] = -r;
         }
 
         int count = 0;
@@ -193,7 +196,7 @@ struct se3StepRGBFunctor
         for (int i = 0; i < 7; ++i)
 #pragma unroll
             for (int j = i; j < 7; ++j)
-                sum[count++] = wt * row[i] * row[j];
+                sum[count++] = row[i] * row[j];
     }
 
     __device__ __forceinline__ void operator()() const
