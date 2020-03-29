@@ -77,6 +77,7 @@ void Tracking::Track()
             if (!bOK)
             {
                 mState = LOST;
+                return;
             }
         }
         break;
@@ -206,17 +207,18 @@ bool Tracking::TrackRGBD()
     mpTracker->SetTrackingDepth(mCurrentFrame.mImDepth);
 
     // Calculate the relateive transformation
-    Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), true);
+    Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), false);
 
     if (DT.translation().norm() > 0.1)
     {
         std::cout << DT.translation().norm() << std::endl;
         std::cout << DT.matrix3x4() << std::endl;
-        std::cout << "frame id: " << mCurrentFrame.mnId << std::endl;
+        std::cout << "Tracking lost, frame id: " << mCurrentFrame.mnId << std::endl;
         // mpTracker->WriteDebugImages();
         return false;
     }
 
+    mpTracker->SwapFrameBuffer();
     mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
     mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
 

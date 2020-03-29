@@ -32,6 +32,7 @@ PRIVATE
     RGBDFusion/src/VoxelMap.cu
     RGBDFusion/src/RGBDTracking.cu
     RGBDFusion/src/MeshEngine.cu
+    RGBDFusion/src/CoarseTracking.cpp
     RGBDFusion/src/RayTraceEngine.cu
 )
 

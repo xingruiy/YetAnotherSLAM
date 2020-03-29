@@ -6,6 +6,15 @@
 
 #define NUM_PYR 5
 
+#define N_PATT 9
+
+struct FramePoint
+{
+    int x, y;
+    float idepth;
+    float sample[N_PATT];
+};
+
 class RGBDTracking
 {
 

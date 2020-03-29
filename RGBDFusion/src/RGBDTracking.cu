@@ -80,6 +80,23 @@ RGBDTracking::RGBDTracking(int w, int h,
     mGpuBufferRawDepth.create(h, w, CV_32FC1);
 }
 
+// __global__ void SelectPoints_kernel(cv::cuda::PtrStepSz<float> im,
+//                                     cv::cuda::PtrStep<float> depth,
+//                                     FramePoint *pts, int *N)
+// {
+//     int x = blockDim.x * blockIdx.x + threadIdx.x;
+//     int y = blockDim.y * blockIdx.y + threadIdx.y;
+//     if (x < 3 || y < 3 || x >= im.cols - 3 || y >= im.rows - 3)
+//         return;
+
+//     float sample = im.ptr(y)[x];
+//     float idepth = 1.0f / depth.ptr(y)[x];
+
+//     if (!isnan(idepth) && isfinite(idepth) && isfinite(sample))
+//     {
+//     }
+// }
+
 void RGBDTracking::SetReferenceImage(const cv::Mat &imGray)
 {
     cv::Mat imGrayFloat;
@@ -234,6 +251,9 @@ Sophus::SE3d RGBDTracking::GetTransform(const Sophus::SE3d &init, const bool bSw
 
             // update = ClampEigenVector(update, 0.05, -0.05);
 
+            if (update.norm() < 1e-3)
+                break;
+
             estimate = Sophus::SE3d::exp(update) * estimate;
             if (error < lastError)
             {
@@ -378,9 +398,9 @@ __device__ __forceinline__ bool IcpStepFunctor::ProjectPoint(int &x, int &y,
     v_last = T_last_curr * v_last_c.head<3>();
 
     float invz = 1.0 / v_last(2);
-    int u = __float2int_rd(fx * v_last(0) * invz + cx);
-    int v = __float2int_rd(fy * v_last(1) * invz + cy);
-    if (u < 0 || v < 0 || u >= cols || v >= rows)
+    int u = __float2int_rd(fx * v_last(0) * invz + cx + 0.5);
+    int v = __float2int_rd(fy * v_last(1) * invz + cy + 0.5);
+    if (u < 1 || v < 1 || u >= cols - 1 || v >= rows - 1)
         return false;
 
     Eigen::Vector4f v_curr_c = vmap_curr.ptr(v)[u];
