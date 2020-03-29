@@ -86,9 +86,6 @@ void System::FuseAllMapStruct()
     if (!pMSini || mapStructs.size() == 0)
         return;
 
-    // auto InitMap = vpMSs[0];
-    // InitMap->SetActiveFlag(true);
-
     for (auto vit : mapStructs)
     {
         if (pMSini == vit || !vit || vit->isActive())
@@ -102,6 +99,7 @@ void System::FuseAllMapStruct()
         vit->mbSubsumed = true;
         vit->mpParent = pMSini;
         pMap->EraseMapStruct(vit);
+        std::cout << "fusing map: " << vit->mnId << std::endl;
     }
 
     pMSini->GenerateMesh();

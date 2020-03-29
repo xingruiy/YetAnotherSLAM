@@ -120,7 +120,8 @@ void RGBDTracking::SetReferenceImage(const cv::Mat &imGray)
         if (lvl == 0)
             mvReferenceIntensity[0].upload(imGrayFloat);
         else
-            cv::cuda::pyrDown(mvReferenceIntensity[lvl - 1], mvReferenceIntensity[lvl]);
+            // cv::cuda::pyrDown(mvReferenceIntensity[lvl - 1], mvReferenceIntensity[lvl]);
+            PyrDownImage(mvReferenceIntensity[lvl - 1], mvReferenceIntensity[lvl]);
     }
 }
 
@@ -163,7 +164,8 @@ void RGBDTracking::SetTrackingImage(const cv::Mat &imGray)
         if (lvl == 0)
             mvCurrentIntensity[lvl].upload(imGrayFloat);
         else
-            cv::cuda::pyrDown(mvCurrentIntensity[lvl - 1], mvCurrentIntensity[lvl]);
+            // cv::cuda::pyrDown(mvCurrentIntensity[lvl - 1], mvCurrentIntensity[lvl]);
+            PyrDownImage(mvCurrentIntensity[lvl - 1], mvCurrentIntensity[lvl]);
 
         ComputeImageGradientCentralDifference(mvCurrentIntensity[lvl], mvIntensityGradientX[lvl], mvIntensityGradientY[lvl]);
     }
@@ -200,8 +202,12 @@ void RGBDTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
         if (lvl != 0)
-            // cv::cuda::pyrDown(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
-            PyrDownDepth(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
+        { // cv::cuda::pyrDown(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
+            PyrDownVec4f(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
+            // cv::Mat out(mvReferenceVMap[lvl]);
+            // cv::imshow("out", out);
+            // cv::waitKey(0);
+        }
 
         ComputeNormalMap(mvReferenceVMap[lvl], mvReferenceNMap[lvl]);
         ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);

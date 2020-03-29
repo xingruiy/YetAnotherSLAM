@@ -578,3 +578,86 @@ void ComputeCurvature(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat &nmap,
     //     cv::waitKey(0);
     // }
 }
+
+__global__ void PyrDownImage_kernel(const cv::cuda::PtrStep<float> src, cv::cuda::PtrStepSz<float> dst)
+{
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    int y = blockDim.y * blockIdx.y + threadIdx.y;
+    if (x >= dst.cols || y >= dst.rows)
+        return;
+
+    dst.ptr(y)[x] = 0.25 * (src.ptr(y * 2)[x * 2] + src.ptr(y * 2)[x * 2 + 1] + src.ptr(y * 2 + 1)[x * 2] + src.ptr(y * 2 + 1)[x * 2 + 1]);
+}
+
+void PyrDownImage(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst)
+{
+    if (dst.empty())
+        dst.create(src.rows / 2, src.cols / 2, CV_32FC1);
+
+    dim3 block(8, 8);
+    dim3 grid(cv::divUp(dst.cols, block.x), cv::divUp(dst.rows, block.y));
+
+    PyrDownImage_kernel<<<grid, block>>>(src, dst);
+}
+
+__global__ void PyrDownVec4f_kernel(const cv::cuda::PtrStep<Eigen::Vector4f> src, cv::cuda::PtrStepSz<Eigen::Vector4f> dst)
+{
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    int y = blockDim.y * blockIdx.y + threadIdx.y;
+    if (x >= dst.cols || y >= dst.rows)
+        return;
+
+    Eigen::Vector4f v;
+    Eigen::Vector3f vsum(0, 0, 0);
+    int vcount = 0;
+
+    v = src.ptr(y * 2)[x * 2];
+    if (v(3) > 0)
+    {
+        vcount++;
+        vsum += v.head<3>();
+    }
+
+    v = src.ptr(y * 2)[x * 2 + 1];
+    if (v(3) > 0)
+    {
+        vcount++;
+        vsum += v.head<3>();
+    }
+
+    v = src.ptr(y * 2 + 1)[x * 2];
+    if (v(3) > 0)
+    {
+        vcount++;
+        vsum += v.head<3>();
+    }
+
+    v = src.ptr(y * 2 + 1)[x * 2 + 1];
+    if (v(3) > 0)
+    {
+        vcount++;
+        vsum += v.head<3>();
+    }
+
+    if (vcount == 0)
+    {
+        dst.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1);
+    }
+    else
+    {
+        v.head<3>() = vsum / vcount;
+        v(3) = 1.f;
+        dst.ptr(y)[x] = v;
+    }
+}
+
+void PyrDownVec4f(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst)
+{
+    if (dst.empty())
+        dst.create(src.rows / 2, src.cols / 2, CV_32FC1);
+
+    dim3 block(8, 8);
+    dim3 grid(cv::divUp(dst.cols, block.x), cv::divUp(dst.rows, block.y));
+
+    PyrDownVec4f_kernel<<<grid, block>>>(src, dst);
+}

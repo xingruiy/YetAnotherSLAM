@@ -26,3 +26,7 @@ void VMapToDepth(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &depth);
 void ComputeNormalAndMeanCurvature(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &nmap, cv::cuda::GpuMat &curvature);
 
 void ComputeCurvature(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat &nmap, cv::cuda::GpuMat &curvature);
+
+void PyrDownImage(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst);
+
+void PyrDownVec4f(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst);

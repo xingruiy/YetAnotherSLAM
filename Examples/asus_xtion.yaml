@@ -40,7 +40,7 @@ ORB_SLAM2.minThFAST: 7
 # Tracking
 # =============================
 Tracking.UseDepth: 1
-Tracking.UseColour: 1
+Tracking.UseColour: 0
 Tracking.ThDepth: 40.0 # Close/Far threshold. Baseline times.
 
 # =============================

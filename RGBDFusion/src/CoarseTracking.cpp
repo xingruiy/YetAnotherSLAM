@@ -1,59 +1,63 @@
 #include "CoarseTracking.h"
 
-CoarseTracking::CoarseTracking(int w, int h, int minLvl, int maxLvl) : minLvl(minLvl), maxLvl(maxLvl)
+CoarseTracking::CoarseTracking(int w, int h, float fx, float fy, float cx, float cy)
 {
-    nLvl = maxLvl - minLvl + 1;
-    for (int lvl = minLvl; lvl < maxLvl; ++lvl)
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
         int wlvl = w / (1 << lvl);
-        int hlvl = w / (1 << lvl);
+        int hlvl = h / (1 << lvl);
+        this->w[lvl] = wlvl;
+        this->h[lvl] = hlvl;
+        this->fx[lvl] = fx / (1 << lvl);
+        this->fy[lvl] = fy / (1 << lvl);
+        this->cx[lvl] = cx / (1 << lvl);
+        this->cy[lvl] = cy / (1 << lvl);
+        this->fxi[lvl] = 1.0 / this->fx[lvl];
+        this->fyi[lvl] = 1.0 / this->fy[lvl];
 
-        this->w.push_back(wlvl);
-        this->h.push_back(hlvl);
-
-        float *imgRefLvl = (float *)aligned_alloc(16, sizeof(float) * wlvl * hlvl * 3);
-        float *depthRefLvl = (float *)aligned_alloc(16, sizeof(float) * wlvl * hlvl * 3);
-        float *imgCurLvl = (float *)aligned_alloc(16, sizeof(float) * wlvl * hlvl * 3);
-        float *depthCurLvl = (float *)aligned_alloc(16, sizeof(float) * wlvl * hlvl * 3);
-
-        mvReferenceImage.push_back(imgRefLvl);
-        mvTrackingImage.push_back(imgCurLvl);
-        mvReferenceDepth.push_back(depthRefLvl);
-        mvTrackingDepth.push_back(depthCurLvl);
+        referenceImage[lvl] = new float[wlvl * hlvl * 3];
+        trackingImage[lvl] = new float[wlvl * hlvl * 3];
     }
 }
 
-void CoarseTracking::setTrackingReference(cv::Mat img, cv::Mat depth)
+void CoarseTracking::makeReferenceImage(float *img)
 {
-}
+    int wlvl = w[0];
+    int hlvl = h[0];
+    int nlvl = wlvl * hlvl;
+    float *I = referenceImage[0];
 
-void CoarseTracking::setTrackingTarget(cv::Mat img, cv::Mat depth)
-{
-    for (int lvl = 0; lvl < nLvl; ++lvl)
+    for (int i = 0; i < nlvl; ++i)
+        I[i * 3] = img[i];
+
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
+        wlvl = w[lvl];
+        hlvl = h[lvl];
+        nlvl = wlvl * hlvl;
+        float *Ilvl = referenceImage[lvl];
+
+        if (lvl != 0)
+        {
+            int wlast = w[lvl - 1];
+            int hlast = h[lvl - 1];
+            float *Ilast = referenceImage[lvl - 1];
+            for (int i = 0; i < nlvl; ++i)
+            {
+                I[i * 3] = 0.25 * (Ilast[i * 3] + Ilast[(i + 1) * 3] + Ilast[(i + wlast) * 3] + Ilast[(i + wlast + 1) * 3]);
+            }
+        }
+
+        for (int i = 0; i < nlvl; ++i)
+        {
+        }
     }
 }
 
-void CoarseTracking::setCameraCalibration(float fx, float fy, float cx, float cy)
+void CoarseTracking::makeTrackingImage(float *img)
 {
-    for (int lvl = minLvl; lvl < maxLvl; ++lvl)
-    {
-        float fxlvl = fx / (1 << lvl);
-        float fylvl = fy / (1 << lvl);
-        float cxlvl = cx / (1 << lvl);
-        float cylvl = cy / (1 << lvl);
-
-        this->fx.push_back(fxlvl);
-        this->fy.push_back(fylvl);
-        this->cx.push_back(cxlvl);
-        this->cy.push_back(cylvl);
-        this->fxi.push_back(1.0 / fxlvl);
-        this->fyi.push_back(1.0 / fylvl);
-    }
 }
 
 Sophus::SE3d CoarseTracking::getCoarseAlignment(const Sophus::SE3d &Tini)
 {
-    Sophus::SE3d estimate = Tini;
-    Sophus::SE3d lastSuccessEstimate = Tini;
 }
