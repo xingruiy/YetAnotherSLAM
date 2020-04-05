@@ -335,7 +335,7 @@ struct MapRenderingDelegate
         if (x >= width || y >= height)
             return;
 
-        vmap.ptr(y)[x](0) = __int_as_float(0x7fffffff);
+        vmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1.f);
 
         int u = __float2int_rd((float)x / 8);
         int v = __float2int_rd((float)y / 8);
@@ -404,8 +404,6 @@ struct MapRenderingDelegate
             vmap.ptr(y)[x].head<3>() = result;
             vmap.ptr(y)[x](3) = 1.f;
         }
-        else
-            vmap.ptr(y)[x](3) = -1.f;
     }
 };
 

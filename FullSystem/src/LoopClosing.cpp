@@ -12,6 +12,7 @@ LoopClosing::LoopClosing(MapManager *pMap, KeyFrameDatabase *pDB, ORBVocabulary 
       mpThreadGBA(nullptr), mbRunningGBA(false), mnFullBAIdx(0)
 {
     mnCovisibilityConsistencyTh = 3;
+    mpRGBDTracker = new RGBDTracking(g_width[0], g_height[0], g_calib[0].cast<double>(), true, true);
 }
 
 void LoopClosing::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -227,6 +228,8 @@ bool LoopClosing::ComputeSE3()
 
     bool bMatch = false;
 
+    mpRGBDTracker->SetReferenceDepth(mpCurrentKF->mDepth);
+    mpRGBDTracker->SetReferenceImage(mpCurrentKF->mImg);
     // Perform alternatively RANSAC iterations for each candidate
     // until one is succesful or all fail
     while (nCandidates > 0 && !bMatch)
@@ -266,6 +269,7 @@ bool LoopClosing::ComputeSE3()
                 }
 
                 matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, T12, 7.5);
+                // std::cout << "inliers: " << nInliers << std::endl;
 
                 // gScm here should be the inverse of T12, i.e. 2->1
                 Sophus::SE3d T21 = T12.inverse();
@@ -276,12 +280,17 @@ bool LoopClosing::ComputeSE3()
                 // If optimization is succesful stop ransacs and continue
                 if (nInliers >= 20)
                 {
+                    Sophus::SE3d T21(gScm.rotation(), gScm.translation());
+
+                    mpRGBDTracker->SetTrackingDepth(pKF->mDepth);
+                    mpRGBDTracker->SetTrackingImage(pKF->mImg);
+                    T12 = mpRGBDTracker->GetTransform(T21.inverse(), false);
+
                     bMatch = true;
                     mpMatchedKF = pKF;
-                    Sophus::SE3d T21(gScm.rotation(), gScm.translation());
                     Sophus::SE3d Twc = pKF->GetPoseInverse();
 
-                    mTcwNew = pKF->GetPose() * T21.inverse();
+                    mTcwNew = pKF->GetPose() * T12;
 
                     mvpCurrentMatchedPoints = vpMapPointMatches;
                     break;
@@ -377,25 +386,6 @@ void LoopClosing::CorrectLoop()
     }
 
     Map *pMap = mpMap->GetActiveMap();
-    // if (mpMatchedKF->GetMapId() != mpCurrentKF->GetMapId())
-    // {
-    //     // Update all keyframes in the map;
-    //     Map *pMap2 = mpMap->GetMap(mpCurrentKF->GetMapId());
-    //     Sophus::SE3d Tcw = mpCurrentKF->GetPoseInverse();
-    //     std::vector<KeyFrame *> vpKeyFrames = pMap2->GetAllKeyFrames();
-
-    //     for (auto vit = vpKeyFrames.begin(), vend = vpKeyFrames.end(); vit != vend; ++vit)
-    //     {
-    //         KeyFrame *pKFi = *vit;
-
-    //         Sophus::SE3d TKFi2KF = Tcw * pKFi->GetPose();
-    //         pKFi->SetPose(mTcwNew * TKFi2KF);
-    //     }
-
-    //     mpMap->FuseMap(mpMatchedKF->GetMapId(), mpCurrentKF->GetMapId());
-    //     pMap = mpMap->GetActiveMap();
-    //     mTcwNew = Sophus::SE3d();
-    // }
 
     // Ensure current keyframe is updated
     mpCurrentKF->UpdateConnections();

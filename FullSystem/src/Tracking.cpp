@@ -10,7 +10,7 @@ namespace SLAM
 Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB)
     : mState(SYSTEM_NOT_READY), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
       mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastSuccessRelocFrameId(0),
-      mnNumRelocRuns(0), mTriesBeforeReloc(0)
+      mnNumRelocRuns(0), mTriesBeforeReloc(0), nKFInMap(0)
 {
     int w = g_width[0];
     int h = g_height[0];
@@ -40,6 +40,11 @@ void Tracking::SetViewer(Viewer *pViewer)
 void Tracking::GrabImageRGBD(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
 {
     mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, mpORBExtractor, mpORBVocabulary);
+
+    // cv::Mat ImgGrayFloat;
+    // ImgGray.convertTo(ImgGrayFloat, CV_32FC1);
+
+    // pTemp->AddFrame((float *)ImgGrayFloat.data, (float *)ImgDepth.data, 0);
 
     Track();
 }
@@ -207,20 +212,24 @@ bool Tracking::TrackRGBD()
     mpTracker->SetTrackingDepth(mCurrentFrame.mImDepth);
 
     // Calculate the relateive transformation
-    Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), false);
+    // Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), false);
+    Sophus::SE3d DT = mpTracker->GetTransform(mLastFrame.mTcp.inverse(), false);
+    // Sophus::SE3d DT = pTemp->estimate;
 
-    if (DT.translation().norm() > 0.1)
+    if (DT.translation().norm() > 0.3)
     {
         std::cout << DT.translation().norm() << std::endl;
         std::cout << DT.matrix3x4() << std::endl;
         std::cout << "Tracking lost, frame id: " << mCurrentFrame.mnId << std::endl;
+        // pTemp->discardLastFrame();
         // mpTracker->WriteDebugImages();
         return false;
     }
 
-    mpTracker->SwapFrameBuffer();
-    mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
-    mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
+    // mpTracker->SwapFrameBuffer();
+    mCurrentFrame.mTcw = mpReferenceKF->GetPose() * DT.inverse();
+    // mCurrentFrame.mTcp = mLastFrame.mTcp * DT.inverse();
+    mCurrentFrame.mTcp = DT.inverse();
 
     mRawDepth.upload(mCurrentFrame.mImDepth);
     mpCurrVoxelMap->Fuse(mRawDepth, mCurrentFrame.mTcp);
@@ -489,10 +498,10 @@ void Tracking::SearchLocalPoints()
     if (nToMatch > 0)
     {
         ORBMatcher matcher(0.8);
-        int th = 1;
+        int th = 2;
         // If the camera has been relocalised recently, perform a coarser search
         if (mCurrentFrame.mnId - mnLastSuccessRelocFrameId <= 1)
-            th = 3;
+            th = 5;
 
         matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
     }
@@ -646,9 +655,9 @@ bool Tracking::NeedNewKeyFrame()
     bool bCreateNew = false;
     Sophus::SE3d DT = mCurrentFrame.mTcp;
 
-    if (DT.log().topRows<3>().norm() > 0.15)
+    if (DT.log().topRows<3>().norm() > 0.1)
         bCreateNew = true;
-    else if (DT.log().bottomRows<3>().norm() > 0.15)
+    else if (DT.log().bottomRows<3>().norm() > 0.1)
         bCreateNew = true;
 
     return bCreateNew;
@@ -730,6 +739,8 @@ void Tracking::CreateNewKeyFrame()
 
     if (!TrackLocalMap())
         return;
+    mpTracker->SwapFrameBuffer();
+    mpCurrVoxelMap->SetPose(mpReferenceKF->GetPose());
 
     Map *pMap = mpMap->GetActiveMap();
     mpReferenceKF = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
@@ -755,7 +766,14 @@ void Tracking::reset()
 
 bool Tracking::needNewVoxelMap()
 {
-    return true;
+    nKFInMap++;
+    if (nKFInMap > 6)
+    {
+        nKFInMap = 0;
+        return true;
+    }
+
+    return false;
 }
 
 void Tracking::createNewVoxelMap()
@@ -772,8 +790,8 @@ void Tracking::createNewVoxelMap()
     mpCurrVoxelMap->SetRayTraceEngine(mpRayTraceEngine);
     mpCurrVoxelMap->create(5000, 4000, 4500, 0.01, 0.03);
     mpCurrVoxelMap->Reset();
+    mpCurrVoxelMap->SetPose(mpReferenceKF->GetPose());
     mpReferenceKF->mpVoxelStruct = mpCurrVoxelMap;
-    mpCurrVoxelMap->mTcw = mpReferenceKF->GetPose();
 }
 
 } // namespace SLAM

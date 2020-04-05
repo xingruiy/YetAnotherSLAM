@@ -141,6 +141,8 @@ public:
 
     // Raw depth for fusion
     cv::cuda::GpuMat mRawDepth;
+
+    int nKFInMap;
 };
 
 } // namespace SLAM

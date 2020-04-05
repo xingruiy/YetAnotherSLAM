@@ -19,7 +19,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap, KeyFrameDatabase *pKFDB)
       mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
       mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
       mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
-      mbToBeErased(false), mbBad(false), mpMap(pMap), mImg(F.mImGray.clone()), mpVoxelStruct(nullptr)
+      mbToBeErased(false), mbBad(false), mpMap(pMap), mImg(F.mImGray.clone()), mDepth(F.mImDepth.clone()), mpVoxelStruct(nullptr)
 {
   mnId = nNextId++;
 
@@ -50,7 +50,7 @@ void KeyFrame::SetPose(const Sophus::SE3d &Tcw)
   std::unique_lock<std::mutex> lock(mMutexPose);
   mTcw = Tcw;
 
-  if (mpVoxelStruct)
+  if (mpVoxelStruct && !mpVoxelStruct->isActive())
     mpVoxelStruct->SetPose(mTcw);
 }
 

@@ -144,7 +144,6 @@ void RGBDTracking::SetReferenceDepth(const cv::Mat &imDepth)
 
         ComputeVertexMap(mvReferenceInvDepth[lvl], mvReferenceVMap[lvl], invfx, invfy, cx, cy, 3.0f);
         ComputeNormalMap(mvReferenceVMap[lvl], mvReferenceNMap[lvl]);
-        ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
         // ComputeNormalAndMeanCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
     }
 
@@ -192,7 +191,7 @@ void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
         ComputeNormalMap(mvCurrentVMap[lvl], mvCurrentNMap[lvl]);
         ComputeCurvature(mvCurrentVMap[lvl], mvCurrentNMap[lvl], mvCurrentCurvature[lvl]);
 
-        // ComputeNormalAndMeanCurvature(mvCurrentVMap[lvl], mvCurrentNMap[lvl], mvCurrentCurvature[lvl]);
+        // ComputeCurvature(mvCurrentVMap[lvl], mvCurrentNMap[lvl], mvCurrentCurvature[lvl]);
     }
 }
 
@@ -210,7 +209,9 @@ void RGBDTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
         }
 
         ComputeNormalMap(mvReferenceVMap[lvl], mvReferenceNMap[lvl]);
-        ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
+        // ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
+
+        // ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
     }
 }
 
@@ -491,6 +492,15 @@ void RGBDTracking::ComputeSingleStepDepth(
     int cols = mvWidth[lvl];
     int rows = mvHeight[lvl];
 
+    // if (lvl == 0)
+    // {
+    //     cv::Mat out0(mvReferenceVMap[0]);
+    //     cv::Mat out1(mvCurrentVMap[0]);
+    //     cv::imshow("ref", out0);
+    //     cv::imshow("curr", out1);
+    //     cv::waitKey(1);
+    // }
+
     IcpStepFunctor icpStep;
     icpStep.out = mGpuBufferFloat96x29;
     icpStep.vmap_curr = mvCurrentVMap[lvl];
@@ -619,8 +629,8 @@ void RGBDTracking::ComputeSingleStepRGBDLinear(
 
     ComputeSingleStepDepth(lvl, T, hessianBuffer.data(), residualBuffer.data());
 
-    hessianMapped += 100 * hessianBuffer;
-    residualMapped += 10 * residualBuffer;
+    hessianMapped += 10000 * hessianBuffer;
+    residualMapped += 100 * residualBuffer;
 
     mHessian = hessianMapped;
 }

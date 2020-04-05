@@ -30,3 +30,5 @@ void ComputeCurvature(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat &nmap,
 void PyrDownImage(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst);
 
 void PyrDownVec4f(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst);
+
+void computeMeanOpticalShift(cv::cuda::GpuMat srcImage, cv::cuda::GpuMat srcDepth, cv::cuda::GpuMat dstImage, const Sophus::SE3d &T, float &meanShift);

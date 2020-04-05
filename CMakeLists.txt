@@ -32,7 +32,6 @@ PRIVATE
     RGBDFusion/src/VoxelMap.cu
     RGBDFusion/src/RGBDTracking.cu
     RGBDFusion/src/MeshEngine.cu
-    RGBDFusion/src/CoarseTracking.cpp
     RGBDFusion/src/RayTraceEngine.cu
 )
 
@@ -90,6 +89,7 @@ PRIVATE
 add_executable(asus_recorded 
     ${PROJECT_SOURCE_DIR}/Examples/asus_recorded.cpp
 )
+
 target_link_libraries(asus_recorded
 PRIVATE 
     ${PROJECT_NAME} 

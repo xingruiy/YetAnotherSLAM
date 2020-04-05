@@ -4,6 +4,7 @@
 #include "Map.h"
 #include "Tracking.h"
 #include "LocalMapping.h"
+#include "RGBDTracking.h"
 #include "KeyFrameDatabase.h"
 #include <sophus/se3.hpp>
 
@@ -100,6 +101,9 @@ private:
     std::mutex mMutexGBA;
     std::thread *mpThreadGBA;
     int mnFullBAIdx;
+
+public:
+    RGBDTracking *mpRGBDTracker;
 };
 
 } // namespace SLAM

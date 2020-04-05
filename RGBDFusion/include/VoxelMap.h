@@ -41,7 +41,7 @@ public:
                 float truncationDist);
 
     Sophus::SE3d GetPose();
-    void SetPose(Sophus::SE3d &Tcw);
+    void SetPose(const Sophus::SE3d &Tcw);
 
     void SetMeshEngine(MeshEngine *pMeshEngine);
     void SetRayTraceEngine(RayTraceEngine *pRayTraceEngine);

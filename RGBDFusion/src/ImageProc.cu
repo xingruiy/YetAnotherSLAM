@@ -78,10 +78,10 @@ void TransformReferencePoint(const cv::cuda::GpuMat depth,
     TransformReferencePoint_kernel<<<grid, block>>>(depth, vmap, RKinv.cast<float>(), t.cast<float>());
 }
 
-__device__ __forceinline__ Eigen::Matrix<uchar, 4, 1> RenderPoint(const Eigen::Vector3f &point,
-                                                                  const Eigen::Vector3f &normal,
-                                                                  const Eigen::Vector3f &image,
-                                                                  const Eigen::Vector3f &lightPos)
+__device__ __forceinline__ Eigen::Vector<uchar, 4> RenderPoint(const Eigen::Vector3f &point,
+                                                               const Eigen::Vector3f &normal,
+                                                               const Eigen::Vector3f &image,
+                                                               const Eigen::Vector3f &lightPos)
 {
     Eigen::Vector3f colour(4.f / 255.f, 2.f / 255.f, 2.f / 255.f);
     if (!isnan(point(0)))
@@ -103,16 +103,16 @@ __device__ __forceinline__ Eigen::Matrix<uchar, 4, 1> RenderPoint(const Eigen::V
         colour = Eigen::Vector3f(Ix, Ix, Ix);
     }
 
-    return Eigen::Matrix<uchar, 4, 1>(static_cast<uchar>(__saturatef(colour(0)) * 255.f),
-                                      static_cast<uchar>(__saturatef(colour(1)) * 255.f),
-                                      static_cast<uchar>(__saturatef(colour(2)) * 255.f),
-                                      255);
+    return Eigen::Vector<uchar, 4>(static_cast<uchar>(__saturatef(colour(0)) * 255.f),
+                                   static_cast<uchar>(__saturatef(colour(1)) * 255.f),
+                                   static_cast<uchar>(__saturatef(colour(2)) * 255.f),
+                                   255);
 }
 
 __global__ void RenderScene_kernel(const cv::cuda::PtrStep<Eigen::Vector4f> vmap,
                                    const cv::cuda::PtrStep<Eigen::Vector4f> nmap,
                                    const Eigen::Vector3f lightPos,
-                                   cv::cuda::PtrStepSz<Eigen::Matrix<uchar, 4, 1>> dst)
+                                   cv::cuda::PtrStepSz<Eigen::Vector<uchar, 4>> dst)
 {
     const int x = threadIdx.x + blockIdx.x * blockDim.x;
     const int y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -205,7 +205,7 @@ __global__ void ComputeVertexMap_kernel(const cv::cuda::PtrStepSz<float> depth_i
     }
     else
     {
-        vmap.ptr(y)[x](3) = -1.f;
+        vmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1.f);
     }
 }
 
@@ -519,12 +519,12 @@ void ComputeNormalAndMeanCurvature(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat
     ComputeNormalAndMeanCurvature_kernel<<<grid, block>>>(vmap, nmap, curvature);
     SafeCall(cudaDeviceSynchronize());
 
-    if (nmap.cols == 640)
-    {
-        cv::Mat out(nmap);
-        cv::imshow("nmap", out);
-        cv::waitKey(0);
-    }
+    // if (nmap.cols == 640)
+    // {
+    //     cv::Mat out(nmap);
+    //     cv::imshow("nmap", out);
+    //     cv::waitKey(0);
+    // }
 }
 
 __global__ void ComputeCurvature_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
@@ -558,7 +558,149 @@ __global__ void ComputeCurvature_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4
 
     float dx = (v00.head<3>() - v.head<3>()).dot(n.head<3>()) - (v.head<3>() - v01.head<3>()).dot(n.head<3>());
     float dy = (v11.head<3>() - v.head<3>()).dot(n.head<3>()) - (v.head<3>() - v10.head<3>()).dot(n.head<3>());
-    curvature.ptr(y)[x] = (dx + dy) * 0.5f;
+    float c = (dx + dy) * 0.5f;
+    curvature.ptr(y)[x] = fabs(c) > 0.003f ? 255 : 0;
+}
+
+__global__ void DilateKernel(const cv::cuda::PtrStepSz<float> src, cv::cuda::PtrStep<float> dst)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
+    if (y >= src.rows || x >= src.cols)
+        return;
+
+    float r = src.ptr(y)[x];
+    if (x < 1 || x >= src.cols - 1 || y < 1 || y >= src.rows - 1)
+        dst.ptr(y)[x] = r;
+
+    r = fmax(src.ptr(y - 1)[x - 1], r);
+    r = fmax(src.ptr(y - 1)[x], r);
+    r = fmax(src.ptr(y - 1)[x + 1], r);
+    r = fmax(src.ptr(y)[x - 1], r);
+    r = fmax(src.ptr(y)[x + 1], r);
+    r = fmax(src.ptr(y + 1)[x - 1], r);
+    r = fmax(src.ptr(y + 1)[x], r);
+    r = fmax(src.ptr(y + 1)[x + 1], r);
+    dst.ptr(y)[x] = r;
+}
+
+__global__ void ErodeKernel(const cv::cuda::PtrStepSz<float> src, cv::cuda::PtrStep<float> dst)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
+    if (y >= src.rows || x >= src.cols)
+        return;
+
+    float r = src.ptr(y)[x];
+    if (x < 1 || x >= src.rows - 1 || y < 1 || y >= src.cols - 1)
+        dst.ptr(y)[x] = r;
+
+    r = fmin(src.ptr(y - 1)[x - 1], r);
+    r = fmin(src.ptr(y - 1)[x], r);
+    r = fmin(src.ptr(y - 1)[x + 1], r);
+    r = fmin(src.ptr(y)[x - 1], r);
+    r = fmin(src.ptr(y)[x + 1], r);
+    r = fmin(src.ptr(y + 1)[x - 1], r);
+    r = fmin(src.ptr(y + 1)[x], r);
+    r = fmin(src.ptr(y + 1)[x + 1], r);
+    dst.ptr(y)[x] = r;
+}
+
+void morphGeometricSegmentationMap(const cv::cuda::GpuMat src,
+                                   const cv::cuda::GpuMat dst2)
+{
+
+    cv::cuda::GpuMat dst(src.size(), CV_32FC1);
+
+    dim3 block(32, 8);
+    dim3 grid(1, 1, 1);
+    grid.x = cv::divUp(src.cols, block.x);
+    grid.y = cv::divUp(src.rows, block.y);
+    DilateKernel<<<grid, block>>>(src, dst);
+    ErodeKernel<<<grid, block>>>(dst, src);
+    DilateKernel<<<grid, block>>>(src, dst);
+    ErodeKernel<<<grid, block>>>(dst, src);
+    DilateKernel<<<grid, block>>>(src, dst);
+    ErodeKernel<<<grid, block>>>(dst, src);
+
+    cv::Mat out(dst);
+    cv::imshow("out", out);
+    cv::waitKey(0);
+}
+
+__device__ float getConcavityTerm(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
+                                  const cv::cuda::PtrStepSz<Eigen::Vector4f> nmap,
+                                  const Eigen::Vector3f &v,
+                                  const Eigen::Vector3f &n,
+                                  int x_n, int y_n)
+{
+    const Eigen::Vector3f v_n = vmap.ptr(y_n)[x_n].head<3>();
+    const Eigen::Vector3f n_n = nmap.ptr(y_n)[x_n].head<3>();
+    if ((v_n - v).dot(n) < 0)
+        return 0;
+    return 1 - n_n.dot(n);
+}
+
+__device__ float getDistanceTerm(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
+                                 const Eigen::Vector3f &v,
+                                 const Eigen::Vector3f &n,
+                                 int x_n, int y_n)
+{
+    const Eigen::Vector3f v_n = vmap.ptr(y_n)[x_n].head<3>();
+    Eigen::Vector3f d = v_n - v;
+    return fabs(d.dot(n));
+}
+
+__global__ void computeGeometricSegmentation_Kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
+                                                    const cv::cuda::PtrStepSz<Eigen::Vector4f> nmap,
+                                                    cv::cuda::PtrStepSz<float> output,
+                                                    float wD, float wC)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
+    if (y >= vmap.rows || x >= vmap.cols)
+        return;
+
+    const int radius = 1;
+    if (x < radius || x >= vmap.cols - radius || y < radius || y >= vmap.rows - radius)
+    {
+        output.ptr(y)[x] = 1.0f;
+        return;
+    }
+
+    const Eigen::Vector3f v = vmap.ptr(y)[x].head<3>();
+    const Eigen::Vector3f n = nmap.ptr(y)[x].head<3>();
+    if (vmap.ptr(y)[x](3) <= 0.0f || nmap.ptr(y)[x](3) < 0)
+    {
+        output.ptr(y)[x] = 1.0f;
+        return;
+    }
+
+    float c = 0.0f;
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x - radius, y - radius), c);
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x, y - radius), c);
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x + radius, y - radius), c);
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x - radius, y), c);
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x + radius, y), c);
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x - radius, y + radius), c);
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x, y + radius), c);
+    c = fmax(getConcavityTerm(vmap, nmap, v, n, x + radius, y + radius), c);
+    c = fmax(c, 0.0f);
+    c *= wC;
+
+    float d = 0.0f;
+    d = fmax(getDistanceTerm(vmap, v, n, x - radius, y - radius), d);
+    d = fmax(getDistanceTerm(vmap, v, n, x, y - radius), d);
+    d = fmax(getDistanceTerm(vmap, v, n, x + radius, y - radius), d);
+    d = fmax(getDistanceTerm(vmap, v, n, x - radius, y), d);
+    d = fmax(getDistanceTerm(vmap, v, n, x + radius, y), d);
+    d = fmax(getDistanceTerm(vmap, v, n, x - radius, y + radius), d);
+    d = fmax(getDistanceTerm(vmap, v, n, x, y + radius), d);
+    d = fmax(getDistanceTerm(vmap, v, n, x + radius, y + radius), d);
+    d *= wD;
+
+    float edgeness = fmax(c, d);
+    output.ptr(y)[x] = fmin(1.0f, edgeness);
 }
 
 void ComputeCurvature(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat &nmap, cv::cuda::GpuMat &curvature)
@@ -570,11 +712,15 @@ void ComputeCurvature(const cv::cuda::GpuMat vmap, const cv::cuda::GpuMat &nmap,
     dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
 
     ComputeCurvature_kernel<<<grid, block>>>(vmap, nmap, curvature);
+    // computeGeometricSegmentation_Kernel<<<grid, block>>>(vmap, nmap, curvature, 1, 1);
+    // morphGeometricSegmentationMap(curvature, curvature);
+
     // if (vmap.cols == 640)
     // {
     //     cv::Mat out(curvature);
-    //     out.convertTo(out, CV_32FC1, 50000);
-    //     cv::imshow("nmap", out);
+    //     cv::Mat out2;
+    //     out.convertTo(out2, CV_8UC1);
+    //     cv::imshow("nmap", out2);
     //     cv::waitKey(0);
     // }
 }
@@ -660,4 +806,8 @@ void PyrDownVec4f(const cv::cuda::GpuMat src, cv::cuda::GpuMat &dst)
     dim3 grid(cv::divUp(dst.cols, block.x), cv::divUp(dst.rows, block.y));
 
     PyrDownVec4f_kernel<<<grid, block>>>(src, dst);
+}
+
+void computeMeanOpticalShift(cv::cuda::GpuMat srcImage, cv::cuda::GpuMat srcDepth, cv::cuda::GpuMat dstImage, const Sophus::SE3d &T, float &meanShift)
+{
 }

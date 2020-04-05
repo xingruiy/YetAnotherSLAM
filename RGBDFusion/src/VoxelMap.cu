@@ -15,7 +15,7 @@ Sophus::SE3d MapStruct::GetPose()
     return mTcw;
 }
 
-void MapStruct::SetPose(Sophus::SE3d &Tcw)
+void MapStruct::SetPose(const Sophus::SE3d &Tcw)
 {
     std::unique_lock<std::mutex> lock(mMutexPose);
     mTcw = Tcw;
