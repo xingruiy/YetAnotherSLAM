@@ -10,29 +10,34 @@ add_library(${PROJECT_NAME} SHARED "")
 
 target_sources(${PROJECT_NAME}
 PRIVATE
-    FullSystem/src/Map.cpp
-    FullSystem/src/Frame.cpp
-    FullSystem/src/MapDrawer.cpp
-    FullSystem/src/MapPoint.cpp
-    FullSystem/src/KeyFrame.cpp
-    FullSystem/src/LocalMapping.cpp
-    FullSystem/src/System.cpp
-    FullSystem/src/Viewer.cpp
-    FullSystem/src/Tracking.cpp
-    FullSystem/src/Optimizer.cpp
-    FullSystem/src/ORBMatcher.cpp
-    FullSystem/src/GlobalDef.cpp
-    FullSystem/src/LoopClosing.cpp
-    FullSystem/src/KeyFrameDatabase.cpp
-    FullSystem/src/ORBextractor.cpp
-    FullSystem/src/MapManager.cpp
-    FullSystem/src/PoseSolver.cpp
+    src/CoreSystem/Map.cpp
+    src/CoreSystem/Frame.cpp
+    src/CoreSystem/MapDrawer.cpp
+    src/CoreSystem/MapPoint.cpp
+    src/CoreSystem/KeyFrame.cpp
+    src/CoreSystem/LocalMapping.cpp
+    src/CoreSystem/CoreSystem.cc
+    src/CoreSystem/Viewer.cpp
+    src/CoreSystem/Tracking.cpp
+    src/CoreSystem/Optimizer.cpp
+    src/CoreSystem/ORBMatcher.cpp
+    src/CoreSystem/GlobalDef.cpp
+    src/CoreSystem/LoopClosing.cpp
+    src/CoreSystem/KeyFrameDatabase.cpp
+    src/CoreSystem/ORBextractor.cpp
+    src/CoreSystem/MapManager.cpp
+    src/CoreSystem/PoseSolver.cpp
 
-    RGBDFusion/src/ImageProc.cu
-    RGBDFusion/src/VoxelMap.cu
-    RGBDFusion/src/RGBDTracking.cu
-    RGBDFusion/src/MeshEngine.cu
-    RGBDFusion/src/RayTraceEngine.cu
+    src/RGBDOdometry//ImageProc.cu
+    src/RGBDOdometry//VoxelMap.cu
+    src/RGBDOdometry//CoarseTracking.cu
+    src/RGBDOdometry//MeshEngine.cu
+    src/RGBDOdometry//RayTraceEngine.cu
+
+    src/IOSystem/PangolinViewer.cc
+
+    src/utils/GlobalSettings.cc
+    src/utils/cudaDeviceFuncs.cu
 )
 
 set_target_properties(${PROJECT_NAME}
@@ -52,11 +57,8 @@ PUBLIC
     ${CUDA_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${Pangolin_INCLUDE_DIRS}  
-    ${PROJECT_SOURCE_DIR}/Thirdparty/
-    ${PROJECT_SOURCE_DIR}/RGBDFusion/utils
-    ${PROJECT_SOURCE_DIR}/OptBackend/include
-    ${PROJECT_SOURCE_DIR}/RGBDFusion/include
-    ${PROJECT_SOURCE_DIR}/FullSystem/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/3rdparty/
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -68,58 +70,67 @@ PUBLIC
     ${OpenCV_LIBS}
     ${CUDA_LIBRARIES}
     ${Pangolin_LIBRARIES}
-    ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
+    ${PROJECT_SOURCE_DIR}/3rdparty/DBoW2/lib/libDBoW2.so
+)
+
+add_executable(liveRecorded
+    ${PROJECT_SOURCE_DIR}/src/Examples/OpenNI2/liveRecordings.cc
+)
+target_link_libraries(liveRecorded 
+PRIVATE 
+    ${PROJECT_NAME} 
+    ${PROJECT_SOURCE_DIR}/3rdparty/OpenNI/lib/libOpenNI.so
 )
 
 # Build Examples
 # Build Live Viewer
-add_executable(asus_rgbd
-    ${PROJECT_SOURCE_DIR}/Examples/asus_rgbd.cpp
-)
-target_include_directories(asus_rgbd 
-PRIVATE
-    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/include
-)
-target_link_libraries(asus_rgbd 
-PRIVATE 
-    ${PROJECT_NAME} 
-    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI/lib/libOpenNI.so
-)
+# add_executable(asus_rgbd
+#     ${PROJECT_SOURCE_DIR}/Examples/asus_rgbd.cpp
+# )
+# target_include_directories(asus_rgbd 
+# PRIVATE
+#     ${PROJECT_SOURCE_DIR}/3rdparty/OpenNI2/include
+# )
+# target_link_libraries(asus_rgbd 
+# PRIVATE 
+#     ${PROJECT_NAME} 
+#     ${PROJECT_SOURCE_DIR}/3rdparty/OpenNI/lib/libOpenNI.so
+# )
 
-add_executable(asus_recorded 
-    ${PROJECT_SOURCE_DIR}/Examples/asus_recorded.cpp
-)
+# add_executable(asus_recorded 
+#     ${PROJECT_SOURCE_DIR}/Examples/asus_recorded.cpp
+# )
 
-target_link_libraries(asus_recorded
-PRIVATE 
-    ${PROJECT_NAME} 
-)
+# target_link_libraries(asus_recorded
+# PRIVATE 
+#     ${PROJECT_NAME} 
+# )
 
 # Build TUM Viewer
-add_executable(tum_rgbd
-    ${PROJECT_SOURCE_DIR}/Examples/tum_rgbd.cpp
-)
-target_link_libraries(tum_rgbd 
-PRIVATE 
-    ${PROJECT_NAME} 
-)
+# add_executable(tum_rgbd
+#     ${PROJECT_SOURCE_DIR}/Examples/tum_rgbd.cpp
+# )
+# target_link_libraries(tum_rgbd 
+# PRIVATE 
+#     ${PROJECT_NAME} 
+# )
 
 # Build Vocabulary Converter
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Vocabulary)
-add_executable(Text2Bin 
-    Vocabulary/Text2Bin.cpp
-)
-target_include_directories(Text2Bin
-PRIVATE
-    ${PROJECT_SOURCE_DIR}/FullSystem/include
-    ${PROJECT_SOURCE_DIR}/Thirdparty/
-)
-target_compile_features(Text2Bin
-PRIVATE
-    cxx_std_11
-)
-target_link_libraries(Text2Bin 
-PRIVATE
-    ${OpenCV_LIBS}
-    ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
-)
+# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Vocabulary)
+# add_executable(Text2Bin 
+#     Vocabulary/Text2Bin.cpp
+# )
+# target_include_directories(Text2Bin
+# PRIVATE
+#     ${PROJECT_SOURCE_DIR}/FullSystem/include
+#     ${PROJECT_SOURCE_DIR}/3rdparty/
+# )
+# target_compile_features(Text2Bin
+# PRIVATE
+#     cxx_std_11
+# )
+# target_link_libraries(Text2Bin 
+# PRIVATE
+#     ${OpenCV_LIBS}
+#     ${PROJECT_SOURCE_DIR}/3rdparty/DBoW2/lib/libDBoW2.so
+# )

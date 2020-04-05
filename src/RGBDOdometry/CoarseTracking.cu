@@ -1,0 +1,800 @@
+#include "CoarseTracking.h"
+#include "TrackingUtils.h"
+#include "ImageProc.h"
+#include "CoreSystem/Frame.h"
+#include "utils/GlobalSettings.h"
+#include "utils/cudaDeviceFuncs.h"
+
+namespace slam
+{
+
+CoarseTracking::CoarseTracking(GlobalSettings *settings) : lvlUsed(-1)
+{
+    if (!settings)
+        return;
+
+    minInc = settings->minIncForCoarseTracking;
+    lvlUsed = settings->coarsestLvlForTracking;
+
+    width.resize(lvlUsed);
+    height.resize(lvlUsed);
+    fx.resize(lvlUsed);
+    fy.resize(lvlUsed);
+    cx.resize(lvlUsed);
+    cy.resize(lvlUsed);
+    ifx.resize(lvlUsed);
+    ify.resize(lvlUsed);
+
+    buff_nPts.resize(lvlUsed);
+    buff_colour.resize(lvlUsed);
+    buff_idepth.resize(lvlUsed);
+
+    refAbsGrad2Pyr.resize(lvlUsed);
+    refImgPyr.resize(lvlUsed);
+    refDepthPyr.resize(lvlUsed);
+
+    for (int lvl = 0; lvl < lvlUsed; ++lvl)
+    {
+        width[lvl] = settings->widthLvl0 / (1 << lvl);
+        height[lvl] = settings->heightLvl0 / (1 << lvl);
+        fx[lvl] = settings->fxLvl0 / (1 << lvl);
+        fy[lvl] = settings->fyLvl0 / (1 << lvl);
+        cx[lvl] = settings->cxLvl0 / (1 << lvl);
+        cy[lvl] = settings->cyLvl0 / (1 << lvl);
+        ifx[lvl] = 1.0 / fx[lvl];
+        ify[lvl] = 1.0 / fy[lvl];
+
+        SafeCall(cudaMalloc((void **)&buff_nPts[lvl], sizeof(int)));
+        SafeCall(cudaMalloc((void **)&buff_projx[lvl], sizeof(float) * width[lvl] * height[lvl]));
+        SafeCall(cudaMalloc((void **)&buff_projy[lvl], sizeof(float) * width[lvl] * height[lvl]));
+        SafeCall(cudaMalloc((void **)&buff_colour[lvl], sizeof(float) * width[lvl] * height[lvl]));
+        SafeCall(cudaMalloc((void **)&buff_idepth[lvl], sizeof(float) * width[lvl] * height[lvl]));
+
+        SafeCall(cudaMalloc((void **)&refImgPyr[lvl], sizeof(Eigen::Vector3f) * width[lvl] * height[lvl]));
+        SafeCall(cudaMalloc((void **)&refAbsGrad2Pyr[lvl], sizeof(float) * width[lvl] * height[lvl]));
+        SafeCall(cudaMalloc((void **)&refDepthPyr[lvl], sizeof(Eigen::Vector3f) * width[lvl] * height[lvl]));
+    }
+
+    int wl0 = width[0];
+    int hl0 = height[0];
+    SafeCall(cudaMalloc((void **)&raw_img, sizeof(float) * wl0 * hl0));
+    SafeCall(cudaMalloc((void **)&raw_depth, sizeof(float) * wl0 * hl0));
+}
+
+void CoarseTracking::setRefFrame(Frame *refF)
+{
+    for (int lvl = 0; lvl < lvlUsed; ++lvl)
+    {
+        int wl = width[lvl];
+        int hl = height[lvl];
+
+        if (lvl == 0)
+        {
+            SafeCall(cudaMemcpy(refImgPyr[lvl], refF->img, sizeof(Eigen::Vector3f) * wl * hl, cudaMemcpyHostToDevice));
+            SafeCall(cudaMemcpy(refDepthPyr[lvl], refF->depth, sizeof(Eigen::Vector3f) * wl * hl, cudaMemcpyHostToDevice));
+        }
+        else
+        {
+            PyraDownImage(refImgPyr[lvl - 1], refImgPyr[lvl], wl, hl);
+            PyraDownImage(refDepthPyr[lvl - 1], refDepthPyr[lvl], wl, hl);
+        }
+
+        MakeImageGradients(refImgPyr[lvl], refAbsGrad2Pyr[lvl], wl, hl);
+    }
+}
+
+void CoarseTracking::makePoints(const int lvl)
+{
+    int *nPts = buff_nPts[lvl];
+    SafeCall(cudaMemset(nPts, 0, sizeof(int)));
+    Eigen::Vector3f *img = refImgPyr[lvl];
+    float *absGrad2 = refAbsGrad2Pyr[lvl];
+}
+
+bool CoarseTracking::trackNewFrame(Frame *newF, const Sophus::SE3d &lastF2Ref)
+{
+    Sophus::SE3d currT = lastF2Ref;
+    std::vector<int> matIterations;
+
+    for (int lvl = lvlUsed; lvl >= 0; --lvl)
+    {
+        Eigen::Matrix<float, 6, 6> H;
+        Eigen::Vector<float, 6> b;
+        Eigen::Vector4f lastRes = linearizePoints(lvl, currT);
+
+        double lambda = 0.01;
+        for (int iter = 0; iter < matIterations[lvl]; ++iter)
+        {
+            auto Hl = H;
+            for (int i = 0; i < 6; ++i)
+                Hl(i, i) *= (1 + lambda);
+            Eigen::Vector4f currRes = linearizePoints(lvl, currT);
+            bool accept = (currRes[0] / currRes[1]) < (lastRes[0] / lastRes[1]);
+
+            Eigen::Vector<float, 6> inc;
+
+            if (accept)
+            {
+                lastRes = currRes;
+                lambda *= 0.5;
+            }
+            else
+            {
+                lambda *= 4;
+            }
+
+            if (inc.norm() < minInc)
+                break;
+        }
+    }
+
+    return true;
+}
+
+Eigen::Vector4f CoarseTracking::linearizePoints(const int lvl, const Sophus::SE3d currT)
+{
+    int nPts = 0;
+    SafeCall(cudaMemcpy(&nPts, buff_nPts[lvl], sizeof(int), cudaMemcpyDeviceToHost));
+
+    if (nPts == 0)
+        return Eigen::Vector4f(0, 1, 0, 0);
+}
+
+CoarseTracking::CoarseTracking(int w, int h,
+                               const Eigen::Matrix3f &K,
+                               int minLvl, int maxLvl,
+                               bool bRGB, bool bIcp)
+{
+    if (bRGB && bIcp)
+        mModal = TrackingModal::RGB_AND_DEPTH;
+    else if (bRGB)
+        mModal = TrackingModal::RGB_ONLY;
+    else
+        mModal = TrackingModal::DEPTH_ONLY;
+}
+
+CoarseTracking::CoarseTracking(int w, int h,
+                               const Eigen::Matrix3d &K,
+                               bool bRGB, bool bIcp)
+{
+    if (bRGB && bIcp)
+        mModal = TrackingModal::RGB_AND_DEPTH;
+    else if (bRGB)
+        mModal = TrackingModal::RGB_ONLY;
+    else
+        mModal = TrackingModal::DEPTH_ONLY;
+
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        int wLvl = w >> lvl;
+        int hLvl = h >> lvl;
+
+        mK[lvl] = K / (1 << lvl);
+        mK[lvl](2, 2) = 1.0f;
+
+        mvWidth[lvl] = wLvl;
+        mvHeight[lvl] = hLvl;
+    }
+
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        int wLvl = mvWidth[lvl];
+        int hLvl = mvHeight[lvl];
+
+        mvCurrentDepth[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvReferenceDepth[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvCurrentIntensity[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvReferenceIntensity[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvIntensityGradientX[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvIntensityGradientY[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvReferencePointTransformed[lvl].create(hLvl, wLvl, CV_32FC4);
+
+        mvCurrentInvDepth[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvReferenceInvDepth[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvInvDepthGradientX[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvInvDepthGradientY[lvl].create(hLvl, wLvl, CV_32FC1);
+
+        mvCurrentVMap[lvl].create(hLvl, wLvl, CV_32FC4);
+        mvCurrentNMap[lvl].create(hLvl, wLvl, CV_32FC4);
+        mvReferenceVMap[lvl].create(hLvl, wLvl, CV_32FC4);
+        mvReferenceNMap[lvl].create(hLvl, wLvl, CV_32FC4);
+
+        mvCurrentCurvature[lvl].create(hLvl, wLvl, CV_32FC1);
+        mvReferenceCurvature[lvl].create(hLvl, wLvl, CV_32FC1);
+    }
+
+    // Create temporary buffers
+    mGpuBufferFloat96x29.create(96, 29, CV_32FC1);
+    mGpuBufferFloat96x3.create(96, 3, CV_32FC1);
+    mGpuBufferFloat96x2.create(96, 2, CV_32FC1);
+    mGpuBufferFloat96x1.create(96, 1, CV_32FC1);
+    mGpuBufferFloat1x29.create(1, 29, CV_32FC1);
+    mGpuBufferFloat1x3.create(1, 2, CV_32FC1);
+    mGpuBufferFloat1x2.create(1, 2, CV_32FC1);
+    mGpuBufferFloat1x1.create(1, 1, CV_32FC1);
+    mGpuBufferVector4HxW.create(h, w, CV_32FC4);
+    mGpuBufferVector7HxW.create(h, w, CV_32FC(7));
+    mGpuBufferRawDepth.create(h, w, CV_32FC1);
+}
+
+// __global__ void SelectPoints_kernel(cv::cuda::PtrStepSz<float> im,
+//                                     cv::cuda::PtrStep<float> depth,
+//                                     FramePoint *pts, int *N)
+// {
+//     int x = blockDim.x * blockIdx.x + threadIdx.x;
+//     int y = blockDim.y * blockIdx.y + threadIdx.y;
+//     if (x < 3 || y < 3 || x >= im.cols - 3 || y >= im.rows - 3)
+//         return;
+
+//     float sample = im.ptr(y)[x];
+//     float idepth = 1.0f / depth.ptr(y)[x];
+
+//     if (!isnan(idepth) && isfinite(idepth) && isfinite(sample))
+//     {
+//     }
+// }
+
+void CoarseTracking::SetReferenceImage(const cv::Mat &imGray)
+{
+    cv::Mat imGrayFloat;
+    imGray.convertTo(imGrayFloat, CV_32FC1);
+
+    // auto t1 = std::chrono::high_resolution_clock::now();
+    // int w = imGray.cols;
+    // int h = imGray.rows;
+    // float *pImage = (float *)aligned_alloc(16, w * h * 4 * sizeof(float));
+    // __m128 *pImageSSE = (__m128 *)pImage;
+    // for (int i = 0; i < w * h; ++i)
+    // {
+    //     pImageSSE[i] = _mm_set_ps(4.0f, 3.0f, 2.0f, 1.0f);
+    // }
+
+    // auto t2 = std::chrono::high_resolution_clock::now();
+    // std::cout << "time cost: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
+
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        if (lvl == 0)
+            mvReferenceIntensity[0].upload(imGrayFloat);
+        else
+            // cv::cuda::pyrDown(mvReferenceIntensity[lvl - 1], mvReferenceIntensity[lvl]);
+            PyrDownImage(mvReferenceIntensity[lvl - 1], mvReferenceIntensity[lvl]);
+    }
+}
+
+void CoarseTracking::SetReferenceDepth(const cv::Mat &imDepth)
+{
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        if (lvl == 0)
+        {
+            mGpuBufferRawDepth.upload(imDepth);
+            DepthToInvDepth(mGpuBufferRawDepth, mvReferenceInvDepth[lvl]);
+        }
+        else
+            PyrDownDepth(mvReferenceInvDepth[lvl - 1], mvReferenceInvDepth[lvl]);
+
+        float invfx = 1.0 / mK[lvl](0, 0);
+        float invfy = 1.0 / mK[lvl](1, 1);
+        float cx = mK[lvl](0, 2);
+        float cy = mK[lvl](1, 2);
+
+        ComputeVertexMap(mvReferenceInvDepth[lvl], mvReferenceVMap[lvl], invfx, invfy, cx, cy, 3.0f);
+        ComputeNormalMap(mvReferenceVMap[lvl], mvReferenceNMap[lvl]);
+        // ComputeNormalAndMeanCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
+    }
+
+    // cv::cuda::GpuMat curvature(mvReferenceVMap[0].size(), CV_32FC1);
+    // cv::Mat out(mvReferenceNMap[0]);
+    // cv::imshow("out", out);
+    // cv::waitKey(0);
+}
+
+void CoarseTracking::SetTrackingImage(const cv::Mat &imGray)
+{
+    cv::Mat imGrayFloat;
+    imGray.convertTo(imGrayFloat, CV_32FC1);
+
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        if (lvl == 0)
+            mvCurrentIntensity[lvl].upload(imGrayFloat);
+        else
+            // cv::cuda::pyrDown(mvCurrentIntensity[lvl - 1], mvCurrentIntensity[lvl]);
+            PyrDownImage(mvCurrentIntensity[lvl - 1], mvCurrentIntensity[lvl]);
+
+        ComputeImageGradientCentralDifference(mvCurrentIntensity[lvl], mvIntensityGradientX[lvl], mvIntensityGradientY[lvl]);
+    }
+}
+
+void CoarseTracking::SetTrackingDepth(const cv::Mat &imDepth)
+{
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        if (lvl == 0)
+        {
+            mGpuBufferRawDepth.upload(imDepth);
+            DepthToInvDepth(mGpuBufferRawDepth, mvCurrentInvDepth[lvl]);
+        }
+        else
+            PyrDownDepth(mvCurrentInvDepth[lvl - 1], mvCurrentInvDepth[lvl]);
+
+        float invfx = 1.0 / mK[lvl](0, 0);
+        float invfy = 1.0 / mK[lvl](1, 1);
+        float cx = mK[lvl](0, 2);
+        float cy = mK[lvl](1, 2);
+
+        ComputeVertexMap(mvCurrentInvDepth[lvl], mvCurrentVMap[lvl], invfx, invfy, cx, cy, 3.0f);
+        ComputeNormalMap(mvCurrentVMap[lvl], mvCurrentNMap[lvl]);
+        ComputeCurvature(mvCurrentVMap[lvl], mvCurrentNMap[lvl], mvCurrentCurvature[lvl]);
+
+        // ComputeCurvature(mvCurrentVMap[lvl], mvCurrentNMap[lvl], mvCurrentCurvature[lvl]);
+    }
+}
+
+void CoarseTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
+{
+    vmap.copyTo(mvReferenceVMap[0]);
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        if (lvl != 0)
+        { // cv::cuda::pyrDown(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
+            PyrDownVec4f(mvReferenceVMap[lvl - 1], mvReferenceVMap[lvl]);
+            // cv::Mat out(mvReferenceVMap[lvl]);
+            // cv::imshow("out", out);
+            // cv::waitKey(0);
+        }
+
+        ComputeNormalMap(mvReferenceVMap[lvl], mvReferenceNMap[lvl]);
+        // ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
+
+        // ComputeCurvature(mvReferenceVMap[lvl], mvReferenceNMap[lvl], mvReferenceCurvature[lvl]);
+    }
+}
+
+Sophus::SE3d CoarseTracking::GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer)
+{
+    int nIteration = 0;
+    int nSuccessfulIteration = 0;
+
+    Sophus::SE3d estimate = init;
+    Sophus::SE3d lastSuccessEstimate = estimate;
+    std::vector<int> vIterations = {10, 5, 3, 3, 3};
+
+    for (int lvl = NUM_PYR - 1; lvl >= 0; --lvl)
+    {
+        float lastError = std::numeric_limits<float>::max();
+        for (int iter = 0; iter < vIterations[lvl]; ++iter)
+        {
+            Eigen::Matrix<float, 6, 6> hessian = Eigen::Matrix<float, 6, 6>::Zero();
+            Eigen::Matrix<float, 6, 1> residual = Eigen::Matrix<float, 6, 1>::Zero();
+
+            switch (mModal)
+            {
+            case TrackingModal::RGB_ONLY:
+                ComputeSingleStepRGB(lvl, estimate, hessian.data(), residual.data());
+                break;
+
+            case TrackingModal::DEPTH_ONLY:
+                ComputeSingleStepDepth(lvl, estimate, hessian.data(), residual.data());
+                break;
+
+            case TrackingModal::RGB_AND_DEPTH:
+                ComputeSingleStepRGBDLinear(lvl, estimate, hessian.data(), residual.data());
+                break;
+            }
+
+            float error = sqrt(residualSum) / (numResidual + 6);
+            Eigen::Matrix<double, 6, 1> update = hessian.cast<double>().ldlt().solve(residual.cast<double>());
+
+            if (std::isnan(update(0)))
+            {
+                mbTrackingGood = false;
+                return Sophus::SE3d();
+            }
+
+            // update = ClampEigenVector(update, 0.05, -0.05);
+
+            if (update.norm() < 1e-3)
+                break;
+
+            estimate = Sophus::SE3d::exp(update) * estimate;
+            if (error < lastError)
+            {
+                lastSuccessEstimate = estimate;
+                lastError = error;
+                nSuccessfulIteration++;
+            }
+
+            nIteration++;
+        }
+    }
+
+    if (bSwapBuffer)
+    {
+        SwapFrameBuffer();
+    }
+
+    mbTrackingGood = true;
+    return lastSuccessEstimate;
+}
+
+void CoarseTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T)
+{
+    auto refInvDepth = mvReferenceInvDepth[lvl];
+    auto refPtTransformedLvl = mvReferencePointTransformed[lvl];
+    auto KLvl = mK[lvl];
+
+    ::TransformReferencePoint(refInvDepth, refPtTransformedLvl, KLvl, T);
+}
+
+void CoarseTracking::ComputeSingleStepRGB(
+    const int lvl,
+    const Sophus::SE3d &T,
+    float *hessian,
+    float *residual)
+{
+    TransformReferencePoint(lvl, T);
+
+    const int w = mvWidth[lvl];
+    const int h = mvHeight[lvl];
+
+    se3StepRGBResidualFunctor functor;
+    functor.w = w;
+    functor.h = h;
+    functor.n = w * h;
+    functor.refInt = mvReferenceIntensity[lvl];
+    functor.currInt = mvCurrentIntensity[lvl];
+    functor.currGx = mvIntensityGradientX[lvl];
+    functor.currGy = mvIntensityGradientY[lvl];
+    functor.refPtWarped = mvReferencePointTransformed[lvl];
+    functor.refResidual = mGpuBufferVector4HxW;
+    functor.fx = mK[lvl](0, 0);
+    functor.fy = mK[lvl](1, 1);
+    functor.cx = mK[lvl](0, 2);
+    functor.cy = mK[lvl](1, 2);
+    functor.out = mGpuBufferFloat96x2;
+
+    callDeviceFunctor<<<96, 224>>>(functor);
+    cv::cuda::reduce(mGpuBufferFloat96x2, mGpuBufferFloat1x2, 0, cv::REDUCE_SUM);
+    cv::Mat hostData(mGpuBufferFloat1x2);
+
+    iResidualSum = hostData.ptr<float>(0)[0];
+    numResidual = hostData.ptr<float>(0)[1];
+
+    VarianceEstimator estimator;
+    estimator.w = w;
+    estimator.h = h;
+    estimator.n = w * h;
+    estimator.meanEstimated = iResidualSum / numResidual;
+    estimator.residual = mGpuBufferVector4HxW;
+    estimator.out = mGpuBufferFloat96x1;
+
+    callDeviceFunctor<<<96, 224>>>(estimator);
+    cv::cuda::reduce(mGpuBufferFloat96x1, mGpuBufferFloat1x1, 0, cv::REDUCE_SUM);
+    mGpuBufferFloat1x1.download(hostData);
+
+    float squaredDeviationSum = hostData.ptr<float>(0)[0];
+    float varEstimated = sqrt(squaredDeviationSum / (numResidual - 1));
+
+    se3StepRGBFunctor sfunctor;
+    sfunctor.w = w;
+    sfunctor.h = h;
+    sfunctor.n = w * h;
+    sfunctor.huberTh = 4.685 * varEstimated;
+    sfunctor.refPtWarped = mvReferencePointTransformed[lvl];
+    sfunctor.refResidual = mGpuBufferVector4HxW;
+    sfunctor.fx = mK[lvl](0, 0);
+    sfunctor.fy = mK[lvl](1, 1);
+    sfunctor.out = mGpuBufferFloat96x29;
+
+    callDeviceFunctor<<<96, 224>>>(sfunctor);
+    cv::cuda::reduce(mGpuBufferFloat96x29, mGpuBufferFloat1x29, 0, cv::REDUCE_SUM);
+
+    mGpuBufferFloat1x29.download(hostData);
+    RankUpdateHessian<6, 7>(hostData.ptr<float>(0), hessian, residual);
+
+    residualSum = hostData.ptr<float>(0)[27];
+}
+
+void CoarseTracking::SwapFrameBuffer()
+{
+    for (int lvl = 0; lvl < NUM_PYR; ++lvl)
+    {
+        std::swap(mvReferenceVMap[lvl], mvCurrentVMap[lvl]);
+        std::swap(mvReferenceNMap[lvl], mvCurrentNMap[lvl]);
+        std::swap(mvReferenceInvDepth[lvl], mvCurrentInvDepth[lvl]);
+        std::swap(mvReferenceIntensity[lvl], mvCurrentIntensity[lvl]);
+    }
+}
+
+struct IcpStepFunctor
+{
+    cv::cuda::PtrStep<Eigen::Vector4f> vmap_curr;
+    cv::cuda::PtrStep<Eigen::Vector4f> nmap_curr;
+    cv::cuda::PtrStep<Eigen::Vector4f> vmap_last;
+    cv::cuda::PtrStep<Eigen::Vector4f> nmap_last;
+    cv::cuda::PtrStep<float> curv_last;
+    cv::cuda::PtrStep<float> curv_curr;
+    int cols, rows, N;
+    float fx, fy, cx, cy;
+    float angleTH, distTH;
+    Sophus::SE3f T_last_curr;
+    mutable cv::cuda::PtrStep<float> out;
+
+    __device__ __forceinline__ bool ProjectPoint(int &x, int &y,
+                                                 Eigen::Vector3f &v_curr,
+                                                 Eigen::Vector3f &n_last,
+                                                 Eigen::Vector3f &v_last) const;
+    __device__ __forceinline__ void GetProduct(int &k, float *out) const;
+    __device__ __forceinline__ void operator()() const;
+};
+
+__device__ __forceinline__ bool IcpStepFunctor::ProjectPoint(int &x, int &y,
+                                                             Eigen::Vector3f &v_curr,
+                                                             Eigen::Vector3f &n_last,
+                                                             Eigen::Vector3f &v_last) const
+{
+    Eigen::Vector4f v_last_c = vmap_last.ptr(y)[x];
+    if (v_last_c(3) < 0)
+        return false;
+
+    v_last = T_last_curr * v_last_c.head<3>();
+
+    float invz = 1.0 / v_last(2);
+    int u = __float2int_rd(fx * v_last(0) * invz + cx + 0.5);
+    int v = __float2int_rd(fy * v_last(1) * invz + cy + 0.5);
+    if (u < 1 || v < 1 || u >= cols - 1 || v >= rows - 1)
+        return false;
+
+    Eigen::Vector4f v_curr_c = vmap_curr.ptr(v)[u];
+    v_curr = v_curr_c.head<3>();
+    if (v_curr_c(3) < 0)
+        return false;
+
+    Eigen::Vector4f n_last_c = nmap_last.ptr(y)[x];
+    n_last = T_last_curr.so3() * n_last_c.head<3>();
+
+    Eigen::Vector4f n_curr_c = nmap_curr.ptr(v)[u];
+
+    float dist = (v_last - v_curr).norm();
+    float angle = n_curr_c.head<3>().dot(n_last);
+
+    float c_last = curv_last.ptr(y)[x];
+    float c_curr = curv_curr.ptr(v)[u];
+    float cdiff = fabs(log(c_last) - log(c_curr));
+
+    return (angle >= 0.6 && dist < 0.3 && cdiff < 2 && n_last_c(3) > 0 && n_curr_c(3) > 0);
+    // return (angle < angleTH && dist < distTH && cdiff < 2 && n_last_c(3) > 0 && n_curr_c(3) > 0);
+}
+
+__device__ __forceinline__ void IcpStepFunctor::GetProduct(int &k, float *sum) const
+{
+    int y = k / cols;
+    int x = k - (y * cols);
+
+    Eigen::Vector3f v_curr, n_last, v_last;
+    float row[7] = {0, 0, 0, 0, 0, 0, 0};
+    bool found = ProjectPoint(x, y, v_curr, n_last, v_last);
+
+    if (found)
+    {
+        row[6] = n_last.dot(v_curr - v_last);
+        float hw = 1; //fabs(row[6]) < 0.3 ? 1 : 0.3 / fabs(row[6]);
+        row[6] *= hw;
+        *(Eigen::Vector3f *)&row[0] = hw * n_last;
+        *(Eigen::Vector3f *)&row[3] = hw * v_last.cross(n_last);
+    }
+
+    int count = 0;
+#pragma unroll
+    for (int i = 0; i < 7; ++i)
+#pragma unroll
+        for (int j = i; j < 7; ++j)
+            sum[count++] = row[i] * row[j];
+    sum[count] = (float)found;
+}
+
+__device__ __forceinline__ void IcpStepFunctor::operator()() const
+{
+    float sum[29] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    float val[29];
+    for (int k = blockIdx.x * blockDim.x + threadIdx.x; k < N; k += blockDim.x * gridDim.x)
+    {
+        GetProduct(k, val);
+
+#pragma unroll
+        for (int i = 0; i < 29; ++i)
+        {
+            sum[i] += val[i];
+        }
+    }
+
+    BlockReduceSum<float, 29>(sum);
+
+    if (threadIdx.x == 0)
+    {
+#pragma unroll
+        for (int i = 0; i < 29; ++i)
+            out.ptr(blockIdx.x)[i] = sum[i];
+    }
+}
+
+void CoarseTracking::ComputeSingleStepDepth(
+    const int lvl,
+    const Sophus::SE3d &T,
+    float *hessian,
+    float *residual)
+{
+    int cols = mvWidth[lvl];
+    int rows = mvHeight[lvl];
+
+    // if (lvl == 0)
+    // {
+    //     cv::Mat out0(mvReferenceVMap[0]);
+    //     cv::Mat out1(mvCurrentVMap[0]);
+    //     cv::imshow("ref", out0);
+    //     cv::imshow("curr", out1);
+    //     cv::waitKey(1);
+    // }
+
+    IcpStepFunctor icpStep;
+    icpStep.out = mGpuBufferFloat96x29;
+    icpStep.vmap_curr = mvCurrentVMap[lvl];
+    icpStep.nmap_curr = mvCurrentNMap[lvl];
+    icpStep.vmap_last = mvReferenceVMap[lvl];
+    icpStep.nmap_last = mvReferenceNMap[lvl];
+    icpStep.curv_last = mvReferenceCurvature[lvl];
+    icpStep.curv_curr = mvCurrentCurvature[lvl];
+    icpStep.cols = cols;
+    icpStep.rows = rows;
+    icpStep.N = cols * rows;
+    icpStep.T_last_curr = T.cast<float>();
+    icpStep.angleTH = sin(20.f * 3.14159254f / 180.f);
+    icpStep.distTH = 0.01;
+    icpStep.fx = mK[lvl](0, 0);
+    icpStep.fy = mK[lvl](1, 1);
+    icpStep.cx = mK[lvl](0, 2);
+    icpStep.cy = mK[lvl](1, 2);
+
+    callDeviceFunctor<<<96, 224>>>(icpStep);
+    cv::cuda::reduce(mGpuBufferFloat96x29, mGpuBufferFloat1x29, 0, cv::REDUCE_SUM);
+
+    cv::Mat hostData(mGpuBufferFloat1x29);
+    RankUpdateHessian<6, 7>(hostData.ptr<float>(0), hessian, residual);
+
+    residualSum = hostData.ptr<float>(0)[27];
+}
+
+void CoarseTracking::ComputeSingleStepRGBD(
+    const int lvl,
+    const Sophus::SE3d &T,
+    float *hessian,
+    float *residual)
+{
+    TransformReferencePoint(lvl, T);
+
+    const int w = mvWidth[lvl];
+    const int h = mvHeight[lvl];
+
+    se3StepRGBDResidualFunctor functor;
+    functor.w = w;
+    functor.h = h;
+    functor.n = w * h;
+    functor.refInt = mvReferenceIntensity[lvl];
+    functor.currInt = mvCurrentIntensity[lvl];
+    functor.currGx = mvIntensityGradientX[lvl];
+    functor.currGy = mvIntensityGradientY[lvl];
+    functor.currInvDepth = mvCurrentInvDepth[lvl];
+    functor.currInvDepthGx = mvInvDepthGradientX[lvl];
+    functor.currInvDepthGy = mvInvDepthGradientY[lvl];
+    functor.refPtWarped = mvReferencePointTransformed[lvl];
+    functor.refResidual = mGpuBufferVector7HxW;
+    functor.fx = mK[lvl](0, 0);
+    functor.fy = mK[lvl](1, 1);
+    functor.cx = mK[lvl](0, 2);
+    functor.cy = mK[lvl](1, 2);
+    functor.out = mGpuBufferFloat96x3;
+
+    callDeviceFunctor<<<96, 224>>>(functor);
+    cv::cuda::reduce(mGpuBufferFloat96x3, mGpuBufferFloat1x3, 0, cv::REDUCE_SUM);
+    cv::Mat hostData(mGpuBufferFloat1x3);
+
+    float iResidualSum = hostData.ptr<float>(0)[0];
+    float dResidualSum = hostData.ptr<float>(0)[1];
+    numResidual = hostData.ptr<float>(0)[2];
+
+    VarCov2DEstimator estimator;
+    estimator.h = h;
+    estimator.w = w;
+    estimator.n = h * w;
+    estimator.meanEstimated = Eigen::Vector2f(iResidualSum, dResidualSum) / numResidual;
+    estimator.residual = mGpuBufferVector7HxW;
+    estimator.out = mGpuBufferFloat96x3;
+
+    callDeviceFunctor<<<96, 224>>>(estimator);
+    cv::cuda::reduce(mGpuBufferFloat96x3, mGpuBufferFloat1x3, 0, cv::REDUCE_SUM);
+    mGpuBufferFloat1x3.download(hostData);
+
+    Eigen::Matrix2f varEstimated;
+    varEstimated(0, 0) = hostData.ptr<float>(0)[0];
+    varEstimated(1, 1) = hostData.ptr<float>(0)[1];
+    varEstimated(0, 1) = varEstimated(1, 0) = hostData.ptr<float>(0)[2];
+    varEstimated /= (numResidual - 1);
+
+    se3StepRGBDFunctor sfunctor;
+    sfunctor.w = w;
+    sfunctor.h = h;
+    sfunctor.n = w * h;
+    sfunctor.stddevI = 1.345 * varEstimated(0, 0);
+    sfunctor.stddevD = 4.685 * varEstimated(1, 1);
+    sfunctor.precision = varEstimated.inverse();
+    sfunctor.refPtWarped = mvReferencePointTransformed[lvl];
+    sfunctor.refResidual = mGpuBufferVector7HxW;
+    sfunctor.fx = mK[lvl](0, 0);
+    sfunctor.fy = mK[lvl](1, 1);
+    sfunctor.out = mGpuBufferFloat96x29;
+
+    callDeviceFunctor<<<96, 224>>>(sfunctor);
+    cv::cuda::reduce(mGpuBufferFloat96x29, mGpuBufferFloat1x29, 0, cv::REDUCE_SUM);
+
+    mGpuBufferFloat1x29.download(hostData);
+    RankUpdateHessian<6, 7>(hostData.ptr<float>(0), hessian, residual);
+
+    residualSum = hostData.ptr<float>(0)[27];
+}
+
+void CoarseTracking::ComputeSingleStepRGBDLinear(
+    const int lvl,
+    const Sophus::SE3d &T,
+    float *hessian,
+    float *residual)
+{
+    Eigen::Map<Eigen::Matrix<float, 6, 6>> hessianMapped(hessian);
+    Eigen::Map<Eigen::Matrix<float, 6, 1>> residualMapped(residual);
+
+    Eigen::Matrix<float, 6, 6> hessianBuffer;
+    Eigen::Matrix<float, 6, 1> residualBuffer;
+
+    ComputeSingleStepRGB(lvl, T, hessianBuffer.data(), residualBuffer.data());
+
+    hessianMapped += hessianBuffer;
+    residualMapped += residualBuffer;
+
+    hessianBuffer.setZero();
+    residualBuffer.setZero();
+
+    ComputeSingleStepDepth(lvl, T, hessianBuffer.data(), residualBuffer.data());
+
+    hessianMapped += 10000 * hessianBuffer;
+    residualMapped += 100 * residualBuffer;
+
+    mHessian = hessianMapped;
+}
+
+cv::cuda::GpuMat CoarseTracking::GetReferenceDepth(const int lvl) const
+{
+    return mGpuBufferRawDepth;
+}
+
+void CoarseTracking::WriteDebugImages()
+{
+    cv::Mat out;
+    mvCurrentIntensity[0].download(out);
+    cv::imwrite("curr_image.png", out);
+    mvReferenceIntensity[0].download(out);
+    cv::imwrite("last_image.png", out);
+    mvIntensityGradientX[0].download(out);
+    cv::imwrite("gx.png", out);
+    mvIntensityGradientY[0].download(out);
+    cv::imwrite("gy.png", out);
+    cv::imshow("out", out);
+    cv::waitKey(0);
+}
+
+Eigen::Matrix<double, 6, 6> CoarseTracking::GetCovarianceMatrix()
+{
+    return mHessian.cast<double>().lu().inverse();
+}
+
+} // namespace slam
