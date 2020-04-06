@@ -1,8 +1,8 @@
-#include "System.h"
+#include "CoreSystem.h"
 
 int main(int argc, char **argv)
 {
-    slam::System system(argv[1], argv[2]);
+    slam::CoreSystem system(argv[1], argv[2]);
     std::string base = "/home/xingrui/Downloads/images3/";
     for (int i = 0; i < 2081; ++i)
     {

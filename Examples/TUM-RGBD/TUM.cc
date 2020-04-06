@@ -1,4 +1,4 @@
-#include "System.h"
+#include "CoreSystem.h"
 
 void LoadImages(const std::string &path,
                 std::vector<std::string> &imgFilename,
@@ -28,7 +28,7 @@ int main(int argc, char **argv)
     }
 
     std::cout << "Images in the sequence: " << nImages << std::endl;
-    slam::System sys(argv[1], argv[2]);
+    slam::CoreSystem sys(argv[1], argv[2]);
 
     for (int i = 0; i < nImages; ++i)
     {

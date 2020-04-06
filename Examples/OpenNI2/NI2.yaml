@@ -3,9 +3,9 @@
 # =============================
 # Control
 # =============================
-System.ReverseRGB: 0
-System.DepthScale: 1000
-System.EnableViewer: 1
+CoreSystem.ReverseRGB: 0
+CoreSystem.DepthScale: 1000
+CoreSystem.EnableViewer: 1
 
 # =============================
 # Calib

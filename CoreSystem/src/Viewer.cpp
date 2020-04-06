@@ -3,7 +3,7 @@
 namespace slam
 {
 
-Viewer::Viewer(System *pSystem, MapDrawer *pMapDrawer)
+Viewer::Viewer(CoreSystem *pSystem, MapDrawer *pMapDrawer)
     : mpSystem(pSystem), mpMapDrawer(pMapDrawer),
       mbNewImage(false), mbNewDepth(false), mbNewKF(false)
 {

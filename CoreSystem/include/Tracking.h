@@ -5,7 +5,7 @@
 #include "Viewer.h"
 #include "KeyFrame.h"
 #include "LocalMapping.h"
-#include "System.h"
+#include "CoreSystem.h"
 #include "GlobalDef.h"
 #include "LoopClosing.h"
 #include "MeshEngine.h"
@@ -17,7 +17,7 @@ namespace slam
 {
 
 class Viewer;
-class System;
+class CoreSystem;
 class KeyFrame;
 class MapManager;
 class LocalMapping;
@@ -25,7 +25,7 @@ class LocalMapping;
 class Tracking
 {
 public:
-    Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB);
+    Tracking(CoreSystem *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB);
 
     // Preprocess the input and call Track().
     void GrabImageRGBD(cv::Mat ImGray, cv::Mat Depth, const double TimeStamp);
@@ -91,8 +91,8 @@ protected:
     LocalMapping *mpLocalMapper;
     LoopClosing *mpLoopClosing;
 
-    // System
-    System *mpSystem;
+    // CoreSystem
+    CoreSystem *mpSystem;
 
     //BoW
     ORBVocabulary *ORBVoc;

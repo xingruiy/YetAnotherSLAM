@@ -1,4 +1,4 @@
-#include "System.h"
+#include "CoreSystem.h"
 #include "OpenNI/include/Camera.h"
 
 int main(int argc, char **argv)
@@ -10,7 +10,7 @@ int main(int argc, char **argv)
     }
 
     OpenNI2::Camera cam;
-    slam::System system(argv[1], argv[2]);
+    slam::CoreSystem system(argv[1], argv[2]);
 
     cv::Mat imDepth, imRGB;
 

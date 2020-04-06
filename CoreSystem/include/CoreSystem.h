@@ -26,11 +26,11 @@ class MapManager;
 class LoopClosing;
 class LocalMapping;
 
-class System
+class CoreSystem
 {
 public:
-    ~System();
-    System(const std::string &strSettingFile, const std::string &strVocFile);
+    ~CoreSystem();
+    CoreSystem(const std::string &strSettingFile, const std::string &strVocFile);
     void takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp);
     void Shutdown();
     void reset();

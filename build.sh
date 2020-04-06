@@ -18,7 +18,7 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RELEASE
 make -j
 
-echo "Configuring and Building 3rdparty/ORB_SLAM2/3rdparty/DBoW2 ..."
+echo "Configuring and Building 3rdparty/DBoW2 ..."
 
 cd ../../DBoW2
 mkdir -p build && cd build

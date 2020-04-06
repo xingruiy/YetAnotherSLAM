@@ -10,23 +10,23 @@ add_library(${PROJECT_NAME} SHARED)
 
 target_sources(${PROJECT_NAME}
 PRIVATE
-    FullSystem/src/Map.cpp
-    FullSystem/src/Frame.cpp
-    FullSystem/src/MapDrawer.cpp
-    FullSystem/src/MapPoint.cpp
-    FullSystem/src/KeyFrame.cpp
-    FullSystem/src/LocalMapping.cpp
-    FullSystem/src/System.cpp
-    FullSystem/src/Viewer.cpp
-    FullSystem/src/Tracking.cpp
-    FullSystem/src/Optimizer.cpp
-    FullSystem/src/ORBMatcher.cpp
-    FullSystem/src/GlobalDef.cpp
-    FullSystem/src/LoopClosing.cpp
-    FullSystem/src/KeyFrameDatabase.cpp
-    FullSystem/src/ORBextractor.cpp
-    FullSystem/src/MapManager.cpp
-    FullSystem/src/PoseSolver.cpp
+    CoreSystem/src/Map.cpp
+    CoreSystem/src/Frame.cpp
+    CoreSystem/src/MapDrawer.cpp
+    CoreSystem/src/MapPoint.cpp
+    CoreSystem/src/KeyFrame.cpp
+    CoreSystem/src/LocalMapping.cpp
+    CoreSystem/src/CoreSystem.cpp
+    CoreSystem/src/Viewer.cpp
+    CoreSystem/src/Tracking.cpp
+    CoreSystem/src/Optimizer.cpp
+    CoreSystem/src/ORBMatcher.cpp
+    CoreSystem/src/GlobalDef.cpp
+    CoreSystem/src/LoopClosing.cpp
+    CoreSystem/src/KeyFrameDatabase.cpp
+    CoreSystem/src/ORBextractor.cpp
+    CoreSystem/src/MapManager.cpp
+    CoreSystem/src/PoseSolver.cpp
 
     RGBDFusion/src/ImageProc.cu
     RGBDFusion/src/VoxelMap.cu
@@ -56,7 +56,7 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/3rdparty/
     ${PROJECT_SOURCE_DIR}/RGBDFusion/include
-    ${PROJECT_SOURCE_DIR}/FullSystem/include
+    ${PROJECT_SOURCE_DIR}/CoreSystem/include
 )
 
 target_link_libraries(${PROJECT_NAME}

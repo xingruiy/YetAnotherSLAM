@@ -1,10 +1,10 @@
-#include "System.h"
+#include "CoreSystem.h"
 #include "MapManager.h"
 
 namespace slam
 {
 
-System::System(const std::string &strSettingFile, const std::string &strVocFile)
+CoreSystem::CoreSystem(const std::string &strSettingFile, const std::string &strVocFile)
     : mpViewer(0)
 {
     //Load Settings
@@ -42,7 +42,7 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     }
 }
 
-void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
+void CoreSystem::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
 {
     // Covert colour images to grayscale
     if (!g_bReverseRGB)
@@ -66,14 +66,14 @@ void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
     mpTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
 }
 
-void System::reset()
+void CoreSystem::reset()
 {
     mpTracker->reset();
     mpMapManager->Reset();
     // mpMap->reset();
 }
 
-void System::FuseAllMapStruct()
+void CoreSystem::FuseAllMapStruct()
 {
     Map *pMap = mpMapManager->GetActiveMap();
     auto mapStructs = pMap->GetAllVoxelMaps();
@@ -107,26 +107,26 @@ void System::FuseAllMapStruct()
     pMSini->SetActiveFlag(false);
 }
 
-void System::DisplayNextMap()
+void CoreSystem::DisplayNextMap()
 {
 }
 
-void System::WriteToFile(const std::string &strFile)
+void CoreSystem::WriteToFile(const std::string &strFile)
 {
     // mpMap->WriteToFile(strFile);
 }
 
-void System::ReadFromFile(const std::string &strFile)
+void CoreSystem::ReadFromFile(const std::string &strFile)
 {
     // mpMap->ReadFromFile(strFile);
 }
 
-void System::Shutdown()
+void CoreSystem::Shutdown()
 {
     g_bSystemKilled = true;
 }
 
-System::~System()
+CoreSystem::~CoreSystem()
 {
     mpLoopThread->join();
     mpViewerThread->join();
@@ -142,7 +142,7 @@ System::~System()
     delete mpLocalMappingThread;
 }
 
-void System::readSettings(const std::string &strSettingFile)
+void CoreSystem::readSettings(const std::string &strSettingFile)
 {
     cv::FileStorage settingsFile(strSettingFile, cv::FileStorage::READ);
     if (!settingsFile.isOpened())
@@ -152,9 +152,9 @@ void System::readSettings(const std::string &strSettingFile)
     }
 
     // read system configurations
-    g_bEnableViewer = (int)settingsFile["System.EnableViewer"] == 1;
-    g_bReverseRGB = (int)settingsFile["System.ReverseRGB"] == 1;
-    g_DepthScaleInv = 1.0 / (double)settingsFile["System.DepthScale"];
+    g_bEnableViewer = (int)settingsFile["CoreSystem.EnableViewer"] == 1;
+    g_bReverseRGB = (int)settingsFile["CoreSystem.ReverseRGB"] == 1;
+    g_DepthScaleInv = 1.0 / (double)settingsFile["CoreSystem.DepthScale"];
 
     // read orb parameters
     g_ORBScaleFactor = settingsFile["ORB_SLAM2.scaleFactor"];
@@ -215,7 +215,7 @@ void System::readSettings(const std::string &strSettingFile)
               << "===================================================" << std::endl;
 }
 
-void System::writeTrajectoryToFile(const std::string &filename)
+void CoreSystem::writeTrajectoryToFile(const std::string &filename)
 {
     std::vector<KeyFrame *> vpKFs = mpMapManager->GetActiveMap()->GetAllKeyFrames();
     sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
