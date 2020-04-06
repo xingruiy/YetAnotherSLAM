@@ -79,9 +79,6 @@ void Viewer::Run()
         if (pangolin::Pushed(varReset))
             mpSystem->reset();
 
-        if (pangolin::Pushed(varSaveMap))
-            mpSystem->WriteToFile(strFileName);
-
         g_bSystemRunning = varRunning;
         RenderImagesToScreen();
 

@@ -88,15 +88,15 @@ protected:
     void CreateNewMapPoints();
 
     // Other Thread Pointers
-    LocalMapping *mpLocalMapper;
-    LoopClosing *mpLoopClosing;
+    LocalMapping *localMapper;
+    LoopClosing *loopCloser;
 
     // CoreSystem
     CoreSystem *mpSystem;
 
     //BoW
     ORBVocabulary *ORBVoc;
-    KeyFrameDatabase *mpKeyFrameDB;
+    KeyFrameDatabase *KFDatabase;
 
     //Local Map
     KeyFrame *mpReferenceKF;

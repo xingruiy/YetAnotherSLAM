@@ -17,7 +17,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *pMap, KeyFrameDatabase *pKFDB)
       mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
       mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
       mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
-      mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
+      mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), KFDatabase(pKFDB),
       mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
       mbToBeErased(false), mbBad(false), mpMap(pMap), mImg(F.mImGray.clone()), mpVoxelStruct(nullptr)
 {
@@ -477,7 +477,7 @@ void KeyFrame::SetBadFlag()
   }
 
   mpMap->EraseKeyFrame(this);
-  mpKeyFrameDB->erase(this);
+  KFDatabase->erase(this);
 }
 
 bool KeyFrame::isBad()

@@ -14,10 +14,10 @@ GlobalSettings::GlobalSettings(const std::string &strSettings)
 
 void GlobalSettings::printDebugInfo()
 {
-    std::cout << "==== here's some debug info about the system:\n"
+    std::cout << "==== here's some summary about the system:\n"
               << "w: " << wlv0 << " h: " << hlv0 << "\n"
               << "fx: " << fxlv0 << " fy: " << fylv0 << " cx: " << cxlv0 << " cy: " << cylv0 << "\n"
-              << "verbose? - " << (verbose ? "yes" : "no") << " verbose lvl: " << verboselvl << "\n"
+              << "verbose? - " << (verbose ? "yes" : "no") << "; verbose lvl: " << verboselvl << "\n"
               << "inverse depth scale: " << idepthScale
               << std::endl;
 }

@@ -1,2 +1,2 @@
 #!/bin/bash
-bin/NI2Record Examples/OpenNI2/NI2.yaml Vocabulary.bin
+bin/NI2Record Examples/OpenNI2/NI2.settings Vocabulary.bin

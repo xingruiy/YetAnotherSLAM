@@ -40,32 +40,29 @@ public:
     void FuseAllMapStruct();
     void DisplayNextMap();
 
-    void WriteToFile(const std::string &strFile);
-    void ReadFromFile(const std::string &strFile);
     void writeTrajectoryToFile(const std::string &filename);
 
 private:
     void readSettings(const std::string &strSettingFile);
-    void loadORBVocabulary(const std::string &strVocFile);
 
     std::thread *mpLocalMappingThread;
     std::thread *mpViewerThread;
     std::thread *mpLoopThread;
 
     // Map *mpMap;
-    Tracking *mpTracker;
+    Tracking *localTracker;
     Viewer *mpViewer;
-    LocalMapping *mpLocalMapper;
-    LoopClosing *mpLoopClosing;
+    LocalMapping *localMapper;
+    LoopClosing *loopCloser;
     MapDrawer *mpMapDrawer;
 
-    KeyFrameDatabase *mpKeyFrameDB;
+    KeyFrameDatabase *KFDatabase;
     ORBVocabulary *ORBVoc;
 
     cv::Mat grayScale;
     cv::Mat depthFloat;
 
-    MapManager *mpMapManager;
+    MapManager *mapManager;
     GlobalSettings *settings;
 };
 

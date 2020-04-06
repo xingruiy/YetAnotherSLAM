@@ -25,11 +25,11 @@ add_library(${PROJECT_NAME} SHARED
     CoreSystem/src/MapManager.cpp
     CoreSystem/src/PoseSolver.cpp
 
-    RGBDFusion/src/ImageProc.cu
-    RGBDFusion/src/VoxelMap.cu
-    RGBDFusion/src/CoarseTracking.cu
-    RGBDFusion/src/MeshEngine.cu
-    RGBDFusion/src/RayTraceEngine.cu
+    RGBDOdom/ImageProc.cu
+    RGBDOdom/VoxelMap.cu
+    RGBDOdom/CoarseTracking.cu
+    RGBDOdom/MeshEngine.cu
+    RGBDOdom/RayTraceEngine.cu
 
     utils/cudaDeviceFuncs.cu
     utils/GlobalSettings.cc
@@ -54,7 +54,7 @@ PUBLIC
     ${Pangolin_INCLUDE_DIRS}  
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/3rdparty/
-    ${PROJECT_SOURCE_DIR}/RGBDFusion/include
+    ${PROJECT_SOURCE_DIR}/RGBDOdom
     ${PROJECT_SOURCE_DIR}/CoreSystem/include
 )
 

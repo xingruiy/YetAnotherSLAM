@@ -2,6 +2,9 @@
 #include "TrackingUtils.h"
 #include "ImageProc.h"
 
+namespace slam
+{
+
 CoarseTracking::CoarseTracking(int w, int h, Eigen::Matrix3f K, bool bRGB, bool bIcp)
 {
     if (bRGB && bIcp)
@@ -80,6 +83,14 @@ CoarseTracking::CoarseTracking(int w, int h, Eigen::Matrix3f K, bool bRGB, bool 
 //     {
 //     }
 // }
+
+void CoarseTracking::setReferenceFrame(Frame *refF)
+{
+}
+
+bool CoarseTracking::trackFrameNew(Frame *newF, Sophus::SE3d ref2lastF, Eigen::Vector4f bestRes)
+{
+}
 
 void CoarseTracking::SetReferenceImage(const cv::Mat &imGray)
 {
@@ -633,3 +644,5 @@ Eigen::Matrix<double, 6, 6> CoarseTracking::GetCovarianceMatrix()
 {
     return mHessian.cast<double>().lu().inverse();
 }
+
+} // namespace slam

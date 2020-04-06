@@ -6,8 +6,17 @@
 
 #define NUM_PYR 6
 
+namespace slam
+{
+
+class Frame;
+
 class CoarseTracking
 {
+
+public:
+    void setReferenceFrame(Frame *refF);
+    bool trackFrameNew(Frame *newF, Sophus::SE3d ref2lastF, Eigen::Vector4f bestRes);
 
 public:
     CoarseTracking(int w, int h, Eigen::Matrix3f K, bool bRGB, bool bIcp);
@@ -111,3 +120,5 @@ private:
 
     Eigen::Matrix<float, 6, 6> mHessian;
 };
+
+} // namespace slam

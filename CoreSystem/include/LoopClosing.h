@@ -69,10 +69,10 @@ private:
     MapManager *mpMap;
     Tracking *mpTracker;
 
-    KeyFrameDatabase *mpKeyFrameDB;
+    KeyFrameDatabase *KFDatabase;
     ORBVocabulary *ORBVoc;
 
-    LocalMapping *mpLocalMapper;
+    LocalMapping *localMapper;
 
     std::list<KeyFrame *> mlpLoopKeyFrameQueue;
 

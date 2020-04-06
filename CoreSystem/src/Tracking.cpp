@@ -8,7 +8,7 @@ namespace slam
 {
 
 Tracking::Tracking(CoreSystem *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB)
-    : mState(SYSTEM_NOT_READY), ORBVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
+    : mState(SYSTEM_NOT_READY), ORBVoc(pVoc), KFDatabase(pKFDB), mpSystem(pSystem),
       mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastSuccessRelocFrameId(0),
       mnNumRelocRuns(0), mTriesBeforeReloc(0)
 {
@@ -24,12 +24,12 @@ Tracking::Tracking(CoreSystem *pSystem, ORBVocabulary *pVoc, MapManager *pMap, K
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 {
-    mpLocalMapper = pLocalMapper;
+    localMapper = pLocalMapper;
 }
 
 void Tracking::SetLoopClosing(LoopClosing *pLoopClosing)
 {
-    mpLoopClosing = pLoopClosing;
+    loopCloser = pLoopClosing;
 }
 
 void Tracking::SetViewer(Viewer *pViewer)
@@ -127,7 +127,7 @@ void Tracking::StereoInitialization()
         mCurrentFrame.SetPose(Sophus::SE3d(Eigen::Matrix4d::Identity()));
 
         // Create KeyFrame
-        KeyFrame *pKFini = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
+        KeyFrame *pKFini = new KeyFrame(mCurrentFrame, pMap, KFDatabase);
 
         // Insert KeyFrame in the map
         pMap->AddKeyFrame(pKFini);
@@ -161,7 +161,7 @@ void Tracking::StereoInitialization()
 
         std::cout << "New map created with " << pMap->MapPointsInMap() << " points" << std::endl;
 
-        mpLocalMapper->InsertKeyFrame(pKFini);
+        localMapper->InsertKeyFrame(pKFini);
 
         mLastFrame = Frame(mCurrentFrame);
         mpLastKeyFrame = pKFini;
@@ -256,7 +256,7 @@ bool Tracking::Relocalization()
 
     // Relocalization is performed when tracking is lost
     // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
-    std::vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame);
+    std::vector<KeyFrame *> vpCandidateKFs = KFDatabase->DetectRelocalizationCandidates(&mCurrentFrame);
 
     if (vpCandidateKFs.empty())
         return false;
@@ -726,7 +726,7 @@ void Tracking::CreateNewMapPoints()
 
 void Tracking::CreateNewKeyFrame()
 {
-    if (!mpLocalMapper->SetNotStop(true))
+    if (!localMapper->SetNotStop(true))
         return;
 
     // mpCurrVoxelMap->RayTrace(mCurrentFrame.mTcp);
@@ -738,15 +738,15 @@ void Tracking::CreateNewKeyFrame()
         return;
 
     Map *pMap = mpMap->GetActiveMap();
-    mpReferenceKF = new KeyFrame(mCurrentFrame, pMap, mpKeyFrameDB);
+    mpReferenceKF = new KeyFrame(mCurrentFrame, pMap, KFDatabase);
     mpTracker->SwapFrameBuffer();
     CreateNewMapPoints();
 
     mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
     mCurrentFrame.mTcp = Sophus::SE3d();
-    mpLocalMapper->InsertKeyFrame(mpReferenceKF);
-    mpLocalMapper->SetNotStop(false);
+    localMapper->InsertKeyFrame(mpReferenceKF);
+    localMapper->SetNotStop(false);
 
     if (mpViewer)
         mpViewer->setKeyFrameImage(mCurrentFrame.mImGray, mCurrentFrame.mvKeys);

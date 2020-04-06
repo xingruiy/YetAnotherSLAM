@@ -162,7 +162,7 @@ protected:
     std::vector<MapPoint *> mvpMapPoints;
 
     // BoW
-    KeyFrameDatabase *mpKeyFrameDB;
+    KeyFrameDatabase *KFDatabase;
     ORBVocabulary *mpORBvocabulary;
 
     // Grid over the image to speed up feature matching

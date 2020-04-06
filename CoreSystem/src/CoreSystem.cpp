@@ -2,6 +2,9 @@
 #include "MapManager.h"
 #include "utils/GlobalSettings.h"
 
+#define LOG_TERM(str) \
+    str;
+
 namespace slam
 {
 
@@ -12,34 +15,37 @@ CoreSystem::CoreSystem(GlobalSettings *settings, const std::string &strVocFile)
     readSettings(std::string());
 
     //Load ORB Vocabulary
+    LOG_TERM(std::cout << "==== reading the vocabulary" << std::endl)
     ORBVoc = new ORBVocabulary();
     ORBVoc->loadFromBinaryFile(strVocFile);
+    LOG_TERM(std::cout << "==== reading complete" << std::endl)
 
     //Create the Map
-    mpMapManager = new MapManager();
-    mpMapDrawer = new MapDrawer(mpMapManager);
+    LOG_TERM(std::cout << "==== create maps" << std::endl)
+    mapManager = new MapManager();
+    mpMapDrawer = new MapDrawer(mapManager);
 
-    //Create KeyFrame Database
-    mpKeyFrameDB = new KeyFrameDatabase(*ORBVoc);
+    LOG_TERM(std::cout << "==== create keyframe database" << std::endl)
+    KFDatabase = new KeyFrameDatabase(*ORBVoc);
 
-    mpLoopClosing = new LoopClosing(mpMapManager, mpKeyFrameDB, ORBVoc);
-    mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
+    loopCloser = new LoopClosing(mapManager, KFDatabase, ORBVoc);
+    mpLoopThread = new std::thread(&LoopClosing::Run, loopCloser);
 
-    mpLocalMapper = new LocalMapping(ORBVoc, mpMapManager);
-    mpLocalMapper->SetLoopCloser(mpLoopClosing);
-    mpLoopClosing->SetLocalMapper(mpLocalMapper);
-    mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
+    localMapper = new LocalMapping(ORBVoc, mapManager);
+    localMapper->SetLoopCloser(loopCloser);
+    loopCloser->SetLocalMapper(localMapper);
+    mpLocalMappingThread = new std::thread(&LocalMapping::Run, localMapper);
 
     //Initialize the Tracking thread
-    mpTracker = new Tracking(this, ORBVoc, mpMapManager, mpKeyFrameDB);
-    mpTracker->SetLocalMapper(mpLocalMapper);
+    localTracker = new Tracking(this, ORBVoc, mapManager, KFDatabase);
+    localTracker->SetLocalMapper(localMapper);
 
     if (g_bEnableViewer)
     {
         mpViewer = new Viewer(this, mpMapDrawer);
         mpViewerThread = new std::thread(&Viewer::Run, mpViewer);
-        mpTracker->SetViewer(mpViewer);
-        mpLocalMapper->SetViewer(mpViewer);
+        localTracker->SetViewer(mpViewer);
+        localMapper->SetViewer(mpViewer);
     }
 }
 
@@ -64,19 +70,19 @@ void CoreSystem::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp
         return;
 
     // Invoke the main tracking thread
-    mpTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
+    localTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
 }
 
 void CoreSystem::reset()
 {
-    mpTracker->reset();
-    mpMapManager->Reset();
+    localTracker->reset();
+    mapManager->Reset();
     // mpMap->reset();
 }
 
 void CoreSystem::FuseAllMapStruct()
 {
-    Map *pMap = mpMapManager->GetActiveMap();
+    Map *pMap = mapManager->GetActiveMap();
     auto mapStructs = pMap->GetAllVoxelMaps();
 
     MapStruct *pMSini = pMap->mpMapStructOrigin;
@@ -108,20 +114,6 @@ void CoreSystem::FuseAllMapStruct()
     pMSini->SetActiveFlag(false);
 }
 
-void CoreSystem::DisplayNextMap()
-{
-}
-
-void CoreSystem::WriteToFile(const std::string &strFile)
-{
-    // mpMap->WriteToFile(strFile);
-}
-
-void CoreSystem::ReadFromFile(const std::string &strFile)
-{
-    // mpMap->ReadFromFile(strFile);
-}
-
 void CoreSystem::Shutdown()
 {
     g_bSystemKilled = true;
@@ -135,10 +127,10 @@ CoreSystem::~CoreSystem()
 
     // delete mpMap;
     delete mpViewer;
-    delete mpTracker;
+    delete localTracker;
     delete mpLoopThread;
-    delete mpLocalMapper;
-    delete mpLoopClosing;
+    delete localMapper;
+    delete loopCloser;
     delete mpViewerThread;
     delete mpLocalMappingThread;
 }
@@ -245,7 +237,7 @@ void CoreSystem::readSettings(const std::string &strSettingFile)
 
 void CoreSystem::writeTrajectoryToFile(const std::string &filename)
 {
-    std::vector<KeyFrame *> vpKFs = mpMapManager->GetActiveMap()->GetAllKeyFrames();
+    std::vector<KeyFrame *> vpKFs = mapManager->GetActiveMap()->GetAllKeyFrames();
     sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
 
     // Transform all keyframes so that the first keyframe is at the origin.
@@ -261,11 +253,11 @@ void CoreSystem::writeTrajectoryToFile(const std::string &filename)
 
     // For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
     // which is true when tracking failed (lbL).
-    std::list<KeyFrame *>::iterator lRit = mpTracker->mlpReferences.begin();
-    std::list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
-    std::list<bool>::iterator lbL = mpTracker->mlbLost.begin();
-    for (auto lit = mpTracker->mlRelativeFramePoses.begin(),
-              lend = mpTracker->mlRelativeFramePoses.end();
+    std::list<KeyFrame *>::iterator lRit = localTracker->mlpReferences.begin();
+    std::list<double>::iterator lT = localTracker->mlFrameTimes.begin();
+    std::list<bool>::iterator lbL = localTracker->mlbLost.begin();
+    for (auto lit = localTracker->mlRelativeFramePoses.begin(),
+              lend = localTracker->mlRelativeFramePoses.end();
          lit != lend; lit++, lRit++, lT++, lbL++)
     {
         if (*lbL)

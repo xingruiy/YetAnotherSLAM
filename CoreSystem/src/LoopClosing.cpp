@@ -8,7 +8,7 @@ namespace slam
 {
 
 LoopClosing::LoopClosing(MapManager *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
-    : mpMap(pMap), mpKeyFrameDB(pDB), ORBVoc(pVoc), mLastLoopKFid(0),
+    : mpMap(pMap), KFDatabase(pDB), ORBVoc(pVoc), mLastLoopKFid(0),
       mpThreadGBA(nullptr), mbRunningGBA(false), mnFullBAIdx(0)
 {
     mnCovisibilityConsistencyTh = 3;
@@ -16,7 +16,7 @@ LoopClosing::LoopClosing(MapManager *pMap, KeyFrameDatabase *pDB, ORBVocabulary 
 
 void LoopClosing::SetLocalMapper(LocalMapping *pLocalMapper)
 {
-    mpLocalMapper = pLocalMapper;
+    localMapper = pLocalMapper;
 }
 
 void LoopClosing::Run()
@@ -61,7 +61,7 @@ bool LoopClosing::DetectLoop()
     //If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
     if (mpCurrentKF->mnId < mLastLoopKFid + 10)
     {
-        mpKeyFrameDB->add(mpCurrentKF);
+        KFDatabase->add(mpCurrentKF);
         mpCurrentKF->SetErase();
         return false;
     }
@@ -86,12 +86,12 @@ bool LoopClosing::DetectLoop()
     }
 
     // Query the database imposing the minimum score
-    auto vpCandidateKFs = mpKeyFrameDB->DetectLoopCandidates(mpCurrentKF, minScore);
+    auto vpCandidateKFs = KFDatabase->DetectLoopCandidates(mpCurrentKF, minScore);
 
     // If there are no loop candidates, just add new keyframe and return false
     if (vpCandidateKFs.empty())
     {
-        mpKeyFrameDB->add(mpCurrentKF);
+        KFDatabase->add(mpCurrentKF);
         mvConsistentGroups.clear();
         mpCurrentKF->SetErase();
         return false;
@@ -159,7 +159,7 @@ bool LoopClosing::DetectLoop()
     mvConsistentGroups = vCurrentConsistentGroups;
 
     // Add Current Keyframe to database
-    mpKeyFrameDB->add(mpCurrentKF);
+    KFDatabase->add(mpCurrentKF);
 
     if (mvpEnoughConsistentCandidates.empty())
     {
@@ -353,7 +353,7 @@ void LoopClosing::CorrectLoop()
 
     // Send a stop signal to Local Mapping
     // Avoid new keyframes are inserted while correcting the loop
-    mpLocalMapper->RequestStop();
+    localMapper->RequestStop();
 
     // If a Global Bundle Adjustment is running, abort it
     if (isRunningGBA())
@@ -371,7 +371,7 @@ void LoopClosing::CorrectLoop()
     }
 
     // Wait until Local Mapping has effectively stopped
-    while (!mpLocalMapper->isStopped())
+    while (!localMapper->isStopped())
     {
         usleep(1000);
     }
@@ -542,7 +542,7 @@ void LoopClosing::CorrectLoop()
     mpThreadGBA = new std::thread(&LoopClosing::RunGlobalBundleAdjustment, this, mpCurrentKF->mnId);
 
     // Loop closed. Release Local Mapping.
-    mpLocalMapper->Release();
+    localMapper->Release();
 
     mLastLoopKFid = mpCurrentKF->mnId;
 }
@@ -595,10 +595,10 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
         {
             std::cout << "Global Bundle Adjustment finished" << std::endl;
             std::cout << "Updating map ..." << std::endl;
-            mpLocalMapper->RequestStop();
+            localMapper->RequestStop();
             // Wait until Local Mapping has effectively stopped
 
-            while (!mpLocalMapper->isStopped() && !mpLocalMapper->isFinished())
+            while (!localMapper->isStopped() && !localMapper->isFinished())
             {
                 usleep(1000);
             }
@@ -665,7 +665,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 
             pMap->InformNewBigChange();
 
-            mpLocalMapper->Release();
+            localMapper->Release();
 
             std::cout << "Map updated!" << std::endl;
         }
