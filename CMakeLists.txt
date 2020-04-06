@@ -53,7 +53,7 @@ PUBLIC
     ${CUDA_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${Pangolin_INCLUDE_DIRS}  
-    ${PROJECT_SOURCE_DIR}/Thirdparty/
+    ${PROJECT_SOURCE_DIR}/3rdparty/
     ${PROJECT_SOURCE_DIR}/RGBDFusion/utils
     ${PROJECT_SOURCE_DIR}/OptBackend/include
     ${PROJECT_SOURCE_DIR}/RGBDFusion/include
@@ -69,57 +69,17 @@ PUBLIC
     ${OpenCV_LIBS}
     ${CUDA_LIBRARIES}
     ${Pangolin_LIBRARIES}
-    ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
+    ${PROJECT_SOURCE_DIR}/3rdparty/DBoW2/lib/libDBoW2.so
 )
 
 # Build Examples
-# Build Live Viewer
-add_executable(asus_rgbd
-    ${PROJECT_SOURCE_DIR}/Examples/asus_rgbd.cpp
-)
-target_include_directories(asus_rgbd 
-PRIVATE
-    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI2/include
-)
-target_link_libraries(asus_rgbd 
-PRIVATE 
-    ${PROJECT_NAME} 
-    ${PROJECT_SOURCE_DIR}/Thirdparty/OpenNI/lib/libOpenNI.so
-)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  ${CMAKE_SOURCE_DIR}/bin/)
+add_executable(NI2Live Examples/OpenNI2/NI2Live.cc)
+target_include_directories(NI2Live PRIVATE 3rdparty/OpenNI2/include)
+target_link_libraries(NI2Live PRIVATE ${PROJECT_NAME} ${CMAKE_SOURCE_DIR}/3rdparty/OpenNI/lib/libOpenNI.so)
 
-add_executable(asus_recorded 
-    ${PROJECT_SOURCE_DIR}/Examples/asus_recorded.cpp
-)
-target_link_libraries(asus_recorded
-PRIVATE 
-    ${PROJECT_NAME} 
-)
+add_executable(NI2Record Examples/OpenNI2/NI2Record.cc)
+target_link_libraries(NI2Record PRIVATE  ${PROJECT_NAME})
 
-# Build TUM Viewer
-add_executable(tum_rgbd
-    ${PROJECT_SOURCE_DIR}/Examples/tum_rgbd.cpp
-)
-target_link_libraries(tum_rgbd 
-PRIVATE 
-    ${PROJECT_NAME} 
-)
-
-# Build Vocabulary Converter
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Vocabulary)
-add_executable(Text2Bin 
-    Vocabulary/Text2Bin.cpp
-)
-target_include_directories(Text2Bin
-PRIVATE
-    ${PROJECT_SOURCE_DIR}/FullSystem/include
-    ${PROJECT_SOURCE_DIR}/Thirdparty/
-)
-target_compile_features(Text2Bin
-PRIVATE
-    cxx_std_11
-)
-target_link_libraries(Text2Bin 
-PRIVATE
-    ${OpenCV_LIBS}
-    ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
-)
+add_executable(TUM ${PROJECT_SOURCE_DIR}/Examples/TUM-RGBD/TUM.cc)
+target_link_libraries(TUM PRIVATE ${PROJECT_NAME})

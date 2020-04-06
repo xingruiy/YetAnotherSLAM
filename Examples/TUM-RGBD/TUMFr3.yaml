@@ -1,0 +1,50 @@
+%YAML:1.0
+
+# =============================
+# Control
+# =============================
+System.ReverseRGB: 1
+System.DepthScale: 5000
+System.EnableViewer: 1
+
+# =============================
+# Calib
+# =============================
+Calibration.width: 640
+Calibration.height: 480
+Calibration.fx: 535.4
+Calibration.fy: 539.2
+Calibration.cx: 320.1
+Calibration.cy: 247.6
+Calibration.bf: 40.0 # IR projector baseline times fx (aprox.)
+
+# =============================
+# DistCoeff
+# =============================
+UnDistortion.k1: 0
+UnDistortion.k2: 0
+UnDistortion.p1: 0
+UnDistortion.p2: 0
+UnDistortion.k3: 0
+
+# =============================
+# ORB Features
+# =============================
+ORB_SLAM2.nFeatures: 1000
+ORB_SLAM2.scaleFactor: 1.2
+ORB_SLAM2.nLevels: 8
+ORB_SLAM2.iniThFAST: 20
+ORB_SLAM2.minThFAST: 7
+
+# =============================
+# Tracking
+# =============================
+Tracking.UseDepth: 1
+Tracking.UseColour: 1
+Tracking.ThDepth: 40.0 # Close/Far threshold. Baseline times.
+
+# =============================
+# Map Viewer
+# =============================
+Viewer.PointSize: 3
+Viewer.StartWhenReady: 0
