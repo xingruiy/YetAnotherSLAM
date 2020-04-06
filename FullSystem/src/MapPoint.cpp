@@ -2,7 +2,7 @@
 #include "ORBMatcher.h"
 #include <cmath>
 
-namespace SLAM
+namespace slam
 {
 
 std::mutex MapPoint::mGlobalMutex;
@@ -373,4 +373,4 @@ int MapPoint::PredictScale(const float &currentDist, Frame *pF)
     return nScale;
 }
 
-} // namespace SLAM
+} // namespace slam

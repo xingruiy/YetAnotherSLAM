@@ -7,7 +7,7 @@
 #include "KeyFrameDatabase.h"
 #include <sophus/se3.hpp>
 
-namespace SLAM
+namespace slam
 {
 
 class Map;
@@ -70,7 +70,7 @@ private:
     Tracking *mpTracker;
 
     KeyFrameDatabase *mpKeyFrameDB;
-    ORBVocabulary *mpORBVocabulary;
+    ORBVocabulary *ORBVoc;
 
     LocalMapping *mpLocalMapper;
 
@@ -102,6 +102,6 @@ private:
     int mnFullBAIdx;
 };
 
-} // namespace SLAM
+} // namespace slam
 
 #endif

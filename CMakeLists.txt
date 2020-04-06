@@ -6,7 +6,7 @@ find_package(Eigen3 3.3 REQUIRED)
 find_package(Pangolin 0.5 REQUIRED)
 find_package(g2o 1.0.0 REQUIRED)
 
-add_library(${PROJECT_NAME} SHARED "")
+add_library(${PROJECT_NAME} SHARED)
 
 target_sources(${PROJECT_NAME}
 PRIVATE
@@ -30,10 +30,10 @@ PRIVATE
 
     RGBDFusion/src/ImageProc.cu
     RGBDFusion/src/VoxelMap.cu
-    RGBDFusion/src/RGBDTracking.cu
+    RGBDFusion/src/CoarseTracking.cu
     RGBDFusion/src/MeshEngine.cu
-    RGBDFusion/src/CoarseTracking.cpp
     RGBDFusion/src/RayTraceEngine.cu
+    utils/cudaDeviceFuncs.cu
 )
 
 set_target_properties(${PROJECT_NAME}
@@ -53,22 +53,19 @@ PUBLIC
     ${CUDA_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${Pangolin_INCLUDE_DIRS}  
+    ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/3rdparty/
-    ${PROJECT_SOURCE_DIR}/RGBDFusion/utils
-    ${PROJECT_SOURCE_DIR}/OptBackend/include
     ${PROJECT_SOURCE_DIR}/RGBDFusion/include
     ${PROJECT_SOURCE_DIR}/FullSystem/include
 )
 
 target_link_libraries(${PROJECT_NAME}
 PUBLIC
-    Eigen3::Eigen
-    g2o_core 
-    g2o_types_sba
-    g2o_types_sim3
+    Eigen3::Eigen 
     ${OpenCV_LIBS}
     ${CUDA_LIBRARIES}
-    ${Pangolin_LIBRARIES}
+    g2o_core g2o_types_sba g2o_types_sim3
+    ${Pangolin_LIBRARIES} 
     ${PROJECT_SOURCE_DIR}/3rdparty/DBoW2/lib/libDBoW2.so
 )
 

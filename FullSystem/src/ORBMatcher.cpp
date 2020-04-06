@@ -2,7 +2,7 @@
 #include "ORBMatcher.h"
 #include <sophus/sim3.hpp>
 
-namespace SLAM
+namespace slam
 {
 
 const int ORBMatcher::TH_HIGH = 100;
@@ -1564,4 +1564,4 @@ int ORBMatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
     return dist;
 }
 
-} // namespace SLAM
+} // namespace slam

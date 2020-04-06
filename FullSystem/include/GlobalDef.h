@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <mutex>
 
-namespace SLAM
+namespace slam
 {
 
 #define FRAME_GRID_ROWS 48
@@ -26,7 +26,7 @@ extern int g_ORBNLevels;
 extern int g_ORBIniThFAST;
 extern int g_ORBMinThFAST;
 
-#define NUM_PYR 5
+#define NUM_PYR 6
 
 extern int g_width[NUM_PYR];
 extern int g_height[NUM_PYR];
@@ -55,4 +55,4 @@ extern size_t g_nFailedFrame;
 extern size_t g_nTrackedFrame;
 extern size_t g_nTrackedKeyframe;
 
-} // namespace SLAM
+} // namespace slam

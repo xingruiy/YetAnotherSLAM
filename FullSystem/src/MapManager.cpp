@@ -1,6 +1,6 @@
 #include "MapManager.h"
 
-namespace SLAM
+namespace slam
 {
 
 MapManager::MapManager()
@@ -58,4 +58,4 @@ std::vector<Map *> MapManager::GetAllMaps()
     return allMaps;
 }
 
-}; // namespace SLAM
+}; // namespace slam

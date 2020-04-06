@@ -1,7 +1,7 @@
 #include "GlobalDef.h"
 #include <cmath>
 
-namespace SLAM
+namespace slam
 {
 
 bool g_bReverseRGB = false;
@@ -86,4 +86,4 @@ size_t g_nFailedFrame = 0;
 size_t g_nTrackedFrame = 0;
 size_t g_nTrackedKeyframe = 0;
 
-} // namespace SLAM
+} // namespace slam

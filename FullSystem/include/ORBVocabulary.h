@@ -24,7 +24,7 @@
 #include "DBoW2/DBoW2/FORB.h"
 #include "DBoW2/DBoW2/TemplatedVocabulary.h"
 
-namespace SLAM
+namespace slam
 {
 
 static std::vector<cv::Mat> ToDescriptorVector(const cv::Mat &Descriptors)
@@ -40,6 +40,6 @@ static std::vector<cv::Mat> ToDescriptorVector(const cv::Mat &Descriptors)
 typedef DBoW2::TemplatedVocabulary<DBoW2::FORB::TDescriptor, DBoW2::FORB>
     ORBVocabulary;
 
-} // namespace SLAM
+} // namespace slam
 
 #endif // ORBVOCABULARY_H

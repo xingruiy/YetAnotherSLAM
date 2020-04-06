@@ -27,7 +27,7 @@
 #include "LoopClosing.h"
 #include <g2o/types/sim3/types_seven_dof_expmap.h>
 
-namespace SLAM
+namespace slam
 {
 
 class LoopClosing;
@@ -59,6 +59,6 @@ protected:
     static g2o::SE3Quat ToSE3Quat(const Sophus::SE3d &Tcw);
 };
 
-} // namespace SLAM
+} // namespace slam
 
 #endif

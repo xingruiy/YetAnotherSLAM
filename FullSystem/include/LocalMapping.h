@@ -32,7 +32,7 @@
 #include "Viewer.h"
 #include "LoopClosing.h"
 
-namespace SLAM
+namespace slam
 {
 
 class Viewer;
@@ -133,6 +133,6 @@ protected:
     std::vector<MapPoint *> mvpLocalMapPoints;
 };
 
-} // namespace SLAM
+} // namespace slam
 
 #endif

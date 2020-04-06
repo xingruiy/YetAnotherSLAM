@@ -4,16 +4,15 @@
 #include <Eigen/Core>
 #include <DBoW2/DBoW2/BowVector.h>
 
-#include "MapPoint.h"
-#include "KeyFrame.h"
 #include "GlobalDef.h"
-#include "ORBextractor.h"
 #include "ORBVocabulary.h"
 
-namespace SLAM
+namespace slam
 {
 
+class MapPoint;
 class KeyFrame;
+class ORBextractor;
 
 class Frame
 {
@@ -158,4 +157,4 @@ private:
     void AssignFeaturesToGrid();
 };
 
-} // namespace SLAM
+} // namespace slam

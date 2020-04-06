@@ -8,7 +8,7 @@
 #include "MapDrawer.h"
 #include "GlobalDef.h"
 
-namespace SLAM
+namespace slam
 {
 
 class System;
@@ -63,4 +63,4 @@ private:
     std::vector<cv::KeyPoint> mvCurrentKeys;
 };
 
-} // namespace SLAM
+} // namespace slam

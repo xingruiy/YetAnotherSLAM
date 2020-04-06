@@ -1,7 +1,7 @@
 #include "RayTraceEngine.h"
-#include "CudaUtils.h"
-#include "VoxelStructUtils.h"
-#include "ParallelScan.h"
+#include "utils/CudaUtils.h"
+#include "utils/VoxelStructUtils.h"
+#include "utils/ParallelScan.h"
 
 #define RENDERING_BLOCK_SIZE_X 16
 #define RENDERING_BLOCK_SIZE_Y 16

@@ -3,7 +3,7 @@
 #include "Optimizer.h"
 #include "MapManager.h"
 
-namespace SLAM
+namespace slam
 {
 
 LocalMapping::LocalMapping(ORBVocabulary *pVoc, MapManager *pMap)
@@ -476,4 +476,4 @@ void LocalMapping::SetMapPointsToCheck(const std::vector<MapPoint *> &vpLocalPoi
     mvpLocalMapPoints = vpLocalPoints;
 }
 
-} // namespace SLAM
+} // namespace slam

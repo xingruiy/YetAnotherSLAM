@@ -9,7 +9,7 @@
 
 #include "DBoW2/DUtils/Random.h"
 
-namespace SLAM
+namespace slam
 {
 
 PoseSolver::PoseSolver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12)
@@ -450,4 +450,4 @@ void PoseSolver::FromCameraToImage(const std::vector<Eigen::Vector3d> &vP3Dc, st
     }
 }
 
-} // namespace SLAM
+} // namespace slam

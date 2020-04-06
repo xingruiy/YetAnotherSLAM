@@ -3,7 +3,7 @@
 #include "KeyFrameDatabase.h"
 #include "KeyFrame.h"
 
-namespace SLAM
+namespace slam
 {
 
 KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : mpVoc(&voc)
@@ -275,4 +275,4 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
     return vpRelocCandidates;
 }
 
-} // namespace SLAM
+} // namespace slam

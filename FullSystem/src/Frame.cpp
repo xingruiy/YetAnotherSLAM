@@ -1,6 +1,9 @@
 #include "Frame.h"
+#include "MapPoint.h"
+#include "KeyFrame.h"
+#include "ORBextractor.h"
 
-namespace SLAM
+namespace slam
 {
 
 long unsigned int Frame::nNextId = 0;
@@ -351,4 +354,4 @@ void Frame::CreateRelocalisationPoints()
   }
 }
 
-} // namespace SLAM
+} // namespace slam

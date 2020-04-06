@@ -10,7 +10,7 @@
 #include "MapPoint.h"
 #include "KeyFrameDatabase.h"
 
-namespace SLAM
+namespace slam
 {
 
 class Map;
@@ -201,4 +201,4 @@ public:
     MapStruct *mpVoxelStruct;
 };
 
-} // namespace SLAM
+} // namespace slam

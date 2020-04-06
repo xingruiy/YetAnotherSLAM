@@ -1,7 +1,10 @@
 #include "MapDrawer.h"
 #include "MapManager.h"
+#include "KeyFrame.h"
+#include "MapPoint.h"
+#include "VoxelMap.h"
 
-namespace SLAM
+namespace slam
 {
 
 MapDrawer::MapDrawer(MapManager *pMap) : mpMap(pMap)
@@ -246,4 +249,4 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
     }
 }
 
-} // namespace SLAM
+} // namespace slam

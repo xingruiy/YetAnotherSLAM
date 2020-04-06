@@ -27,7 +27,7 @@
 
 #include "KeyFrame.h"
 
-namespace SLAM
+namespace slam
 {
 
 class PoseSolver
@@ -120,6 +120,6 @@ protected:
     cv::Mat mK2;
 };
 
-} // namespace SLAM
+} // namespace slam
 
 #endif // SIM3SOLVER_H

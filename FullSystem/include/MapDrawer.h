@@ -3,14 +3,14 @@
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 #include <pangolin/pangolin.h>
-#include "KeyFrame.h"
-#include "MapPoint.h"
-#include "VoxelMap.h"
 
-namespace SLAM
+namespace slam
 {
 
 class MapManager;
+class KeyFrame;
+class MapPoint;
+class VoxelMap;
 
 class MapDrawer
 {
@@ -36,4 +36,4 @@ private:
     pangolin::GlSlProgram mShader;
 };
 
-} // namespace SLAM
+} // namespace slam

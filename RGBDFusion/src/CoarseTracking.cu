@@ -1,24 +1,8 @@
-#include "RGBDTracking.h"
+#include "CoarseTracking.h"
 #include "TrackingUtils.h"
 #include "ImageProc.h"
-#include "svd3.h"
 
-RGBDTracking::RGBDTracking(int w, int h,
-                           const Eigen::Matrix3f &K,
-                           int minLvl, int maxLvl,
-                           bool bRGB, bool bIcp)
-{
-    if (bRGB && bIcp)
-        mModal = TrackingModal::RGB_AND_DEPTH;
-    else if (bRGB)
-        mModal = TrackingModal::RGB_ONLY;
-    else
-        mModal = TrackingModal::DEPTH_ONLY;
-}
-
-RGBDTracking::RGBDTracking(int w, int h,
-                           const Eigen::Matrix3d &K,
-                           bool bRGB, bool bIcp)
+CoarseTracking::CoarseTracking(int w, int h, Eigen::Matrix3f K, bool bRGB, bool bIcp)
 {
     if (bRGB && bIcp)
         mModal = TrackingModal::RGB_AND_DEPTH;
@@ -44,8 +28,8 @@ RGBDTracking::RGBDTracking(int w, int h,
         int wLvl = mvWidth[lvl];
         int hLvl = mvHeight[lvl];
 
-        mvCurrentDepth[lvl].create(hLvl, wLvl, CV_32FC1);
-        mvReferenceDepth[lvl].create(hLvl, wLvl, CV_32FC1);
+        currDepth[lvl].create(hLvl, wLvl, CV_32FC1);
+        refDepth[lvl].create(hLvl, wLvl, CV_32FC1);
         mvCurrentIntensity[lvl].create(hLvl, wLvl, CV_32FC1);
         mvReferenceIntensity[lvl].create(hLvl, wLvl, CV_32FC1);
         mvIntensityGradientX[lvl].create(hLvl, wLvl, CV_32FC1);
@@ -97,7 +81,7 @@ RGBDTracking::RGBDTracking(int w, int h,
 //     }
 // }
 
-void RGBDTracking::SetReferenceImage(const cv::Mat &imGray)
+void CoarseTracking::SetReferenceImage(const cv::Mat &imGray)
 {
     cv::Mat imGrayFloat;
     imGray.convertTo(imGrayFloat, CV_32FC1);
@@ -125,7 +109,7 @@ void RGBDTracking::SetReferenceImage(const cv::Mat &imGray)
     }
 }
 
-void RGBDTracking::SetReferenceDepth(const cv::Mat &imDepth)
+void CoarseTracking::SetReferenceDepth(const cv::Mat &imDepth)
 {
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
@@ -154,7 +138,7 @@ void RGBDTracking::SetReferenceDepth(const cv::Mat &imDepth)
     // cv::waitKey(0);
 }
 
-void RGBDTracking::SetTrackingImage(const cv::Mat &imGray)
+void CoarseTracking::SetTrackingImage(const cv::Mat &imGray)
 {
     cv::Mat imGrayFloat;
     imGray.convertTo(imGrayFloat, CV_32FC1);
@@ -171,7 +155,7 @@ void RGBDTracking::SetTrackingImage(const cv::Mat &imGray)
     }
 }
 
-void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
+void CoarseTracking::SetTrackingDepth(const cv::Mat &imDepth)
 {
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
@@ -196,7 +180,7 @@ void RGBDTracking::SetTrackingDepth(const cv::Mat &imDepth)
     }
 }
 
-void RGBDTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
+void CoarseTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
 {
     vmap.copyTo(mvReferenceVMap[0]);
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
@@ -214,14 +198,14 @@ void RGBDTracking::SetReferenceModel(const cv::cuda::GpuMat vmap)
     }
 }
 
-Sophus::SE3d RGBDTracking::GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer)
+Sophus::SE3d CoarseTracking::GetTransform(const Sophus::SE3d &init, const bool bSwapBuffer)
 {
     int nIteration = 0;
     int nSuccessfulIteration = 0;
 
     Sophus::SE3d estimate = init;
     Sophus::SE3d lastSuccessEstimate = estimate;
-    std::vector<int> vIterations = {10, 5, 3, 3, 3};
+    std::vector<int> vIterations = {10, 10, 15, 15, 15, 15};
 
     for (int lvl = NUM_PYR - 1; lvl >= 0; --lvl)
     {
@@ -281,7 +265,7 @@ Sophus::SE3d RGBDTracking::GetTransform(const Sophus::SE3d &init, const bool bSw
     return lastSuccessEstimate;
 }
 
-void RGBDTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T)
+void CoarseTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T)
 {
     auto refInvDepth = mvReferenceInvDepth[lvl];
     auto refPtTransformedLvl = mvReferencePointTransformed[lvl];
@@ -290,7 +274,7 @@ void RGBDTracking::TransformReferencePoint(const int lvl, const Sophus::SE3d &T)
     ::TransformReferencePoint(refInvDepth, refPtTransformedLvl, KLvl, T);
 }
 
-void RGBDTracking::ComputeSingleStepRGB(
+void CoarseTracking::ComputeSingleStepRGB(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -359,7 +343,7 @@ void RGBDTracking::ComputeSingleStepRGB(
     residualSum = hostData.ptr<float>(0)[27];
 }
 
-void RGBDTracking::SwapFrameBuffer()
+void CoarseTracking::SwapFrameBuffer()
 {
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)
     {
@@ -482,7 +466,7 @@ __device__ __forceinline__ void IcpStepFunctor::operator()() const
     }
 }
 
-void RGBDTracking::ComputeSingleStepDepth(
+void CoarseTracking::ComputeSingleStepDepth(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -519,7 +503,7 @@ void RGBDTracking::ComputeSingleStepDepth(
     residualSum = hostData.ptr<float>(0)[27];
 }
 
-void RGBDTracking::ComputeSingleStepRGBD(
+void CoarseTracking::ComputeSingleStepRGBD(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -597,7 +581,7 @@ void RGBDTracking::ComputeSingleStepRGBD(
     residualSum = hostData.ptr<float>(0)[27];
 }
 
-void RGBDTracking::ComputeSingleStepRGBDLinear(
+void CoarseTracking::ComputeSingleStepRGBDLinear(
     const int lvl,
     const Sophus::SE3d &T,
     float *hessian,
@@ -625,17 +609,12 @@ void RGBDTracking::ComputeSingleStepRGBDLinear(
     mHessian = hessianMapped;
 }
 
-cv::cuda::GpuMat RGBDTracking::GetReferenceDepth(const int lvl) const
+cv::cuda::GpuMat CoarseTracking::GetReferenceDepth(const int lvl) const
 {
     return mGpuBufferRawDepth;
 }
 
-bool RGBDTracking::IsTrackingGood() const
-{
-    return mbTrackingGood;
-}
-
-void RGBDTracking::WriteDebugImages()
+void CoarseTracking::WriteDebugImages()
 {
     cv::Mat out;
     mvCurrentIntensity[0].download(out);
@@ -650,7 +629,7 @@ void RGBDTracking::WriteDebugImages()
     cv::waitKey(0);
 }
 
-Eigen::Matrix<double, 6, 6> RGBDTracking::GetCovarianceMatrix()
+Eigen::Matrix<double, 6, 6> CoarseTracking::GetCovarianceMatrix()
 {
     return mHessian.cast<double>().lu().inverse();
 }

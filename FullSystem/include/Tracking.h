@@ -9,11 +9,11 @@
 #include "GlobalDef.h"
 #include "LoopClosing.h"
 #include "MeshEngine.h"
-#include "RGBDTracking.h"
+#include "CoarseTracking.h"
 #include "RayTraceEngine.h"
 #include "KeyFrameDatabase.h"
 
-namespace SLAM
+namespace slam
 {
 
 class Viewer;
@@ -55,9 +55,8 @@ public:
     Frame mCurrentFrame;
     cv::Mat mImGray;
 
-    // Lists used to recover the full camera trajectory at the end of the execution.
-    // Basically we store the reference keyframe for each frame and its relative transformation
-    std::list<Eigen::Matrix4d> mlRelativeFramePoses;
+    // Lists used to recover the full camera trajectory
+    std::list<Sophus::SE3d> mlRelativeFramePoses;
     std::list<KeyFrame *> mlpReferences;
     std::list<double> mlFrameTimes;
     std::list<bool> mlbLost;
@@ -82,7 +81,7 @@ protected:
     bool TrackLocalMap();
     void SearchLocalPoints();
 
-    bool TrackRGBD();
+    bool takeNewFrame();
 
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
@@ -96,7 +95,7 @@ protected:
     System *mpSystem;
 
     //BoW
-    ORBVocabulary *mpORBVocabulary;
+    ORBVocabulary *ORBVoc;
     KeyFrameDatabase *mpKeyFrameDB;
 
     //Local Map
@@ -134,7 +133,7 @@ public:
     // Dense Tracking And Mapping
     RayTraceEngine *mpRayTraceEngine;
     MeshEngine *mpMeshEngine;
-    RGBDTracking *mpTracker;
+    CoarseTracking *mpTracker;
 
     // Voxel Map Structure
     MapStruct *mpCurrVoxelMap;
@@ -143,4 +142,4 @@ public:
     cv::cuda::GpuMat mRawDepth;
 };
 
-} // namespace SLAM
+} // namespace slam

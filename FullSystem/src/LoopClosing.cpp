@@ -4,11 +4,11 @@
 #include "Optimizer.h"
 #include "MapManager.h"
 
-namespace SLAM
+namespace slam
 {
 
 LoopClosing::LoopClosing(MapManager *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
-    : mpMap(pMap), mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0),
+    : mpMap(pMap), mpKeyFrameDB(pDB), ORBVoc(pVoc), mLastLoopKFid(0),
       mpThreadGBA(nullptr), mbRunningGBA(false), mnFullBAIdx(0)
 {
     mnCovisibilityConsistencyTh = 3;
@@ -79,7 +79,7 @@ bool LoopClosing::DetectLoop()
             continue;
         const DBoW2::BowVector &BowVec = pKF->mBowVec;
 
-        float score = mpORBVocabulary->score(CurrentBowVec, BowVec);
+        float score = ORBVoc->score(CurrentBowVec, BowVec);
 
         if (score < minScore)
             minScore = score;
@@ -675,4 +675,4 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
     }
 }
 
-} // namespace SLAM
+} // namespace slam

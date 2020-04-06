@@ -1,7 +1,7 @@
 #include "KeyFrame.h"
 #include "GlobalDef.h"
 
-namespace SLAM
+namespace slam
 {
 
 unsigned long KeyFrame::nNextId = 0;
@@ -628,4 +628,4 @@ long unsigned int KeyFrame::GetMapId()
   return mpMap->GetMapId();
 }
 
-} // namespace SLAM
+} // namespace slam

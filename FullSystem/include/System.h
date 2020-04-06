@@ -16,7 +16,7 @@
 #include "MapDrawer.h"
 #include "KeyFrameDatabase.h"
 
-namespace SLAM
+namespace slam
 {
 
 class Viewer;
@@ -31,7 +31,7 @@ class System
 public:
     ~System();
     System(const std::string &strSettingFile, const std::string &strVocFile);
-    void TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp);
+    void takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp);
     void Shutdown();
     void reset();
     void FuseAllMapStruct();
@@ -39,6 +39,7 @@ public:
 
     void WriteToFile(const std::string &strFile);
     void ReadFromFile(const std::string &strFile);
+    void writeTrajectoryToFile(const std::string &filename);
 
 private:
     void readSettings(const std::string &strSettingFile);
@@ -56,7 +57,7 @@ private:
     MapDrawer *mpMapDrawer;
 
     KeyFrameDatabase *mpKeyFrameDB;
-    ORBVocabulary *mpORBVocabulary;
+    ORBVocabulary *ORBVoc;
 
     cv::Mat grayScale;
     cv::Mat depthFloat;
@@ -64,4 +65,4 @@ private:
     MapManager *mpMapManager;
 };
 
-} // namespace SLAM
+} // namespace slam

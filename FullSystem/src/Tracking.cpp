@@ -4,11 +4,11 @@
 #include "PoseSolver.h"
 #include "MapManager.h"
 
-namespace SLAM
+namespace slam
 {
 
 Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB)
-    : mState(SYSTEM_NOT_READY), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
+    : mState(SYSTEM_NOT_READY), ORBVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
       mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastSuccessRelocFrameId(0),
       mnNumRelocRuns(0), mTriesBeforeReloc(0)
 {
@@ -16,7 +16,7 @@ Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFr
     int h = g_height[0];
     Eigen::Matrix3f calib = g_calib[0];
 
-    mpTracker = new RGBDTracking(w, h, calib.cast<double>(), g_bUseColour, g_bUseDepth);
+    mpTracker = new CoarseTracking(w, h, calib, g_bUseColour, g_bUseDepth);
     mpMeshEngine = new MeshEngine(20000000);
     mpRayTraceEngine = new RayTraceEngine(w, h, g_calib[0]);
     mpORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
@@ -39,7 +39,7 @@ void Tracking::SetViewer(Viewer *pViewer)
 
 void Tracking::GrabImageRGBD(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
 {
-    mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, mpORBExtractor, mpORBVocabulary);
+    mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, mpORBExtractor, ORBVoc);
 
     Track();
 }
@@ -56,7 +56,7 @@ void Tracking::Track()
         break;
 
     case OK:
-        bOK = TrackRGBD();
+        bOK = takeNewFrame();
 
         if (bOK)
         {
@@ -108,6 +108,14 @@ void Tracking::Track()
 
     mLastProcessedState = mState;
     mLastFrame = Frame(mCurrentFrame);
+
+    std::cout << "strat writing pose" << std::endl;
+    Sophus::SE3d Tcr = mpReferenceKF->GetPoseInverse() * mCurrentFrame.mTcw;
+    mlRelativeFramePoses.push_back(Tcr);
+    mlpReferences.push_back(mpReferenceKF);
+    mlFrameTimes.push_back(mCurrentFrame.mTimeStamp);
+    mlbLost.push_back(mState == LOST);
+    std::cout << "end writing pose" << std::endl;
 }
 
 void Tracking::StereoInitialization()
@@ -193,7 +201,7 @@ void Tracking::StereoInitialization()
     }
 }
 
-bool Tracking::TrackRGBD()
+bool Tracking::takeNewFrame()
 {
     Sophus::SE3d Tmw = mpCurrVoxelMap->mTcw;
     Sophus::SE3d Tcm = Tmw.inverse() * mLastFrame.mTcw;
@@ -776,4 +784,4 @@ void Tracking::createNewVoxelMap()
     mpCurrVoxelMap->mTcw = mpReferenceKF->GetPose();
 }
 
-} // namespace SLAM
+} // namespace slam

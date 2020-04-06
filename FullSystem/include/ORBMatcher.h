@@ -28,7 +28,7 @@
 #include "MapPoint.h"
 #include "KeyFrame.h"
 
-namespace SLAM
+namespace slam
 {
 
 class ORBMatcher
@@ -88,6 +88,6 @@ protected:
     bool mbCheckOrientation;
 };
 
-} // namespace SLAM
+} // namespace slam
 
 #endif

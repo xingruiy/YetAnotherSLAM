@@ -9,7 +9,7 @@
 using namespace cv;
 using namespace std;
 
-namespace SLAM
+namespace slam
 {
 
 const int PATCH_SIZE = 31;
@@ -1068,4 +1068,4 @@ void ORBextractor::ComputePyramid(cv::Mat image)
     }
 }
 
-} // namespace SLAM
+} // namespace slam

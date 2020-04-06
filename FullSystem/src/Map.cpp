@@ -2,7 +2,7 @@
 #include <fstream>
 #include <algorithm>
 
-namespace SLAM
+namespace slam
 {
 
 long unsigned int Map::nextId = 0;
@@ -221,4 +221,4 @@ void Map::FuseMap(Map *pMap)
     pMap->reset();
 }
 
-} // namespace SLAM
+} // namespace slam

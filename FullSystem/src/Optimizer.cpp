@@ -11,7 +11,7 @@
 
 #include "Optimizer.h"
 
-namespace SLAM
+namespace slam
 {
 
 g2o::SE3Quat Optimizer::ToSE3Quat(const Sophus::SE3d &Tcw)
@@ -1136,4 +1136,4 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint
     return nIn;
 }
 
-} // namespace SLAM
+} // namespace slam

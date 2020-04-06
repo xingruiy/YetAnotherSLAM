@@ -10,13 +10,13 @@ int main(int argc, char **argv)
     }
 
     OpenNI2::Camera cam;
-    SLAM::System system(argv[1], argv[2]);
+    slam::System system(argv[1], argv[2]);
 
     cv::Mat imDepth, imRGB;
 
-    while (!SLAM::g_bSystemKilled)
+    while (!slam::g_bSystemKilled)
     {
         if (cam.TryFetchingImages(imDepth, imRGB))
-            system.TrackRGBD(imRGB, imDepth, 0);
+            system.takeNewFrame(imRGB, imDepth, 0);
     }
 }

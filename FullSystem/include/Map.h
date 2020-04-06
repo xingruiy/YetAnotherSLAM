@@ -9,7 +9,7 @@
 #include "MapPoint.h"
 #include "VoxelMap.h"
 
-namespace SLAM
+namespace slam
 {
 
 class Frame;
@@ -59,14 +59,6 @@ public:
     friend class MapManager;
 
 protected:
-    struct cmp
-    {
-        bool operator()(MapStruct *a, MapStruct *b) const
-        {
-            return a->mnId < b->mnId;
-        };
-    };
-
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
 
@@ -92,4 +84,4 @@ protected:
     static long unsigned int nextId;
 };
 
-} // namespace SLAM
+} // namespace slam

@@ -1,35 +1,36 @@
 #include "System.h"
 #include "MapManager.h"
 
-namespace SLAM
+namespace slam
 {
 
 System::System(const std::string &strSettingFile, const std::string &strVocFile)
-    : mpViewer(nullptr)
+    : mpViewer(0)
 {
     //Load Settings
     readSettings(strSettingFile);
 
     //Load ORB Vocabulary
-    loadORBVocabulary(strVocFile);
+    ORBVoc = new ORBVocabulary();
+    ORBVoc->loadFromBinaryFile(strVocFile);
 
     //Create the Map
     mpMapManager = new MapManager();
     mpMapDrawer = new MapDrawer(mpMapManager);
 
     //Create KeyFrame Database
-    mpKeyFrameDB = new KeyFrameDatabase(*mpORBVocabulary);
+    mpKeyFrameDB = new KeyFrameDatabase(*ORBVoc);
 
-    mpLoopClosing = new LoopClosing(mpMapManager, mpKeyFrameDB, mpORBVocabulary);
+    mpLoopClosing = new LoopClosing(mpMapManager, mpKeyFrameDB, ORBVoc);
     mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
 
-    mpLocalMapper = new LocalMapping(mpORBVocabulary, mpMapManager);
+    mpLocalMapper = new LocalMapping(ORBVoc, mpMapManager);
     mpLocalMapper->SetLoopCloser(mpLoopClosing);
     mpLoopClosing->SetLocalMapper(mpLocalMapper);
     mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
 
     //Initialize the Tracking thread
-    mpTracker = new Tracking(this, mpORBVocabulary, mpMapManager, mpKeyFrameDB);
+    mpTracker = new Tracking(this, ORBVoc, mpMapManager, mpKeyFrameDB);
     mpTracker->SetLocalMapper(mpLocalMapper);
 
     if (g_bEnableViewer)
@@ -41,7 +42,7 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     }
 }
 
-void System::TrackRGBD(cv::Mat img, cv::Mat depth, const double timeStamp)
+void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
 {
     // Covert colour images to grayscale
     if (!g_bReverseRGB)
@@ -214,14 +215,64 @@ void System::readSettings(const std::string &strSettingFile)
               << "===================================================" << std::endl;
 }
 
-void System::loadORBVocabulary(const std::string &strVocFile)
+void System::writeTrajectoryToFile(const std::string &filename)
 {
-    std::cout << "loading ORB vocabulary..." << std::endl;
+    std::vector<KeyFrame *> vpKFs = mpMapManager->GetActiveMap()->GetAllKeyFrames();
+    sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
 
-    mpORBVocabulary = new ORBVocabulary();
-    mpORBVocabulary->loadFromBinaryFile(strVocFile);
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    Sophus::SE3d Tow = vpKFs[0]->GetPose();
 
-    std::cout << "ORB vocabulary loaded..." << std::endl;
+    std::ofstream file(filename);
+    file << std::fixed;
+
+    // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
+    // We need to get first the keyframe pose and then concatenate the relative transformation.
+    // Frames not localized (tracking failure) are not saved.
+
+    // For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
+    // which is true when tracking failed (lbL).
+    std::list<KeyFrame *>::iterator lRit = mpTracker->mlpReferences.begin();
+    std::list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
+    std::list<bool>::iterator lbL = mpTracker->mlbLost.begin();
+    for (auto lit = mpTracker->mlRelativeFramePoses.begin(),
+              lend = mpTracker->mlRelativeFramePoses.end();
+         lit != lend; lit++, lRit++, lT++, lbL++)
+    {
+        if (*lbL)
+            continue;
+
+        KeyFrame *pKF = *lRit;
+        Sophus::SE3d Trw;
+
+        // If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
+        while (pKF->isBad())
+        {
+            Trw = pKF->mTcp;
+            pKF = pKF->GetParent();
+        }
+
+        Trw = Tow * pKF->GetPose() * Trw;
+
+        Sophus::SE3d Tcw = Trw * (*lit);
+        Eigen::Matrix3d Rwc = Tcw.rotationMatrix();
+        Eigen::Vector3d twc = Tcw.translation();
+
+        Eigen::Quaterniond q(Rwc);
+
+        file << std::setprecision(6) << *lT << " "
+             << std::setprecision(9)
+             << twc[0] << " "
+             << twc[1] << " "
+             << twc[2] << " "
+             << q.x() << " "
+             << q.y() << " "
+             << q.z() << " "
+             << q.w() << std::endl;
+    }
+
+    file.close();
 }
 
-} // namespace SLAM
+} // namespace slam

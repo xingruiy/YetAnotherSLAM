@@ -8,7 +8,7 @@
 #include "Frame.h"
 #include <mutex>
 
-namespace SLAM
+namespace slam
 {
 
 class KeyFrame;
@@ -42,4 +42,4 @@ protected:
     std::mutex mMutex;
 };
 
-} // namespace SLAM
+} // namespace slam

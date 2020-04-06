@@ -1,6 +1,6 @@
 #include "Viewer.h"
 
-namespace SLAM
+namespace slam
 {
 
 Viewer::Viewer(System *pSystem, MapDrawer *pMapDrawer)
@@ -14,7 +14,7 @@ Viewer::Viewer(System *pSystem, MapDrawer *pMapDrawer)
 
 void Viewer::Run()
 {
-    pangolin::CreateWindowAndBind("SLAM", 1920, 1080);
+    pangolin::CreateWindowAndBind("slam", 1920, 1080);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -227,4 +227,4 @@ void Viewer::setLiveDepth(const cv::Mat &ImgDepth)
     mbNewDepth = true;
 }
 
-} // namespace SLAM
+} // namespace slam

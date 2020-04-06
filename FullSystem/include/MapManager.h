@@ -1,6 +1,6 @@
 #include "Map.h"
 
-namespace SLAM
+namespace slam
 {
 
 class MapManager
@@ -20,4 +20,4 @@ private:
     std::map<long unsigned int, Map *> mpMaps;
 };
 
-}; // namespace SLAM
+}; // namespace slam

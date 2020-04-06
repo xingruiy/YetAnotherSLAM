@@ -6,7 +6,7 @@
 #include "Frame.h"
 #include "KeyFrame.h"
 
-namespace SLAM
+namespace slam
 {
 
 class Map;
@@ -119,4 +119,4 @@ public:
     std::mutex mMutexFeatures;
 };
 
-} // namespace SLAM
+} // namespace slam

@@ -1,6 +1,6 @@
 #include "ImageProc.h"
-#include "CudaUtils.h"
-#include "svd3.h"
+#include "utils/CudaUtils.h"
+// #include "svd3.h"
 
 #define DEPTH_MAX 8.f
 #define DEPTH_MIN 0.2f
@@ -63,7 +63,7 @@ __global__ void TransformReferencePoint_kernel(const cv::cuda::PtrStepSz<float> 
 
 void TransformReferencePoint(const cv::cuda::GpuMat depth,
                              cv::cuda::GpuMat &vmap,
-                             const Eigen::Matrix3d &K,
+                             const Eigen::Matrix3f &K,
                              const Sophus::SE3d &T)
 {
     if (vmap.empty())
@@ -72,7 +72,7 @@ void TransformReferencePoint(const cv::cuda::GpuMat depth,
     dim3 block(8, 8);
     dim3 grid(cv::divUp(depth.cols, block.x), cv::divUp(depth.rows, block.y));
 
-    Eigen::Matrix3d RKinv = T.matrix().topLeftCorner(3, 3) * K.inverse();
+    Eigen::Matrix3d RKinv = T.matrix().topLeftCorner(3, 3) * K.cast<double>().inverse();
     Eigen::Vector3d t = T.matrix().topRightCorner(3, 1);
 
     TransformReferencePoint_kernel<<<grid, block>>>(depth, vmap, RKinv.cast<float>(), t.cast<float>());
@@ -431,100 +431,100 @@ void ComputeIntegralImage(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &IntImg)
     ComputeIntegralImageY_kernel<<<gridY, 1024>>>(vmap, IntImg);
 }
 
-template <int R = 5>
-__global__ void ComputeNormalAndMeanCurvature_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
-                                                     cv::cuda::PtrStep<Eigen::Vector4f> nmap,
-                                                     cv::cuda::PtrStep<float> curvature)
-{
-    int x = blockDim.x * blockIdx.x + threadIdx.x;
-    int y = blockDim.y * blockIdx.y + threadIdx.y;
-    if (x >= vmap.cols || y >= vmap.rows)
-        return;
+// template <int R = 5>
+// __global__ void ComputeNormalAndMeanCurvature_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
+//                                                      cv::cuda::PtrStep<Eigen::Vector4f> nmap,
+//                                                      cv::cuda::PtrStep<float> curvature)
+// {
+//     int x = blockDim.x * blockIdx.x + threadIdx.x;
+//     int y = blockDim.y * blockIdx.y + threadIdx.y;
+//     if (x >= vmap.cols || y >= vmap.rows)
+//         return;
 
-    int r = R / 2;
-    if (x < r || y < r || x >= vmap.cols - r || y >= vmap.rows - r)
-    {
-        nmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1.f);
-        curvature.ptr(y)[x] = -1;
-        return;
-    }
+//     int r = R / 2;
+//     if (x < r || y < r || x >= vmap.cols - r || y >= vmap.rows - r)
+//     {
+//         nmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1.f);
+//         curvature.ptr(y)[x] = -1;
+//         return;
+//     }
 
-    Eigen::Vector3f centroid;
-    centroid.setZero();
-    int vcount;
-#pragma unroll
-    for (int i = x - r; i <= x + r; ++i)
-#pragma unroll
-        for (int j = y - r; j <= y + r; ++j)
-        {
-            if (vmap.ptr(j)[i](3) > 0)
-            {
-                vcount++;
-                centroid += vmap.ptr(j)[i].head<3>();
-            }
-        }
+//     Eigen::Vector3f centroid;
+//     centroid.setZero();
+//     int vcount;
+// #pragma unroll
+//     for (int i = x - r; i <= x + r; ++i)
+// #pragma unroll
+//         for (int j = y - r; j <= y + r; ++j)
+//         {
+//             if (vmap.ptr(j)[i](3) > 0)
+//             {
+//                 vcount++;
+//                 centroid += vmap.ptr(j)[i].head<3>();
+//             }
+//         }
 
-    if (vcount == 0)
-    {
-        nmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1);
-        curvature.ptr(y)[x] = -1;
-        return;
-    }
+//     if (vcount == 0)
+//     {
+//         nmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1);
+//         curvature.ptr(y)[x] = -1;
+//         return;
+//     }
 
-    centroid /= vcount;
-    Eigen::Matrix<float, 3, 3> A;
-    A.setZero();
-#pragma unroll
-    for (int i = x - r; i < x + r; ++i)
-#pragma unroll
-        for (int j = y - r; j < y + r; ++j)
-        {
-            if (vmap.ptr(j)[i](3) > 0)
-            {
-                Eigen::Vector3f v = vmap.ptr(j)[i].head<3>() - centroid;
-                A += v * v.transpose();
-            }
-        }
+//     centroid /= vcount;
+//     Eigen::Matrix<float, 3, 3> A;
+//     A.setZero();
+// #pragma unroll
+//     for (int i = x - r; i < x + r; ++i)
+// #pragma unroll
+//         for (int j = y - r; j < y + r; ++j)
+//         {
+//             if (vmap.ptr(j)[i](3) > 0)
+//             {
+//                 Eigen::Vector3f v = vmap.ptr(j)[i].head<3>() - centroid;
+//                 A += v * v.transpose();
+//             }
+//         }
 
-    Eigen::Matrix<float, 3, 3> U, S, V;
-    svd(A, U, S, V);
-    float s1 = S(0, 0), s2 = S(1, 1), s3 = S(2, 2);
+//     Eigen::Matrix<float, 3, 3> U, S, V;
+//     svd(A, U, S, V);
+//     float s1 = S(0, 0), s2 = S(1, 1), s3 = S(2, 2);
 
-    if (s1 == 0 || s2 == 0 || s3 == 0)
-    {
-        // nmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1);
-        curvature.ptr(y)[x] = -1;
-        return;
-    }
+//     if (s1 == 0 || s2 == 0 || s3 == 0)
+//     {
+//         // nmap.ptr(y)[x] = Eigen::Vector4f(0, 0, 0, -1);
+//         curvature.ptr(y)[x] = -1;
+//         return;
+//     }
 
-    // nmap.ptr(y)[x].head<3>() = V.topRows<1>();
-    // nmap.ptr(y)[x](3) = 1.f;
-    curvature.ptr(y)[x] = s1 / (s1 + s2 + s3);
+//     // nmap.ptr(y)[x].head<3>() = V.topRows<1>();
+//     // nmap.ptr(y)[x](3) = 1.f;
+//     curvature.ptr(y)[x] = s1 / (s1 + s2 + s3);
 
-    // printf("%f, %f, %f\n", s1, s2, s3);
-}
+//     // printf("%f, %f, %f\n", s1, s2, s3);
+// }
 
 void ComputeNormalAndMeanCurvature(const cv::cuda::GpuMat vmap, cv::cuda::GpuMat &nmap, cv::cuda::GpuMat &curvature)
 {
-    if (nmap.empty())
-        nmap.create(vmap.size(), CV_32FC4);
-    if (curvature.empty())
-        curvature.create(vmap.size(), CV_32FC1);
+    // if (nmap.empty())
+    //     nmap.create(vmap.size(), CV_32FC4);
+    // if (curvature.empty())
+    //     curvature.create(vmap.size(), CV_32FC1);
 
-    // cv::cuda::GpuMat IntImg(vmap.size(), CV_32FC3);
-    // ComputeIntegralImage(vmap, IntImg);
+    // // cv::cuda::GpuMat IntImg(vmap.size(), CV_32FC3);
+    // // ComputeIntegralImage(vmap, IntImg);
 
-    dim3 block(8, 8);
-    dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
-    ComputeNormalAndMeanCurvature_kernel<<<grid, block>>>(vmap, nmap, curvature);
-    SafeCall(cudaDeviceSynchronize());
+    // dim3 block(8, 8);
+    // dim3 grid(cv::divUp(vmap.cols, block.x), cv::divUp(vmap.rows, block.y));
+    // // ComputeNormalAndMeanCurvature_kernel<<<grid, block>>>(vmap, nmap, curvature);
+    // SafeCall(cudaDeviceSynchronize());
 
-    if (nmap.cols == 640)
-    {
-        cv::Mat out(nmap);
-        cv::imshow("nmap", out);
-        cv::waitKey(0);
-    }
+    // if (nmap.cols == 640)
+    // {
+    //     cv::Mat out(nmap);
+    //     cv::imshow("nmap", out);
+    //     cv::waitKey(0);
+    // }
 }
 
 __global__ void ComputeCurvature_kernel(const cv::cuda::PtrStepSz<Eigen::Vector4f> vmap,
