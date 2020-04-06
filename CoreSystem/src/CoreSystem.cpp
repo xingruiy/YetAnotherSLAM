@@ -224,23 +224,23 @@ void CoreSystem::readSettings(const std::string &strSettingFile)
     // g_pointSize = settingsFile["Viewer.PointSize"];
     // g_bSystemRunning = (int)settingsFile["Viewer.StartWhenReady"] == 1;
 
-    std::cout << "===================================================\n"
-              << "The system is created with the following parameters:\n"
-              << "pyramid level - " << NUM_PYR << "\n";
-    for (int i = 0; i < NUM_PYR; ++i)
-    {
-        std::cout << "pyramid " << i << " -"
-                  << " width: " << g_width[i]
-                  << " height: " << g_height[i]
-                  << " fx: " << g_fx[i]
-                  << " fy: " << g_fy[i]
-                  << " cx: " << g_cx[i]
-                  << " cy: " << g_cy[i] << "\n";
-    }
-    std::cout << "camera baseline - " << g_bf / fx << "\n"
-              << "close point th - " << g_thDepth << "\n"
-              << "enable mpViewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
-              << "===================================================" << std::endl;
+    // std::cout << "===================================================\n"
+    //           << "The system is created with the following parameters:\n"
+    //           << "pyramid level - " << NUM_PYR << "\n";
+    // for (int i = 0; i < NUM_PYR; ++i)
+    // {
+    //     std::cout << "pyramid " << i << " -"
+    //               << " width: " << g_width[i]
+    //               << " height: " << g_height[i]
+    //               << " fx: " << g_fx[i]
+    //               << " fy: " << g_fy[i]
+    //               << " cx: " << g_cx[i]
+    //               << " cy: " << g_cy[i] << "\n";
+    // }
+    // std::cout << "camera baseline - " << g_bf / fx << "\n"
+    //           << "close point th - " << g_thDepth << "\n"
+    //           << "enable mpViewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
+    //           << "===================================================" << std::endl;
 }
 
 void CoreSystem::writeTrajectoryToFile(const std::string &filename)

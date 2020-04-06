@@ -31,6 +31,7 @@ int main(int argc, char **argv)
     std::cout << "Images in the sequence: " << nImages << std::endl;
 
     slam::GlobalSettings settings(argv[1]);
+    settings.printDebugInfo();
     slam::CoreSystem sys(&settings, argv[2]);
 
     for (int i = 0; i < nImages; ++i)

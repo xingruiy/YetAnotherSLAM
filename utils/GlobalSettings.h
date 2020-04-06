@@ -11,6 +11,7 @@ class GlobalSettings
 {
 public:
     GlobalSettings(const std::string &file);
+    void printDebugInfo();
 
     // ==== general ====
     bool colourArrangeRGB = true;
@@ -27,6 +28,14 @@ public:
     int coarsestlvlForTracking = 6;
     std::vector<float> imgGrad2ThForTracking = {64, 49, 36, 25, 16, 9};
     std::vector<int> maxIterationsForTracking = {10, 10, 20, 20, 20, 30};
+
+    // ==== debug ====
+    bool verbose = false;
+    int verboselvl = -1;
+    bool displayDebugImages = false;
+
+protected:
+    void readFromFile(const std::string &file);
 };
 
 } // namespace slam

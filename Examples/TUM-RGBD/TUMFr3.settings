@@ -1,0 +1,24 @@
+# Settings
+
+[System Configurations]
+depthScale = 5000
+
+[Tunning Parameters]
+coarsestLvl = 6
+maxIterations = 15, 20, 20, 20, 30, 30
+imgGrad2Th = 64, 49, 36, 25, 16, 9
+
+[Calibrations]
+fx = 535.4
+fy = 539.2
+cx = 320.1
+cy = 247.6
+width = 640
+height = 480
+ 
+[Distortions]
+k1 = 0
+k2 = 0
+p1 = 0
+p2 = 0
+k3 = 0
