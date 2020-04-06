@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils/CudaUtils.h"
+#include "utils/cudaGlobalFuncs.h"
 #include <cuda_runtime_api.h>
 
 #define WarpSize 32

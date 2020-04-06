@@ -6,10 +6,7 @@ find_package(Eigen3 3.3 REQUIRED)
 find_package(Pangolin 0.5 REQUIRED)
 find_package(g2o 1.0.0 REQUIRED)
 
-add_library(${PROJECT_NAME} SHARED)
-
-target_sources(${PROJECT_NAME}
-PRIVATE
+add_library(${PROJECT_NAME} SHARED
     CoreSystem/src/Map.cpp
     CoreSystem/src/Frame.cpp
     CoreSystem/src/MapDrawer.cpp
@@ -33,7 +30,9 @@ PRIVATE
     RGBDFusion/src/CoarseTracking.cu
     RGBDFusion/src/MeshEngine.cu
     RGBDFusion/src/RayTraceEngine.cu
+
     utils/cudaDeviceFuncs.cu
+    utils/GlobalSettings.cc
 )
 
 set_target_properties(${PROJECT_NAME}

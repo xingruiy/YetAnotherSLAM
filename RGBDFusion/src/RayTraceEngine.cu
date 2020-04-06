@@ -1,5 +1,5 @@
 #include "RayTraceEngine.h"
-#include "utils/CudaUtils.h"
+#include "utils/cudaGlobalFuncs.h"
 #include "utils/VoxelStructUtils.h"
 #include "utils/ParallelScan.h"
 

@@ -1,14 +1,15 @@
 #include "CoreSystem.h"
 #include "MapManager.h"
+#include "utils/GlobalSettings.h"
 
 namespace slam
 {
 
-CoreSystem::CoreSystem(const std::string &strSettingFile, const std::string &strVocFile)
-    : mpViewer(0)
+CoreSystem::CoreSystem(GlobalSettings *settings, const std::string &strVocFile)
+    : mpViewer(0), settings(settings)
 {
     //Load Settings
-    readSettings(strSettingFile);
+    readSettings(std::string());
 
     //Load ORB Vocabulary
     ORBVoc = new ORBVocabulary();
@@ -144,57 +145,84 @@ CoreSystem::~CoreSystem()
 
 void CoreSystem::readSettings(const std::string &strSettingFile)
 {
-    cv::FileStorage settingsFile(strSettingFile, cv::FileStorage::READ);
-    if (!settingsFile.isOpened())
-    {
-        printf("Reading settings failed at line %d in file %s\n", __LINE__, __FILE__);
-        exit(-1);
-    }
+    // cv::FileStorage settingsFile(strSettingFile, cv::FileStorage::READ);
+    // if (!settingsFile.isOpened())
+    // {
+    //     printf("Reading settings failed at line %d in file %s\n", __LINE__, __FILE__);
+    //     exit(-1);
+    // }
 
+    g_bEnableViewer = true;
+    g_bReverseRGB = settings->colourArrangeRGB;
+    g_DepthScaleInv = settings->idepthScale;
+
+    int width = settings->wlv0;
+    int height = settings->hlv0;
+    float fx = settings->fxlv0;
+    float fy = settings->fylv0;
+    float cx = settings->cxlv0;
+    float cy = settings->cylv0;
     // read system configurations
-    g_bEnableViewer = (int)settingsFile["CoreSystem.EnableViewer"] == 1;
-    g_bReverseRGB = (int)settingsFile["CoreSystem.ReverseRGB"] == 1;
-    g_DepthScaleInv = 1.0 / (double)settingsFile["CoreSystem.DepthScale"];
+    // g_bEnableViewer = (int)settingsFile["CoreSystem.EnableViewer"] == 1;
+    // g_bReverseRGB = (int)settingsFile["CoreSystem.ReverseRGB"] == 1;
+    // g_DepthScaleInv = 1.0 / (double)settingsFile["CoreSystem.DepthScale"];
 
     // read orb parameters
-    g_ORBScaleFactor = settingsFile["ORB_SLAM2.scaleFactor"];
-    g_ORBNFeatures = settingsFile["ORB_SLAM2.nFeatures"];
-    g_ORBNLevels = settingsFile["ORB_SLAM2.nLevels"];
-    g_ORBIniThFAST = settingsFile["ORB_SLAM2.iniThFAST"];
-    g_ORBMinThFAST = settingsFile["ORB_SLAM2.minThFAST"];
+    // g_ORBScaleFactor = settingsFile["ORB_SLAM2.scaleFactor"];
+    // g_ORBNFeatures = settingsFile["ORB_SLAM2.nFeatures"];
+    // g_ORBNLevels = settingsFile["ORB_SLAM2.nLevels"];
+    // g_ORBIniThFAST = settingsFile["ORB_SLAM2.iniThFAST"];
+    // g_ORBMinThFAST = settingsFile["ORB_SLAM2.minThFAST"];
 
     // read calibration parameters
-    int width = settingsFile["Calibration.width"];
-    int height = settingsFile["Calibration.height"];
-    float fx = settingsFile["Calibration.fx"];
-    float fy = settingsFile["Calibration.fy"];
-    float cx = settingsFile["Calibration.cx"];
-    float cy = settingsFile["Calibration.cy"];
+    // int width = settingsFile["Calibration.width"];
+    // int height = settingsFile["Calibration.height"];
+    // float fx = settingsFile["Calibration.fx"];
+    // float fy = settingsFile["Calibration.fy"];
+    // float cx = settingsFile["Calibration.cx"];
+    // float cy = settingsFile["Calibration.cy"];
     Eigen::Matrix3d calib;
     calib << fx, 0, cx, 0, fy, cy, 0, 0, 1.0;
     setGlobalCalibration(width, height, calib);
 
     // Update tracking parameters
-    g_bf = settingsFile["Calibration.bf"];
-    g_thDepth = g_bf * (float)settingsFile["Tracking.ThDepth"] / fx;
-    g_bUseColour = (int)settingsFile["Tracking.UseColour"] == 1;
-    g_bUseDepth = (int)settingsFile["Tracking.UseDepth"] == 1;
+    g_bf = 40;
+    g_thDepth = g_bf * 40 / fx;
+    g_bUseColour = settings->useRGB;
+    g_bUseDepth = settings->useDepth;
+    // g_bf = settingsFile["Calibration.bf"];
+    // g_thDepth = g_bf * (float)settingsFile["Tracking.ThDepth"] / fx;
+    // g_bUseColour = (int)settingsFile["Tracking.UseColour"] == 1;
+    // g_bUseDepth = (int)settingsFile["Tracking.UseDepth"] == 1;
 
     // read distortion coefficients
     g_distCoeff = cv::Mat(4, 1, CV_32F);
-    g_distCoeff.at<float>(0) = settingsFile["UnDistortion.k1"];
-    g_distCoeff.at<float>(1) = settingsFile["UnDistortion.k2"];
-    g_distCoeff.at<float>(2) = settingsFile["UnDistortion.p1"];
-    g_distCoeff.at<float>(3) = settingsFile["UnDistortion.p2"];
-    const float k3 = settingsFile["UnDistortion.k3"];
+    g_distCoeff.at<float>(0) = settings->k1;
+    g_distCoeff.at<float>(1) = settings->k2;
+    g_distCoeff.at<float>(2) = settings->p1;
+    g_distCoeff.at<float>(3) = settings->p2;
+    const float k3 = settings->k3;
     if (k3 != 0)
     {
         g_distCoeff.resize(5);
         g_distCoeff.at<float>(4) = k3;
     }
 
-    g_pointSize = settingsFile["Viewer.PointSize"];
-    g_bSystemRunning = (int)settingsFile["Viewer.StartWhenReady"] == 1;
+    g_pointSize = 3;
+    g_bSystemRunning = false;
+    // g_distCoeff.at<float>(0) = settingsFile["UnDistortion.k1"];
+    // g_distCoeff.at<float>(1) = settingsFile["UnDistortion.k2"];
+    // g_distCoeff.at<float>(2) = settingsFile["UnDistortion.p1"];
+    // g_distCoeff.at<float>(3) = settingsFile["UnDistortion.p2"];
+    // const float k3 = settingsFile["UnDistortion.k3"];
+    // if (k3 != 0)
+    // {
+    //     g_distCoeff.resize(5);
+    //     g_distCoeff.at<float>(4) = k3;
+    // }
+
+    // g_pointSize = settingsFile["Viewer.PointSize"];
+    // g_bSystemRunning = (int)settingsFile["Viewer.StartWhenReady"] == 1;
 
     std::cout << "===================================================\n"
               << "The system is created with the following parameters:\n"

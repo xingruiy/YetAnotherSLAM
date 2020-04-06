@@ -1,5 +1,5 @@
 #include "VoxelMap.h"
-#include "utils/CudaUtils.h"
+#include "utils/cudaGlobalFuncs.h"
 #include "ImageProc.h"
 #include "utils/ParallelScan.h"
 #include "utils/VoxelStructUtils.h"

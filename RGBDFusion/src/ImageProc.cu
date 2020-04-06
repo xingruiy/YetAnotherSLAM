@@ -1,5 +1,5 @@
 #include "ImageProc.h"
-#include "utils/CudaUtils.h"
+#include "utils/cudaGlobalFuncs.h"
 // #include "svd3.h"
 
 #define DEPTH_MAX 8.f

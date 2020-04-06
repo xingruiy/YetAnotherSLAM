@@ -1,4 +1,5 @@
 #include "CoreSystem.h"
+#include "utils/GlobalSettings.h"
 
 void LoadImages(const std::string &path,
                 std::vector<std::string> &imgFilename,
@@ -28,7 +29,9 @@ int main(int argc, char **argv)
     }
 
     std::cout << "Images in the sequence: " << nImages << std::endl;
-    slam::CoreSystem sys(argv[1], argv[2]);
+
+    slam::GlobalSettings settings(argv[1]);
+    slam::CoreSystem sys(&settings, argv[2]);
 
     for (int i = 0; i < nImages; ++i)
     {

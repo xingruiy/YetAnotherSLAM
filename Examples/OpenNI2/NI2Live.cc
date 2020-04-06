@@ -1,4 +1,5 @@
 #include "CoreSystem.h"
+#include "utils/GlobalSettings.h"
 #include "OpenNI/include/Camera.h"
 
 int main(int argc, char **argv)
@@ -10,7 +11,8 @@ int main(int argc, char **argv)
     }
 
     OpenNI2::Camera cam;
-    slam::CoreSystem system(argv[1], argv[2]);
+    slam::GlobalSettings settings(argv[1]);
+    slam::CoreSystem system(&settings, argv[2]);
 
     cv::Mat imDepth, imRGB;
 
