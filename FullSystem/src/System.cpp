@@ -44,6 +44,7 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
 
 void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
 {
+    // std::cout << "track new image" << std::endl;
     // Covert colour images to grayscale
     if (!g_bReverseRGB)
         cv::cvtColor(img, grayScale, cv::COLOR_RGB2GRAY);
@@ -59,8 +60,8 @@ void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
         mpViewer->setLiveDepth(depthFloat);
     }
 
-    if (!g_bSystemRunning)
-        return;
+    // if (!g_bSystemRunning)
+    //     return;
 
     // Invoke the main tracking thread
     mpTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
@@ -70,6 +71,10 @@ void System::reset()
 {
     mpTracker->reset();
     mpMapManager->Reset();
+    mpKeyFrameDB->clear();
+
+    KeyFrame::nNextId = 0;
+    MapPoint::nNextId = 0;
     // mpMap->reset();
 }
 
@@ -217,6 +222,9 @@ void System::readSettings(const std::string &strSettingFile)
 
 void System::writeTrajectoryToFile(const std::string &filename)
 {
+    Map *pMap = mpMapManager->GetActiveMap();
+    if (!pMap)
+        printf("Map Is NULL\n");
     std::vector<KeyFrame *> vpKFs = mpMapManager->GetActiveMap()->GetAllKeyFrames();
     sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
 

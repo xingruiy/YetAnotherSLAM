@@ -17,6 +17,7 @@ public:
 
 private:
     long unsigned int mActiveId;
+    Map * pMap;
     std::map<long unsigned int, Map *> mpMaps;
 };
 

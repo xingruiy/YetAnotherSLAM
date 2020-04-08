@@ -5,20 +5,23 @@ namespace slam
 
 MapManager::MapManager()
 {
+    pMap = new Map();
 }
 
 void MapManager::MakeNewMap(Map *pMap)
 {
-    mActiveId = pMap->GetMapId();
-    mpMaps[mActiveId] = pMap;
+    // mActiveId = pMap->GetMapId();
+    // mpMaps[mActiveId] = pMap;
 }
 
 void MapManager::Reset()
 {
-    for (auto mit : mpMaps)
-        mit.second->reset();
-    mpMaps.clear();
-    Map::nextId = 0;
+    // for (auto mit : mpMaps)
+    //     mit.second->reset();
+    // mpMaps.clear();
+    pMap->reset();
+    // Map::nextId = 0;
+    // mActiveId = 0;
 }
 
 int MapManager::MapsInSystem()
@@ -28,7 +31,8 @@ int MapManager::MapsInSystem()
 
 Map *MapManager::GetActiveMap()
 {
-    return mpMaps[mActiveId];
+    // return mpMaps[mActiveId]
+    return pMap;
 }
 
 Map *MapManager::GetMap(long unsigned int id)

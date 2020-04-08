@@ -1,40 +1,36 @@
 cmake_minimum_required(VERSION 2.8)
-project(YetAnotherSLAM CXX CUDA)
+project(slam CXX CUDA)
 
 find_package(OpenCV 3.4 REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(Pangolin 0.5 REQUIRED)
 find_package(g2o 1.0.0 REQUIRED)
 
-add_library(${PROJECT_NAME} SHARED)
+add_library(${PROJECT_NAME} SHARED
+FullSystem/src/Map.cpp
+FullSystem/src/Frame.cpp
+FullSystem/src/MapDrawer.cpp
+FullSystem/src/MapPoint.cpp
+FullSystem/src/KeyFrame.cpp
+FullSystem/src/LocalMapping.cpp
+FullSystem/src/System.cpp
+FullSystem/src/Viewer.cpp
+FullSystem/src/Tracking.cpp
+FullSystem/src/Optimizer.cpp
+FullSystem/src/ORBMatcher.cpp
+FullSystem/src/GlobalDef.cpp
+FullSystem/src/LoopClosing.cpp
+FullSystem/src/KeyFrameDatabase.cpp
+FullSystem/src/ORBextractor.cpp
+FullSystem/src/MapManager.cpp
+FullSystem/src/PoseSolver.cpp
 
-target_sources(${PROJECT_NAME}
-PRIVATE
-    FullSystem/src/Map.cpp
-    FullSystem/src/Frame.cpp
-    FullSystem/src/MapDrawer.cpp
-    FullSystem/src/MapPoint.cpp
-    FullSystem/src/KeyFrame.cpp
-    FullSystem/src/LocalMapping.cpp
-    FullSystem/src/System.cpp
-    FullSystem/src/Viewer.cpp
-    FullSystem/src/Tracking.cpp
-    FullSystem/src/Optimizer.cpp
-    FullSystem/src/ORBMatcher.cpp
-    FullSystem/src/GlobalDef.cpp
-    FullSystem/src/LoopClosing.cpp
-    FullSystem/src/KeyFrameDatabase.cpp
-    FullSystem/src/ORBextractor.cpp
-    FullSystem/src/MapManager.cpp
-    FullSystem/src/PoseSolver.cpp
-
-    RGBDFusion/src/ImageProc.cu
-    RGBDFusion/src/VoxelMap.cu
-    RGBDFusion/src/CoarseTracking.cu
-    RGBDFusion/src/MeshEngine.cu
-    RGBDFusion/src/RayTraceEngine.cu
-    utils/cudaDeviceFuncs.cu
-)
+RGBDFusion/src/ImageProc.cu
+RGBDFusion/src/VoxelMap.cu
+RGBDFusion/src/CoarseTracking.cu
+RGBDFusion/src/MeshEngine.cu
+RGBDFusion/src/RayTraceEngine.cu
+utils/cudaDeviceFuncs.cu)
 
 set_target_properties(${PROJECT_NAME}
 PROPERTIES 
@@ -78,5 +74,11 @@ target_link_libraries(NI2Live PRIVATE ${PROJECT_NAME} ${CMAKE_SOURCE_DIR}/3rdpar
 add_executable(NI2Record Examples/OpenNI2/NI2Record.cc)
 target_link_libraries(NI2Record PRIVATE  ${PROJECT_NAME})
 
+find_package(PythonLibs 3 REQUIRED)
 add_executable(TUM ${PROJECT_SOURCE_DIR}/Examples/TUM-RGBD/TUM.cc)
-target_link_libraries(TUM PRIVATE ${PROJECT_NAME})
+target_link_libraries(TUM PRIVATE ${PROJECT_NAME} ${PYTHON_LIBRARIES})
+
+# Test python bindings
+# add_subdirectory(pybind11)
+# pybind11_add_module(pyslam ${PROJECT_SOURCE_DIR}/Examples/PythonBindings.cpp)
+# target_link_libraries(pyslam PRIVATE ${PROJECT_NAME})

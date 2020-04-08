@@ -5,7 +5,7 @@
 # =============================
 System.ReverseRGB: 1
 System.DepthScale: 5000
-System.EnableViewer: 1
+System.EnableViewer: 0
 
 # =============================
 # Calib

@@ -40,7 +40,7 @@ void Tracking::SetViewer(Viewer *pViewer)
 void Tracking::GrabImageRGBD(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
 {
     mCurrentFrame = Frame(ImgGray, ImgDepth, TimeStamp, mpORBExtractor, ORBVoc);
-
+    // std::cout << "start tracking process.." << std::endl;
     Track();
 }
 
@@ -50,6 +50,7 @@ void Tracking::Track()
     switch (mState)
     {
     case SYSTEM_NOT_READY:
+        // std::cout << "initialize system" << std::endl;
         StereoInitialization();
         if (mState != OK)
             return;
@@ -109,13 +110,13 @@ void Tracking::Track()
     mLastProcessedState = mState;
     mLastFrame = Frame(mCurrentFrame);
 
-    std::cout << "strat writing pose" << std::endl;
+    // std::cout << "strat writing pose" << std::endl;
     Sophus::SE3d Tcr = mpReferenceKF->GetPoseInverse() * mCurrentFrame.mTcw;
     mlRelativeFramePoses.push_back(Tcr);
     mlpReferences.push_back(mpReferenceKF);
     mlFrameTimes.push_back(mCurrentFrame.mTimeStamp);
     mlbLost.push_back(mState == LOST);
-    std::cout << "end writing pose" << std::endl;
+    // std::cout << "end writing pose" << std::endl;
 }
 
 void Tracking::StereoInitialization()
@@ -123,7 +124,7 @@ void Tracking::StereoInitialization()
     mCurrentFrame.ExtractORB();
     if (mCurrentFrame.N > 500)
     {
-        Map *pMap = new Map();
+        Map *pMap = mpMap->GetActiveMap();
 
         // Set Frame pose to the origin
         mCurrentFrame.SetPose(Sophus::SE3d(Eigen::Matrix4d::Identity()));
@@ -159,9 +160,9 @@ void Tracking::StereoInitialization()
             return;
         }
 
-        mpMap->MakeNewMap(pMap);
+        // mpMap->MakeNewMap(pMap);
 
-        std::cout << "New map created with " << pMap->MapPointsInMap() << " points" << std::endl;
+        // std::cout << "New map created with " << pMap->MapPointsInMap() << " points" << std::endl;
 
         mpLocalMapper->InsertKeyFrame(pKFini);
 
@@ -225,6 +226,8 @@ bool Tracking::takeNewFrame()
         // mpTracker->WriteDebugImages();
         return false;
     }
+
+    // std::cout << DT.matrix3x4() << std::endl;
 
     mpTracker->SwapFrameBuffer();
     mCurrentFrame.mTcw = mLastFrame.mTcw * DT.inverse();
@@ -759,6 +762,9 @@ void Tracking::CreateNewKeyFrame()
 void Tracking::reset()
 {
     mState = SYSTEM_NOT_READY;
+    mpReferenceKF = 0;
+    mpLastKeyFrame = 0;
+    mpCurrVoxelMap = 0;
 }
 
 bool Tracking::needNewVoxelMap()

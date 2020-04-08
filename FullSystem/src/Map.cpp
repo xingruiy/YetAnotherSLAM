@@ -148,7 +148,7 @@ void Map::WriteToFile(const std::string &strFile)
             KeyFrame *pKF = *sit;
             if (pKF == nullptr)
             {
-                std::cout << "error writing files: keyframe shouldn't be nullptr..." << std::endl;
+                // std::cout << "error writing files: keyframe shouldn't be nullptr..." << std::endl;
                 continue;
             }
 
@@ -169,7 +169,7 @@ void Map::WriteToFile(const std::string &strFile)
     }
     else
     {
-        std::cout << "failed at creating files..." << std::endl;
+        // std::cout << "failed at creating files..." << std::endl;
         return;
     }
 }
