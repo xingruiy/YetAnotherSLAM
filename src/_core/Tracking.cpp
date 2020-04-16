@@ -2,14 +2,14 @@
 #include "ORBMatcher.h"
 #include "Optimizer.h"
 #include "PoseSolver.h"
-#include "MapManager.h"
+#include "Map.h"
 
 namespace slam
 {
 
-Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB)
+Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB)
     : mState(SYSTEM_NOT_READY), ORBVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
-      mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(pMap), mnLastSuccessRelocFrameId(0)
+      mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(mpMap), mnLastSuccessRelocFrameId(0)
 {
     int w = g_width[0];
     int h = g_height[0];
@@ -86,12 +86,11 @@ void Tracking::initSystem()
 {
     if (currFrame.detectFeaturesInFrame() > 500)
     {
-        Map *pMap = mpMap->GetActiveMap();
         currFrame.mTcw = Sophus::SE3d();
-        KeyFrame *pKFini = new KeyFrame(currFrame, pMap, mpKeyFrameDB);
+        KeyFrame *pKFini = new KeyFrame(currFrame, mpMap, mpKeyFrameDB);
 
         // Insert KeyFrame in the map
-        pMap->AddKeyFrame(pKFini);
+        mpMap->AddKeyFrame(pKFini);
 
         // Create MapPoints and asscoiate to KeyFrame
         for (int i = 0; i < currFrame.N; i++)
@@ -100,21 +99,21 @@ void Tracking::initSystem()
             if (z > 0)
             {
                 Eigen::Vector3d x3D = pKFini->UnprojectStereo(i);
-                MapPoint *pNewMP = new MapPoint(x3D, pKFini, pMap);
+                MapPoint *pNewMP = new MapPoint(x3D, pKFini, mpMap);
                 pNewMP->AddObservation(pKFini, i);
                 pKFini->AddMapPoint(pNewMP, i);
                 pNewMP->ComputeDistinctiveDescriptors();
                 pNewMP->UpdateNormalAndDepth();
-                pMap->AddMapPoint(pNewMP);
+                mpMap->AddMapPoint(pNewMP);
 
                 currFrame.mvpMapPoints[i] = pNewMP;
             }
         }
 
-        if (pMap->MapPointsInMap() < 300)
+        if (mpMap->MapPointsInMap() < 300)
         {
             mState = SYSTEM_NOT_READY;
-            delete pMap;
+            delete mpMap;
             return;
         }
 
@@ -124,13 +123,13 @@ void Tracking::initSystem()
         mpLastKeyFrame = pKFini;
 
         mvpLocalKeyFrames.push_back(pKFini);
-        mvpLocalMapPoints = pMap->GetAllMapPoints();
+        mvpLocalMapPoints = mpMap->GetAllMapPoints();
         mpReferenceKF = pKFini;
         currFrame.mpReferenceKF = pKFini;
 
-        pMap->SetReferenceMapPoints(mvpLocalMapPoints);
+        mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
-        pMap->mvpKeyFrameOrigins.push_back(pKFini);
+        mpMap->mvpKeyFrameOrigins.push_back(pKFini);
 
         mState = OK;
 
@@ -465,8 +464,7 @@ void Tracking::UpdateLocalMap()
     UpdateLocalPoints();
 
     // This is for visualization
-    Map *pMap = mpMap->GetActiveMap();
-    pMap->SetReferenceMapPoints(mvpLocalMapPoints);
+    mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 }
 
 void Tracking::UpdateLocalPoints()
@@ -616,7 +614,6 @@ bool Tracking::NeedNewKeyFrame()
 
 void Tracking::CreateNewMapPoints()
 {
-    Map *pMap = mpMap->GetActiveMap();
     // We sort points by the measured depth by the stereo/RGBD sensor.
     // We create all those MapPoints whose depth < mThDepth.
     // If there are less than 100 close points we create the 100 closest.
@@ -656,12 +653,12 @@ void Tracking::CreateNewMapPoints()
             if (bCreateNew)
             {
                 Eigen::Vector3d x3D = mpReferenceKF->UnprojectStereo(i);
-                MapPoint *pNewMP = new MapPoint(x3D, mpReferenceKF, pMap);
+                MapPoint *pNewMP = new MapPoint(x3D, mpReferenceKF, mpMap);
                 pNewMP->AddObservation(mpReferenceKF, i);
                 mpReferenceKF->AddMapPoint(pNewMP, i);
                 pNewMP->ComputeDistinctiveDescriptors();
                 pNewMP->UpdateNormalAndDepth();
-                pMap->AddMapPoint(pNewMP);
+                mpMap->AddMapPoint(pNewMP);
 
                 currFrame.mvpMapPoints[i] = pNewMP;
                 nPoints++;
@@ -692,9 +689,8 @@ void Tracking::CreateNewKeyFrame()
     if (!TrackLocalMap())
         return;
 
-    Map *pMap = mpMap->GetActiveMap();
     mpTracker->setKeyFrame(currFrame.mImGray, currFrame.mImDepth);
-    mpReferenceKF = new KeyFrame(currFrame, pMap, mpKeyFrameDB);
+    mpReferenceKF = new KeyFrame(currFrame, mpMap, mpKeyFrameDB);
 
     CreateNewMapPoints();
 
@@ -725,8 +721,7 @@ bool Tracking::needNewVoxelMap()
 
 void Tracking::createNewVoxelMap()
 {
-    Map *pMap = mpMap->GetActiveMap();
-    pMap->AddMapStruct(mpCurrVoxelMap);
+    mpMap->AddMapStruct(mpCurrVoxelMap);
     mpCurrVoxelMap->SetActiveFlag(false);
     mpCurrVoxelMap->Hibernate();
 

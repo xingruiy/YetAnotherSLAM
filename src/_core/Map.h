@@ -56,8 +56,6 @@ public:
     std::mutex mMutexMapUpdate;
     std::mutex mPointCreateMutex;
 
-    friend class MapManager;
-
 protected:
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
@@ -77,7 +75,7 @@ protected:
 
 public:
     long unsigned int GetMapId();
-    void FuseMap(Map *pMap);
+    void FuseMap(Map *mpMap);
 
 protected:
     long unsigned int mMapId;

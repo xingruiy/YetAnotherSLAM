@@ -22,7 +22,6 @@ src/_core/GlobalDef.cpp
 src/_core/LoopClosing.cpp
 src/_core/KeyFrameDatabase.cpp
 src/_core/ORBextractor.cpp
-src/_core/MapManager.cpp
 src/_core/PoseSolver.cpp
 src/_cuda/ImageProc.cu
 src/_cuda/VoxelMap.cu

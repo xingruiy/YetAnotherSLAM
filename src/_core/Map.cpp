@@ -178,26 +178,26 @@ void Map::ReadFromFile(const std::string &strFile)
 {
 }
 
-void Map::FuseMap(Map *pMap)
+void Map::FuseMap(Map *mpMap)
 {
     {
         std::unique_lock<std::mutex> lock(mMutexMap);
-        std::unique_lock<std::mutex> lock2(pMap->mMutexMap);
+        std::unique_lock<std::mutex> lock2(mpMap->mMutexMap);
 
         std::set<KeyFrame *> keyFrames;
         std::set<MapPoint *> mapPoints;
         std::set<MapStruct *> mapStructs;
 
         std::set_union(mspKeyFrames.begin(), mspKeyFrames.end(),
-                       pMap->mspKeyFrames.begin(), pMap->mspKeyFrames.end(),
+                       mpMap->mspKeyFrames.begin(), mpMap->mspKeyFrames.end(),
                        std::inserter(keyFrames, std::begin(keyFrames)));
 
         std::set_union(mspMapPoints.begin(), mspMapPoints.end(),
-                       pMap->mspMapPoints.begin(), pMap->mspMapPoints.end(),
+                       mpMap->mspMapPoints.begin(), mpMap->mspMapPoints.end(),
                        std::inserter(mapPoints, std::begin(mapPoints)));
 
         std::set_union(mspMapStructs.begin(), mspMapStructs.end(),
-                       pMap->mspMapStructs.begin(), pMap->mspMapStructs.end(),
+                       mpMap->mspMapStructs.begin(), mpMap->mspMapStructs.end(),
                        std::inserter(mapStructs, std::begin(mapStructs)));
 
         mspKeyFrames = keyFrames;
@@ -205,7 +205,7 @@ void Map::FuseMap(Map *pMap)
         mspMapStructs = mapStructs;
 
         // Update max keyframe id
-        mnMaxKFid = std::max(mnMaxKFid, pMap->mnMaxKFid);
+        mnMaxKFid = std::max(mnMaxKFid, mpMap->mnMaxKFid);
 
         // Update keyframe reference id
         for (auto sit = mspKeyFrames.begin(), send = mspKeyFrames.end(); sit != send; ++sit)
@@ -215,10 +215,10 @@ void Map::FuseMap(Map *pMap)
                 pKF->mpMap = this;
         }
 
-        mpMapStructOrigin = mpMapStructOrigin->mnId < pMap->mpMapStructOrigin->mnId ? mpMapStructOrigin : pMap->mpMapStructOrigin;
+        mpMapStructOrigin = mpMapStructOrigin->mnId < mpMap->mpMapStructOrigin->mnId ? mpMapStructOrigin : mpMap->mpMapStructOrigin;
     }
 
-    pMap->reset();
+    mpMap->reset();
 }
 
 } // namespace slam

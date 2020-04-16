@@ -8,24 +8,24 @@ namespace slam
 std::mutex MapPoint::mGlobalMutex;
 unsigned long MapPoint::nNextId = 0;
 
-MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *pMap)
+MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *mpMap)
     : mnFirstKFid(pRefKF->mnId), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
       mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
-      mpReplaced(nullptr), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), mWorldPos(pos),
+      mpReplaced(nullptr), mfMinDistance(0), mfMaxDistance(0), mpMap(mpMap), mWorldPos(pos),
       mAvgViewingDir(Eigen::Vector3d::Zero()), mnTrackReferenceForFrame(0), mnLastFrameSeen(pRefKF->mnFrameId)
 {
-    std::unique_lock<std::mutex> lock(pMap->mPointCreateMutex);
+    std::unique_lock<std::mutex> lock(mpMap->mPointCreateMutex);
     mnId = nNextId++;
 }
 
-MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *pMap, KeyFrame *pRefKF, const int &idxF)
+MapPoint::MapPoint(const Eigen::Vector3d &pos, Map *mpMap, KeyFrame *pRefKF, const int &idxF)
     : mnFirstKFid(pRefKF->mnId), mpRefKF(pRefKF), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0),
       mnLoopPointForKF(0), mnCorrectedByKF(0), mnCorrectedReference(0), mnBAGlobalForKF(0),
-      mnVisible(1), mnFound(1), mbBad(false), mpReplaced(nullptr), mpMap(pMap), mWorldPos(pos),
+      mnVisible(1), mnFound(1), mbBad(false), mpReplaced(nullptr), mpMap(mpMap), mWorldPos(pos),
       mnTrackReferenceForFrame(0), mnLastFrameSeen(pRefKF->mnFrameId)
 {
     {
-        std::unique_lock<std::mutex> lock(pMap->mPointCreateMutex);
+        std::unique_lock<std::mutex> lock(mpMap->mPointCreateMutex);
         mnId = nNextId++;
     }
 

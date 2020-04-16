@@ -21,7 +21,7 @@ class KeyFrameDatabase;
 class KeyFrame
 {
 public:
-    KeyFrame(const Frame &F, Map *pMap, KeyFrameDatabase *pKFDB);
+    KeyFrame(const Frame &F, Map *mpMap, KeyFrameDatabase *pKFDB);
 
     // Pose functions
     void SetPose(const Sophus::SE3d &Tcw);

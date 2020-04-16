@@ -1,5 +1,5 @@
 #include "MapDrawer.h"
-#include "MapManager.h"
+#include "Map.h"
 #include "KeyFrame.h"
 #include "MapPoint.h"
 #include "VoxelMap.h"
@@ -7,7 +7,7 @@
 namespace slam
 {
 
-MapDrawer::MapDrawer(MapManager *pMap) : mpMap(pMap)
+MapDrawer::MapDrawer(Map *mpMap) : mpMap(mpMap)
 {
     mCalibInv = g_calibInv[0];
     width = g_width[0];
@@ -63,10 +63,8 @@ void MapDrawer::LinkGlSlProgram()
 
 void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 {
-    Map *pMap = mpMap->GetActiveMap();
-    if (!pMap)
-        return;
-    const auto vpKFs = pMap->GetAllKeyFrames();
+
+    const auto vpKFs = mpMap->GetAllKeyFrames();
 
     if (bDrawKF)
     {
@@ -125,11 +123,8 @@ void MapDrawer::DrawKeyFrames(bool bDrawKF, bool bDrawGraph, int N)
 
 void MapDrawer::DrawMapPoints(int iPointSize)
 {
-    Map *pMap = mpMap->GetActiveMap();
-    if (!pMap)
-        return;
-    const auto &vpMPs = pMap->GetAllMapPoints();
-    const auto &vpRefMPs = pMap->GetReferenceMapPoints();
+    const auto &vpMPs = mpMap->GetAllMapPoints();
+    const auto &vpRefMPs = mpMap->GetReferenceMapPoints();
 
     std::set<MapPoint *> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
 
@@ -172,10 +167,7 @@ void MapDrawer::DrawMesh(int N, const pangolin::OpenGlMatrix &mvpMat)
     if (N == 0)
         return;
 
-    Map *pMap = mpMap->GetActiveMap();
-    if (!pMap)
-        return;
-    std::vector<MapStruct *> vpMapStruct = pMap->GetAllVoxelMaps();
+    std::vector<MapStruct *> vpMapStruct = mpMap->GetAllVoxelMaps();
     std::sort(vpMapStruct.begin(), vpMapStruct.end(), [&](MapStruct *a, MapStruct *b) { return a->mnId < b->mnId; });
     std::vector<MapStruct *> vpMapsToRender;
 

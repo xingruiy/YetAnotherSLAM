@@ -1,5 +1,5 @@
 #include "System.h"
-#include "MapManager.h"
+#include "Map.h"
 
 namespace slam
 {
@@ -15,22 +15,22 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     ORBVoc->loadFromBinaryFile(strVocFile);
 
     //Create the Map
-    mpMapManager = new MapManager();
-    mpMapDrawer = new MapDrawer(mpMapManager);
+    mpMap = new Map();
+    mpMapDrawer = new MapDrawer(mpMap);
 
     //Create KeyFrame Database
     mpKeyFrameDB = new KeyFrameDatabase(*ORBVoc);
 
-    mpLoopClosing = new LoopClosing(mpMapManager, mpKeyFrameDB, ORBVoc);
+    mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, ORBVoc);
     mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
 
-    mpLocalMapper = new LocalMapping(ORBVoc, mpMapManager);
+    mpLocalMapper = new LocalMapping(ORBVoc, mpMap);
     mpLocalMapper->SetLoopCloser(mpLoopClosing);
     mpLoopClosing->SetLocalMapper(mpLocalMapper);
     mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
 
     //Initialize the Tracking thread
-    mpTracker = new Tracking(this, ORBVoc, mpMapManager, mpKeyFrameDB);
+    mpTracker = new Tracking(this, ORBVoc, mpMap, mpKeyFrameDB);
     mpTracker->SetLocalMapper(mpLocalMapper);
 
     if (g_bEnableViewer)
@@ -70,7 +70,7 @@ void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
 void System::reset()
 {
     mpTracker->reset();
-    mpMapManager->Reset();
+    mpMap->reset();
     mpKeyFrameDB->clear();
 
     KeyFrame::nNextId = 0;
@@ -80,10 +80,8 @@ void System::reset()
 
 void System::FuseAllMapStruct()
 {
-    Map *pMap = mpMapManager->GetActiveMap();
-    auto mapStructs = pMap->GetAllVoxelMaps();
-
-    MapStruct *pMSini = pMap->mpMapStructOrigin;
+    auto mapStructs = mpMap->GetAllVoxelMaps();
+    MapStruct *pMSini = mpMap->mpMapStructOrigin;
     if (pMSini->mbInHibernation)
         pMSini->ReActivate();
 
@@ -104,7 +102,7 @@ void System::FuseAllMapStruct()
         vit->Release();
         vit->mbSubsumed = true;
         vit->mpParent = pMSini;
-        pMap->EraseMapStruct(vit);
+        mpMap->EraseMapStruct(vit);
         std::cout << "fusing map: " << vit->mnId << std::endl;
     }
 
@@ -208,8 +206,7 @@ void System::readSettings(const std::string &strSettingFile)
 
 void System::SaveTrajectoryTUM(const std::string &filename)
 {
-    Map *pMap = mpMapManager->GetActiveMap();
-    std::vector<KeyFrame *> vpKFs = mpMapManager->GetActiveMap()->GetAllKeyFrames();
+    std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
     sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
 
     // Transform all keyframes so that the first keyframe is at the origin.
@@ -271,8 +268,7 @@ void System::SaveTrajectoryTUM(const std::string &filename)
 
 void System::SaveKeyFrameTrajectoryTUM(const std::string &filename)
 {
-    Map *pMap = mpMapManager->GetActiveMap();
-    std::vector<KeyFrame *> vpKFs = pMap->GetAllKeyFrames();
+    std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
     std::sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
 
     // Transform all keyframes so that the first keyframe is at the origin.

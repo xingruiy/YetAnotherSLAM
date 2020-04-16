@@ -19,13 +19,13 @@ namespace slam
 class Viewer;
 class System;
 class KeyFrame;
-class MapManager;
+class Map;
 class LocalMapping;
 
 class Tracking
 {
 public:
-    Tracking(System *pSystem, ORBVocabulary *pVoc, MapManager *pMap, KeyFrameDatabase *pKFDB);
+    Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB);
 
     // Preprocess the input and call Track().
     void GrabImageRGBD(cv::Mat ImGray, cv::Mat Depth, const double TimeStamp);
@@ -107,7 +107,7 @@ protected:
     Viewer *mpViewer;
 
     //Map
-    MapManager *mpMap;
+    Map *mpMap;
 
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame *mpCurrentKeyFrame;

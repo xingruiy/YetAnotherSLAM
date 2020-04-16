@@ -12,7 +12,7 @@ namespace slam
 
 class Map;
 class Tracking;
-class MapManager;
+class Map;
 class LocalMapping;
 class KeyFrameDatabase;
 
@@ -25,7 +25,7 @@ public:
         KeyFrameAndPose;
 
 public:
-    LoopClosing(MapManager *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc);
+    LoopClosing(Map *mpMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc);
 
     void SetTracker(Tracking *pTracker);
 
@@ -66,7 +66,7 @@ private:
 
     void CorrectLoop();
 
-    MapManager *mpMap;
+    Map *mpMap;
     Tracking *mpTracker;
 
     KeyFrameDatabase *mpKeyFrameDB;

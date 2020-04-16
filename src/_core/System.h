@@ -22,7 +22,7 @@ namespace slam
 class Viewer;
 class Tracking;
 class MapViewer;
-class MapManager;
+class Map;
 class LoopClosing;
 class LocalMapping;
 
@@ -59,7 +59,7 @@ private:
     cv::Mat grayScale;
     cv::Mat depthFloat;
 
-    MapManager *mpMapManager;
+    Map *mpMap;
 };
 
 } // namespace slam

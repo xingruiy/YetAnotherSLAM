@@ -39,14 +39,14 @@ public:
                                  int nIterations = 5, bool *pbStopFlag = nullptr, const unsigned long nLoopKF = 0,
                                  const bool bRobust = true);
 
-    void static GlobalBundleAdjustemnt(Map *pMap, int nIterations = 5, bool *pbStopFlag = nullptr,
+    void static GlobalBundleAdjustemnt(Map *mpMap, int nIterations = 5, bool *pbStopFlag = nullptr,
                                        const unsigned long nLoopKF = 0, const bool bRobust = true);
 
-    void static LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *pMap);
+    void static LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *mpMap);
 
     int static PoseOptimization(Frame &pKF);
 
-    void static OptimizeEssentialGraph(Map *pMap, KeyFrame *pLoopKF, KeyFrame *pCurKF,
+    void static OptimizeEssentialGraph(Map *mpMap, KeyFrame *pLoopKF, KeyFrame *pCurKF,
                                        const LoopClosing::KeyFrameAndPose &NonCorrectedSim3,
                                        const LoopClosing::KeyFrameAndPose &CorrectedSim3,
                                        const std::map<KeyFrame *, std::set<KeyFrame *>> &LoopConnections,
