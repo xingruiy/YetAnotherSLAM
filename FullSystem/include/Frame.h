@@ -18,48 +18,23 @@ class Frame
 {
 public:
     Frame();
-
-    // Copy constructor.
     Frame(const Frame &frame);
-
-    // Constructor for RGB-D cameras.
     Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor *extractor, ORBVocabulary *voc);
-
-    // Extract ORB on the image.
-    void ExtractORB();
-
-    // Compute Bag of Words representation.
+    int detectFeaturesInFrame();
     void ComputeBoW();
-
-    // Set the camera pose.
     void SetPose(const Sophus::SE3d &Tcw);
-
-    // Check if a MapPoint is in the frustum of the camera
-    // and fill variables of the MapPoint to be used by the tracking
     bool isInFrustum(MapPoint *pMP, float viewingCosLimit);
-
-    // Compute the cell of a keypoint (return false if outside the grid)
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
-
     std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, const float &r, const int minLevel = -1, const int maxLevel = -1) const;
-
-    // Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
     void ComputeStereoFromRGBD();
 
 public:
     void CreateRelocalisationPoints();
 
 public:
-    // Vocabulary used for relocalization.
     ORBVocabulary *mpORBvocabulary;
-
-    // Feature extractor. The right is used only in the stereo case.
     ORBextractor *mpORBextractor;
-
-    // Frame timestamp.
     double mTimeStamp;
-
-    // Calibration matrix and OpenCV distortion parameters.
     cv::Mat mK;
     static float fx;
     static float fy;
@@ -68,28 +43,13 @@ public:
     static float invfx;
     static float invfy;
     cv::Mat mDistCoef;
-
-    // Stereo baseline multiplied by fx.
     float mbf;
-
-    // Stereo baseline in meters.
     float mb;
-
-    // Threshold close/far points. Close points are inserted from 1 view.
-    // Far points are inserted as in the monocular case from 2 views.
     float mThDepth;
-
-    // Number of KeyPoints.
     int N;
 
-    // Vector of keypoints (original for visualization)
-    // and undistorted (actually used by the system).
-    // In the RGB-D case, RGB images can be distorted.
     std::vector<cv::KeyPoint> mvKeys;
     std::vector<cv::KeyPoint> mvKeysUn;
-
-    // Corresponding stereo coordinate and depth for each keypoint.
-    // "Monocular" keypoints have a negative value.
     std::vector<float> mvuRight;
     std::vector<float> mvDepth;
 

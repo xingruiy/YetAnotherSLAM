@@ -35,11 +35,7 @@ public:
     void Shutdown();
     void reset();
     void FuseAllMapStruct();
-    void DisplayNextMap();
-
-    void WriteToFile(const std::string &strFile);
-    void ReadFromFile(const std::string &strFile);
-    void writeTrajectoryToFile(const std::string &filename);
+    void SaveTrajectoryTUM(const std::string &filename);
     void SaveKeyFrameTrajectoryTUM(const std::string &filename);
 
 private:

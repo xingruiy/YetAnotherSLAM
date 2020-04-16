@@ -10,6 +10,12 @@ System.EnableViewer: 1
 # =============================
 # Calib
 # =============================
+# Calibration.width: 739
+# Calibration.height: 458
+# Calibration.fx: 726.28741455078
+# Calibration.fy: 726.28741455078
+# Calibration.cx: 354.6496887207
+# Calibration.cy: 186.46566772461
 Calibration.width: 640
 Calibration.height: 480
 Calibration.fx: 517.3

@@ -52,7 +52,7 @@ public:
     eTrackingState mLastProcessedState;
 
     // Current Frame
-    Frame mCurrentFrame;
+    Frame currFrame;
     cv::Mat mImGray;
 
     // Lists used to recover the full camera trajectory
@@ -71,7 +71,7 @@ protected:
     void Track();
 
     // Map initialization
-    void StereoInitialization();
+    void initSystem();
 
     bool Relocalization();
     void UpdateLocalMap();
@@ -109,20 +109,12 @@ protected:
     //Map
     MapManager *mpMap;
 
-    //New KeyFrame rules (according to fps)
-    int mMinFrames;
-    int mMaxFrames;
-
-    int mTriesBeforeReloc;
-    const int mMaxTriesBeforeReloc = 5;
-
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame *mpCurrentKeyFrame;
     KeyFrame *mpLastKeyFrame;
-    Frame mLastFrame;
+    Frame lastFrame;
     ORBextractor *mpORBExtractor;
     unsigned int mnLastKeyFrameId;
-    unsigned int mnNumRelocRuns;
     unsigned int mnLastSuccessRelocFrameId;
 
     // The following sections are added

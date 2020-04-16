@@ -15,7 +15,7 @@ void loadImages(
     std::vector<double> &time_stamps)
 {
     std::ifstream fAssociation;
-    fAssociation.open((path + "association.txt").c_str());
+    fAssociation.open((path + "associated.txt").c_str());
     while (!fAssociation.eof())
     {
         std::string s;
@@ -52,7 +52,7 @@ int main(int argc, char **argv)
     }
 
     std::vector<std::string> listOfTests = {
-        "/home/xingrui/Downloads/TUM-RGBD/rgbd_dataset_freiburg1_floor/"};
+        "/home/xingrui/Downloads/TUM-RGBD/rgbd_dataset_freiburg1_desk2/"};
 
     printf("==== initializing the system\n");
     slam::System slam(argv[1], argv[2]);
@@ -73,7 +73,6 @@ int main(int argc, char **argv)
 
         std::string result_dir = test + "results/";
         std::string cmd = "mkdir -p " + result_dir;
-
         RUNTIME_ASSERT(0 == system(cmd.c_str()))
 
         for (int iter = 0; iter < totalIter; ++iter)
@@ -86,17 +85,11 @@ int main(int argc, char **argv)
                 cv::Mat rgb = cv::imread(test + rgb_files[i], CV_LOAD_IMAGE_UNCHANGED);
                 cv::Mat depth = cv::imread(test + depth_files[i], CV_LOAD_IMAGE_UNCHANGED);
 
-                cv::imshow("rgb", rgb);
-                cv::imshow("depth", depth);
-                // if (i >= 2099 && i <= 2107)
-                //     cv::waitKey(0);
-                cv::waitKey(1);
-
                 const double ts = time_stamps[i];
                 slam.takeNewFrame(rgb, depth, ts);
                 auto t2 = std::chrono::steady_clock::now();
                 double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
-                // Wait to load the next frame
+
                 double T = 0;
                 if (i < nImages - 1)
                     T = time_stamps[i + 1] - ts;
@@ -111,62 +104,10 @@ int main(int argc, char **argv)
             std::stringstream ss, ss2;
             ss << result_dir << iter << "th_run.txt";
             ss2 << result_dir << iter << "th_run_kf.txt";
-            slam.writeTrajectoryToFile(ss.str());
+            slam.SaveTrajectoryTUM(ss.str());
             slam.SaveKeyFrameTrajectoryTUM(ss2.str());
         }
     }
 
     printf("all done!\n");
-
-    // std::vector<std::string> imgFilenames;
-    // std::vector<std::string> depthFilenames;
-    // std::vector<double> timeStamps;
-    // std::string filePath = std::string(argv[3]);
-    // LoadImages(filePath, imgFilenames, depthFilenames, timeStamps);
-
-    // cv::Mat imDepth, imRGB;
-    // size_t nImages = imgFilenames.size();
-    // if (imgFilenames.empty())
-    // {
-    //     std::cerr << "No images found in provided path." << std::endl;
-    //     return -1;
-    // }
-
-    // std::cout << "Images in the sequence: " << nImages << std::endl;
-    // slam::System sys(argv[1], argv[2]);
-
-    // for (int i = 0; i < nImages; ++i)
-    // {
-    //     if (slam::g_bSystemKilled)
-    //         break;
-
-    //     if (slam::g_bSystemRunning)
-    //     {
-    //         imRGB = cv::imread(std::string(argv[3]) + "/" + imgFilenames[i], CV_LOAD_IMAGE_UNCHANGED);
-    //         imDepth = cv::imread(std::string(argv[3]) + "/" + depthFilenames[i], CV_LOAD_IMAGE_UNCHANGED);
-    //         double tframe = timeStamps[i];
-
-    //         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-    //         sys.takeNewFrame(imRGB, imDepth, tframe);
-    //         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
-
-    //         double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
-
-    //         // Wait to load the next frame
-    //         double T = 0;
-    //         if (i < nImages - 1)
-    //             T = timeStamps[i + 1] - tframe;
-    //         else if (i > 0)
-    //             T = tframe - timeStamps[i - 1];
-
-    //         if (ttrack < T)
-    //             usleep((T - ttrack) * 1e6);
-    //     }
-    //     else
-    //     {
-    //         i--;
-    //     }
-    // }
-
-    // sys.writeTrajectoryToFile("CameraTrajectory.txt");
 }

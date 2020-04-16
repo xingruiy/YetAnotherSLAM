@@ -112,20 +112,6 @@ void System::FuseAllMapStruct()
     pMSini->SetActiveFlag(false);
 }
 
-void System::DisplayNextMap()
-{
-}
-
-void System::WriteToFile(const std::string &strFile)
-{
-    // mpMap->WriteToFile(strFile);
-}
-
-void System::ReadFromFile(const std::string &strFile)
-{
-    // mpMap->ReadFromFile(strFile);
-}
-
 void System::Shutdown()
 {
     g_bSystemKilled = true;
@@ -220,7 +206,7 @@ void System::readSettings(const std::string &strSettingFile)
               << "===================================================" << std::endl;
 }
 
-void System::writeTrajectoryToFile(const std::string &filename)
+void System::SaveTrajectoryTUM(const std::string &filename)
 {
     Map *pMap = mpMapManager->GetActiveMap();
     std::vector<KeyFrame *> vpKFs = mpMapManager->GetActiveMap()->GetAllKeyFrames();

@@ -109,18 +109,117 @@ void CoarseTracking::SetReferenceImage(const cv::Mat &imGray)
     }
 }
 
-struct GetFlowFunctor
+__global__ void MakeGradientKernel(int w, int h,
+                                   cv::cuda::PtrStep<float> img,
+                                   cv::cuda::PtrStep<float> grad2)
 {
-};
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    int y = blockDim.y * blockIdx.y + threadIdx.y;
+    if (x == 0 || y == 0 || x >= w - 1 || y >= h - 1)
+        return;
+
+    float dx = (img.ptr(y)[x + 1] - img.ptr(y)[x - 1]) * 0.5f;
+    float dy = (img.ptr(y + 1)[x] - img.ptr(y - 1)[x]) * 0.5f;
+    grad2.ptr(y)[x] = dx * dx + dy * dy;
+}
 
 void CoarseTracking::setKeyFrame(cv::Mat img, cv::Mat depth)
 {
+    int w = img.cols;
+    int h = img.rows;
     keyframeImage.upload(img);
     keyframeDepth.upload(depth);
+    if (keyframeAbsGrab2.empty())
+        keyframeAbsGrab2.create(h, w, CV_32FC1);
+
+    dim3 block(8, 8);
+    dim3 grid(cv::divUp(w, block.x), cv::divUp(h, block.y));
+    MakeGradientKernel<<<grid, block>>>(w, h, keyframeImage, keyframeAbsGrab2);
+}
+
+__global__ void computeOpticalFlow(int w, int h, float fx, float fy,
+                                   float ifx, float ify, float cx, float cy,
+                                   Eigen::Matrix3f R, Eigen::Vector3f t,
+                                   cv::cuda::PtrStep<float> flowVec,
+                                   cv::cuda::PtrStep<float> grad,
+                                   cv::cuda::PtrStep<float> depth)
+{
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    int y = blockDim.y * blockIdx.y + threadIdx.y;
+    if (x >= w || y >= h)
+        return;
+
+    if (x == 0 || y == 0 || x == w || y == h)
+    {
+        flowVec.ptr(y * w + x)[0] = 0;
+        flowVec.ptr(y * w + x)[1] = 0;
+        return;
+    }
+
+    if (grad.ptr(y)[x] <= 1)
+    {
+        flowVec.ptr(y * w + x)[0] = 0;
+        flowVec.ptr(y * w + x)[1] = 0;
+        return;
+    }
+
+    float z = depth.ptr(y)[x];
+    if (z >= 0 && z < 8.f && !isnan(z))
+    {
+        Eigen::Vector3f pt(ifx * (x - cx) * z, ifx * (y - cy) * z, z);
+        Eigen::Vector3f ptRt = R * pt + t;
+        Eigen::Vector3f ptt = pt + t;
+
+        float u = fx * ptRt[0] / ptRt[2] + cx;
+        float v = fy * ptRt[1] / ptRt[2] + cy;
+        float u2 = fx * ptt[0] / ptt[2] + cx;
+        float v2 = fy * ptt[1] / ptt[2] + cy;
+
+        float flow = (x - u) * (x - u) + (y - v) * (y - v);
+        float flow2 = (x - u2) * (x - u2) + (y - v2) * (y - v2);
+
+        flowVec.ptr(y * w + x)[0] = flow;
+        flowVec.ptr(y * w + x)[1] = flow2;
+    }
+    else
+    {
+        flowVec.ptr(y * w + x)[0] = 0;
+        flowVec.ptr(y * w + x)[1] = 0;
+    }
 }
 
 bool CoarseTracking::needNewKF(const Sophus::SE3d &kf2F)
 {
+    float fx = mK[0](0, 0);
+    float fy = mK[0](1, 1);
+    float cx = mK[0](0, 2);
+    float cy = mK[0](1, 2);
+    float ifx = 1.0f / fx;
+    float ify = 1.0f / fy;
+    int w = mvWidth[0];
+    int h = mvHeight[0];
+    Eigen::Matrix3f R = kf2F.rotationMatrix().cast<float>();
+    Eigen::Vector3f t = kf2F.translation().cast<float>();
+    cv::cuda::GpuMat flow(w * h, 2, CV_32FC1);
+    flow.setTo(0);
+    dim3 block(8, 8);
+    dim3 grid(cv::divUp(w, block.x), cv::divUp(h, block.y));
+
+    computeOpticalFlow<<<grid, block>>>(w, h, fx, fy, ifx, ify, cx, cy, R, t, flow, keyframeAbsGrab2, keyframeDepth);
+    cv::cuda::GpuMat flowSum;
+    cv::cuda::reduce(flow, flowSum, 0, cv::REDUCE_SUM);
+    cv::Mat hostData(flowSum);
+    Eigen::Vector2f flowVec;
+
+    flowVec[0] = hostData.ptr<float>(0)[0];
+    flowVec[1] = hostData.ptr<float>(0)[1];
+
+    // std::cout << flowVec.transpose() << std::endl;
+    float weight_Rt = 0.02; //* (w + h);
+    float weight_t = 0.04;  // * (w + h);
+    float rt = weight_Rt * sqrtf(flowVec[0]) / (w * h) + weight_t * sqrtf(flowVec[1]) / (w * h);
+    std::cout << rt << std::endl;
+    return (weight_Rt * flowVec[0] / (w + h) + weight_t * flowVec[1] / (w + h)) > 1;
 }
 
 void CoarseTracking::SetReferenceDepth(const cv::Mat &imDepth)

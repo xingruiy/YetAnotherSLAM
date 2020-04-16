@@ -90,14 +90,14 @@ void Frame::AssignFeaturesToGrid()
   }
 }
 
-void Frame::ExtractORB()
+int Frame::detectFeaturesInFrame()
 {
   (*mpORBextractor)(mImGray, cv::Mat(), mvKeys, mDescriptors);
 
   N = mvKeys.size();
 
   if (mvKeys.empty())
-    return;
+    return 0;
 
   UndistortKeyPoints();
 
@@ -107,6 +107,8 @@ void Frame::ExtractORB()
   mvbOutlier = std::vector<bool>(N, false);
 
   AssignFeaturesToGrid();
+
+  return N;
 }
 
 void Frame::SetPose(const Sophus::SE3d &Tcw)
@@ -334,7 +336,7 @@ void Frame::CreateRelocalisationPoints()
 {
   if (N == 0)
   {
-    ExtractORB();
+    detectFeaturesInFrame();
   }
 
   mvRelocPoints.resize(N);

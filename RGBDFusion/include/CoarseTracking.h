@@ -108,6 +108,7 @@ private:
     cv::cuda::GpuMat mvReferencePointTransformed[NUM_PYR];
     cv::cuda::GpuMat keyframeImage;
     cv::cuda::GpuMat keyframeDepth;
+    cv::cuda::GpuMat keyframeAbsGrab2;
 
     float residualSum;
     float iResidualSum;
