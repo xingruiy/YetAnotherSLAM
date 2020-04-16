@@ -223,8 +223,6 @@ void System::readSettings(const std::string &strSettingFile)
 void System::writeTrajectoryToFile(const std::string &filename)
 {
     Map *pMap = mpMapManager->GetActiveMap();
-    if (!pMap)
-        printf("Map Is NULL\n");
     std::vector<KeyFrame *> vpKFs = mpMapManager->GetActiveMap()->GetAllKeyFrames();
     sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
 
@@ -259,6 +257,8 @@ void System::writeTrajectoryToFile(const std::string &filename)
         {
             Trw = pKF->mTcp;
             pKF = pKF->GetParent();
+            std::cout << "KF: " << pKF->mnId << std::endl;
+            std::cout << Trw.matrix3x4() << std::endl;
         }
 
         Trw = Tow * pKF->GetPose() * Trw;
@@ -281,6 +281,52 @@ void System::writeTrajectoryToFile(const std::string &filename)
     }
 
     file.close();
+}
+
+void System::SaveKeyFrameTrajectoryTUM(const std::string &filename)
+{
+    Map *pMap = mpMapManager->GetActiveMap();
+    std::vector<KeyFrame *> vpKFs = pMap->GetAllKeyFrames();
+    std::sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
+
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    //cv::Mat Two = vpKFs[0]->GetPoseInverse();
+
+    std::ofstream f;
+    f.open(filename.c_str());
+    f << std::fixed;
+
+    for (size_t i = 0; i < vpKFs.size(); i++)
+    {
+        KeyFrame *pKF = vpKFs[i];
+
+        // pKF->SetPose(pKF->GetPose()*Two);
+
+        if (pKF->isBad())
+            continue;
+
+        // cv::Mat R = pKF->GetRotation().t();
+        // std::vector<float> q = Converter::toQuaternion(R);
+        // cv::Mat t = pKF->GetCameraCenter();
+        Sophus::SE3d Tcw = pKF->GetPose();
+        Eigen::Matrix3d R = Tcw.rotationMatrix();
+        Eigen::Vector3d t = Tcw.translation();
+        Eigen::Quaterniond q(R);
+
+        f << std::setprecision(6) << pKF->mTimeStamp << std::setprecision(7)
+          << " " << t[0]
+          << " " << t[1]
+          << " " << t[2]
+          << " " << q.x()
+          << " " << q.y()
+          << " " << q.z()
+          << " " << q.w() << std::endl;
+    }
+
+    f.close();
+    std::cout << std::endl
+              << "trajectory saved!" << std::endl;
 }
 
 } // namespace slam

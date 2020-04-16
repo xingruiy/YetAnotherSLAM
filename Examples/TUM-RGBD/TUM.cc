@@ -52,14 +52,12 @@ int main(int argc, char **argv)
     }
 
     std::vector<std::string> listOfTests = {
-        "/home/xingrui/Downloads/TUM-RGBD/rgbd_dataset_freiburg3_long_office_household/",
-        "/home/xingrui/Downloads/TUM-RGBD/rgbd_dataset_freiburg1_xyz/",
-        "/home/xingrui/Downloads/TUM-RGBD/rgbd_dataset_freiburg1_rpy/"};
+        "/home/xingrui/Downloads/TUM-RGBD/rgbd_dataset_freiburg1_floor/"};
 
     printf("==== initializing the system\n");
     slam::System slam(argv[1], argv[2]);
 
-    const int totalIter = 100;
+    const int totalIter = 1;
     for (auto test : listOfTests)
     {
         std::vector<std::string> rgb_files;
@@ -75,6 +73,7 @@ int main(int argc, char **argv)
 
         std::string result_dir = test + "results/";
         std::string cmd = "mkdir -p " + result_dir;
+
         RUNTIME_ASSERT(0 == system(cmd.c_str()))
 
         for (int iter = 0; iter < totalIter; ++iter)
@@ -83,22 +82,41 @@ int main(int argc, char **argv)
 
             for (int i = 0; i < nImages; ++i)
             {
+                auto t1 = std::chrono::steady_clock::now();
                 cv::Mat rgb = cv::imread(test + rgb_files[i], CV_LOAD_IMAGE_UNCHANGED);
                 cv::Mat depth = cv::imread(test + depth_files[i], CV_LOAD_IMAGE_UNCHANGED);
 
                 cv::imshow("rgb", rgb);
                 cv::imshow("depth", depth);
+                // if (i >= 2099 && i <= 2107)
+                //     cv::waitKey(0);
                 cv::waitKey(1);
 
                 const double ts = time_stamps[i];
                 slam.takeNewFrame(rgb, depth, ts);
+                auto t2 = std::chrono::steady_clock::now();
+                double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+                // Wait to load the next frame
+                double T = 0;
+                if (i < nImages - 1)
+                    T = time_stamps[i + 1] - ts;
+                else if (i > 0)
+                    T = ts - time_stamps[i - 1];
+
+                if (ttrack < T)
+                    usleep((T - ttrack) * 1e6);
             }
 
-            std::stringstream ss;
+            usleep(10 * 1e6);
+            std::stringstream ss, ss2;
             ss << result_dir << iter << "th_run.txt";
+            ss2 << result_dir << iter << "th_run_kf.txt";
             slam.writeTrajectoryToFile(ss.str());
+            slam.SaveKeyFrameTrajectoryTUM(ss2.str());
         }
     }
+
+    printf("all done!\n");
 
     // std::vector<std::string> imgFilenames;
     // std::vector<std::string> depthFilenames;

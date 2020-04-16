@@ -109,6 +109,20 @@ void CoarseTracking::SetReferenceImage(const cv::Mat &imGray)
     }
 }
 
+struct GetFlowFunctor
+{
+};
+
+void CoarseTracking::setKeyFrame(cv::Mat img, cv::Mat depth)
+{
+    keyframeImage.upload(img);
+    keyframeDepth.upload(depth);
+}
+
+bool CoarseTracking::needNewKF(const Sophus::SE3d &kf2F)
+{
+}
+
 void CoarseTracking::SetReferenceDepth(const cv::Mat &imDepth)
 {
     for (int lvl = 0; lvl < NUM_PYR; ++lvl)

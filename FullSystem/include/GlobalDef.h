@@ -26,7 +26,7 @@ extern int g_ORBNLevels;
 extern int g_ORBIniThFAST;
 extern int g_ORBMinThFAST;
 
-#define NUM_PYR 6
+#define NUM_PYR 5
 
 extern int g_width[NUM_PYR];
 extern int g_height[NUM_PYR];

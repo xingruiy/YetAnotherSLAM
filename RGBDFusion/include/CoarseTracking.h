@@ -4,13 +4,16 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 
-#define NUM_PYR 6
+#define NUM_PYR 5
 
 class CoarseTracking
 {
 
 public:
     CoarseTracking(int w, int h, Eigen::Matrix3f K, bool bRGB, bool bIcp);
+
+    void setKeyFrame(cv::Mat img, cv::Mat depth);
+    bool needNewKF(const Sophus::SE3d &kf2F);
 
     void SetReferenceImage(const cv::Mat &imGray);
     void SetReferenceDepth(const cv::Mat &imDepth);
@@ -103,6 +106,8 @@ private:
 
     // Transformed Reference Points in Current Space
     cv::cuda::GpuMat mvReferencePointTransformed[NUM_PYR];
+    cv::cuda::GpuMat keyframeImage;
+    cv::cuda::GpuMat keyframeDepth;
 
     float residualSum;
     float iResidualSum;

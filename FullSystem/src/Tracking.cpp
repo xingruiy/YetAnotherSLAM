@@ -184,7 +184,7 @@ void Tracking::StereoInitialization()
         mpCurrVoxelMap = new MapStruct(g_calib[0]);
         mpCurrVoxelMap->SetMeshEngine(mpMeshEngine);
         mpCurrVoxelMap->SetRayTraceEngine(mpRayTraceEngine);
-        mpCurrVoxelMap->create(5000, 4000, 4500, 0.01, 0.03);
+        mpCurrVoxelMap->create(15000, 12000, 12500, 0.007, 0.03);
         mpCurrVoxelMap->Reset();
 
         pKFini->mpVoxelStruct = mpCurrVoxelMap;
@@ -204,10 +204,10 @@ void Tracking::StereoInitialization()
 
 bool Tracking::takeNewFrame()
 {
-    Sophus::SE3d Tmw = mpCurrVoxelMap->mTcw;
-    Sophus::SE3d Tcm = Tmw.inverse() * mLastFrame.mTcw;
+    // Sophus::SE3d Tmw = mpCurrVoxelMap->mTcw;
+    // Sophus::SE3d Tcm = Tmw.inverse() * mLastFrame.mTcw;
 
-    mpCurrVoxelMap->RayTrace(Tcm);
+    mpCurrVoxelMap->RayTrace(mLastFrame.mTcp);
     auto vmap = mpCurrVoxelMap->GetRayTracingResult();
     mpTracker->SetReferenceModel(vmap);
 
@@ -218,7 +218,7 @@ bool Tracking::takeNewFrame()
     // Calculate the relateive transformation
     Sophus::SE3d DT = mpTracker->GetTransform(Sophus::SE3d(), false);
 
-    if (DT.translation().norm() > 0.1)
+    if (DT.translation().norm() > 0.3)
     {
         std::cout << DT.translation().norm() << std::endl;
         std::cout << DT.matrix3x4() << std::endl;
@@ -657,9 +657,9 @@ bool Tracking::NeedNewKeyFrame()
     bool bCreateNew = false;
     Sophus::SE3d DT = mCurrentFrame.mTcp;
 
-    if (DT.log().topRows<3>().norm() > 0.15)
+    if (DT.log().topRows<3>().norm() > 0.1)
         bCreateNew = true;
-    else if (DT.log().bottomRows<3>().norm() > 0.15)
+    else if (DT.log().bottomRows<3>().norm() > 0.1)
         bCreateNew = true;
 
     return bCreateNew;
@@ -736,6 +736,7 @@ void Tracking::CreateNewKeyFrame()
 
     mpCurrVoxelMap->RayTrace(mCurrentFrame.mTcp);
     mCurrentFrame.mImDepth = cv::Mat(mpCurrVoxelMap->GetRayTracingResultDepth());
+    cv::imshow("mCurrentFrame.mImDepth", mCurrentFrame.mImDepth);
     mCurrentFrame.ExtractORB();
     mCurrentFrame.mTcw = mpReferenceKF->GetPose() * mCurrentFrame.mTcp;
 
@@ -784,7 +785,7 @@ void Tracking::createNewVoxelMap()
     mpCurrVoxelMap->SetActiveFlag(true);
     mpCurrVoxelMap->SetMeshEngine(mpMeshEngine);
     mpCurrVoxelMap->SetRayTraceEngine(mpRayTraceEngine);
-    mpCurrVoxelMap->create(5000, 4000, 4500, 0.01, 0.03);
+    mpCurrVoxelMap->create(15000, 12000, 12500, 0.007, 0.03);
     mpCurrVoxelMap->Reset();
     mpReferenceKF->mpVoxelStruct = mpCurrVoxelMap;
     mpCurrVoxelMap->mTcw = mpReferenceKF->GetPose();
