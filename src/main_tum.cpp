@@ -45,9 +45,9 @@ inline bool file_exist(const std::string &filename)
 
 int main(int argc, char **argv)
 {
-    if (argc != 4)
+    if (argc != 3)
     {
-        printf("usage: ./prog settings vocabulary parent_path");
+        printf("usage: ./prog settings vocabulary");
         exit(-1);
     }
 

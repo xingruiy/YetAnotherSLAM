@@ -293,7 +293,6 @@ void KeyFrame::UpdateConnections()
     if (mbFirstConnection && mnId != 0)
     {
       mpParent = mvpOrderedConnectedKeyFrames.front();
-      std::cout << "parent is self? " << (mpParent == this) << std::endl;
       mpParent->AddChild(this);
       mbFirstConnection = false;
     }

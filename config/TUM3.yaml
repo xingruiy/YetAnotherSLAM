@@ -10,46 +10,22 @@ System.EnableViewer: 1
 # =============================
 # Calib
 # =============================
-# Calibration.width: 739
-# Calibration.height: 458
-# Calibration.fx: 726.28741455078
-# Calibration.fy: 726.28741455078
-# Calibration.cx: 354.6496887207
-# Calibration.cy: 186.46566772461
 Calibration.width: 640
 Calibration.height: 480
-Calibration.fx: 517.3
-Calibration.fy: 516.5
-Calibration.cx: 318.6
-Calibration.cy: 255.3
-# Calibration.fx: 520.9
-# Calibration.fy: 521.0
-# Calibration.cx: 325.1
-# Calibration.cy: 249.7
-# Calibration.fx: 535.4
-# Calibration.fy: 539.2
-# Calibration.cx: 320.1
-# Calibration.cy: 247.6
+Calibration.fx: 535.4
+Calibration.fy: 539.2
+Calibration.cx: 320.1
+Calibration.cy: 247.6
 Calibration.bf: 40.0 # IR projector baseline times fx (aprox.)
 
 # =============================
 # DistCoeff
 # =============================
-UnDistortion.k1: 0.2312
-UnDistortion.k2: -0.7849
-UnDistortion.p1: -0.0033
-UnDistortion.p2: -0.0001
-UnDistortion.k3: 0.9172
-# UnDistortion.k1: 0.2624
-# UnDistortion.k2: -0.9531
-# UnDistortion.p1: -0.0054
-# UnDistortion.p2: 0.0026
-# UnDistortion.k3: 1.1633
-# UnDistortion.k1: 0
-# UnDistortion.k2: 0
-# UnDistortion.p1: 0
-# UnDistortion.p2: 0
-# UnDistortion.k3: 0
+UnDistortion.k1: 0
+UnDistortion.k2: 0
+UnDistortion.p1: 0
+UnDistortion.p2: 0
+UnDistortion.k3: 0
 
 # =============================
 # ORB Features

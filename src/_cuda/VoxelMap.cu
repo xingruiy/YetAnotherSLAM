@@ -1,8 +1,8 @@
 #include "VoxelMap.h"
-#include "utils/CudaUtils.h"
+#include "CudaUtils.h"
 #include "ImageProc.h"
-#include "utils/ParallelScan.h"
-#include "utils/VoxelStructUtils.h"
+#include "ParallelScan.h"
+#include "VoxelStructUtils.h"
 
 #define HASHENTRY_IN_BYTE 0.00002
 #define VOXEL_BLOCK_IN_BYTE 0.000003

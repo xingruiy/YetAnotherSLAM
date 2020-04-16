@@ -610,7 +610,7 @@ bool Tracking::NeedNewKeyFrame()
         bCreateNew = true;
     else if (DT.log().bottomRows<3>().norm() > 0.1)
         bCreateNew = true;
-    mpTracker->needNewKF(DT);
+
     return bCreateNew;
 }
 

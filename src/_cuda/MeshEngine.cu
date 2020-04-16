@@ -1,8 +1,8 @@
 #include "MeshEngine.h"
-#include "utils/VoxelStructUtils.h"
-#include "utils/CudaUtils.h"
-#include "utils/ParallelScan.h"
-#include "utils/TriangleTable.h"
+#include "VoxelStructUtils.h"
+#include "CudaUtils.h"
+#include "ParallelScan.h"
+#include "TriangleTable.h"
 
 struct CollectBlocksFunctor
 {
