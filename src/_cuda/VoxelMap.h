@@ -100,8 +100,8 @@ public:
     void ResetVisibleBlocks();
 
 public:
-    long unsigned int mnId;
-    static long unsigned int nNextId;
+    int mnId;
+    static int nNextId;
 
     //============ Changed by map fusion, hibernation and reserve ==============//
     std::mutex mutexDeviceMem;

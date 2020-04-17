@@ -28,10 +28,6 @@ public:
     void EraseKeyFrame(KeyFrame *pKF);
     void EraseMapPoint(MapPoint *pMP);
     void EraseMapStruct(MapStruct *pMS);
-
-    void WriteToFile(const std::string &strFile);
-    void ReadFromFile(const std::string &strFile);
-
     void setRefPoints(const std::vector<MapPoint *> &vpMPs);
 
     void InformNewBigChange();
@@ -40,46 +36,28 @@ public:
     std::vector<KeyFrame *> GetAllKeyFrames();
     std::vector<MapPoint *> GetAllMapPoints();
     std::vector<MapStruct *> GetAllVoxelMaps();
-
     std::vector<MapPoint *> GetReferenceMapPoints();
 
-    long unsigned int MapPointsInMap();
-    long unsigned KeyFramesInMap();
-
-    long unsigned int GetMaxKFid();
-
+    int MapPointsInMap();
+    int KeyFramesInMap();
+    int GetMaxKFid();
     void reset();
 
     std::vector<KeyFrame *> mvpKeyFrameOrigins;
     MapStruct *mpMapStructOrigin;
-
     std::mutex mMutexMapUpdate;
     std::mutex mPointCreateMutex;
 
 protected:
     std::set<KeyFrame *> mspKeyFrames;
     std::set<MapPoint *> mspMapPoints;
-
     std::set<MapStruct *> mspMapStructs;
-
     std::vector<MapPoint *> mvpReferenceMapPoints;
 
-    long unsigned int mnMaxKFid;
-
-    // Index related to a big change in the map (loop closure, global BA)
+    int mnMaxKFid;
     int mnBigChangeIdx;
-
     std::mutex mMutexMap;
-
     std::mutex mFractualMutex;
-
-public:
-    long unsigned int GetMapId();
-    void FuseMap(Map *mpMap);
-
-protected:
-    long unsigned int mMapId;
-    static long unsigned int nextId;
 };
 
 } // namespace slam

@@ -41,6 +41,8 @@ public:
     void RequestFinish();
     bool isFinished();
 
+    void blockUntilReset();
+
     int KeyframesInQueue()
     {
         std::unique_lock<std::mutex> lock(mMutexNewKFs);

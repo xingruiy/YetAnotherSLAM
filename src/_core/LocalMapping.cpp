@@ -17,7 +17,11 @@ void LocalMapping::Run()
 {
     mbFinished = false;
 
-    SetAcceptKeyFrames(false);
+    // {
+    //     std::unique_lock<std::mutex> lock(mMutexAccept);
+    //     mbAcceptKeyFrames = false;
+    // }
+
     if (CheckNewKeyFrames())
     {
         ProcessNewKeyFrame();
@@ -57,7 +61,7 @@ void LocalMapping::Run()
     ResetIfRequested();
 
     // Tracking will see that Local Mapping is busy
-    SetAcceptKeyFrames(true);
+    // SetAcceptKeyFrames(true);
 
     if (CheckFinish())
         return;

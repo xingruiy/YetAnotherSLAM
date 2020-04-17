@@ -1,15 +1,19 @@
 #include "PangolinViewer.h"
 #include <thread>
 #include "Map.h"
+#include "Frame.h"
 #include "FullSystem.h"
 #include "MapPoint.h"
 
 namespace slam
 {
 
+using namespace std;
+using namespace Eigen;
+
 PangolinViewer::PangolinViewer(int w, int h) : BaseIOWrapper(), map(0), fsIO(0), w(w), h(h)
 {
-    new std::thread(&PangolinViewer::run, this);
+    new thread(&PangolinViewer::run, this);
 }
 
 void PangolinViewer::run()
@@ -46,6 +50,7 @@ void PangolinViewer::run()
             drawMapPoints(size_bar);
         }
 
+        drawLiveFrame(0.05);
         drawKeyFrames(display_graph, display_kf, 0);
         pangolin::FinishFrame();
     }
@@ -66,7 +71,7 @@ void PangolinViewer::drawKeyFrames(bool drawGraph, bool drawKF, int N)
     //     for (size_t i = 0; i < vpKFs.size(); i++)
     //     {
     //         KeyFrame *pKF = vpKFs[i];
-    //         Eigen::Matrix4f Tcw = pKF->GetPose().matrix().cast<float>();
+    //         Matrix4f Tcw = pKF->GetPose().matrix().cast<float>();
 
     //         glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
     //         pangolin::glDrawFrustum(mCalibInv, width, height, Tcw, 0.05f);
@@ -84,7 +89,7 @@ void PangolinViewer::drawKeyFrames(bool drawGraph, bool drawKF, int N)
     //         // Covisibility Graph
     //         glColor4f(0.5f, 1.0f, 0.0f, 1.0f);
     //         const auto vCovKFs = vpKFs[i]->GetBestCovisibilityKeyFrames(N);
-    //         Eigen::Vector3f Ow = vpKFs[i]->GetTranslation().cast<float>();
+    //         Vector3f Ow = vpKFs[i]->GetTranslation().cast<float>();
     //         if (!vCovKFs.empty())
     //         {
     //             for (auto vit = vCovKFs.begin(), vend = vCovKFs.end(); vit != vend; vit++)
@@ -92,7 +97,7 @@ void PangolinViewer::drawKeyFrames(bool drawGraph, bool drawKF, int N)
     //                 if ((*vit)->mnId < vpKFs[i]->mnId)
     //                     continue;
 
-    //                 Eigen::Vector3f Ow2 = (*vit)->GetTranslation().cast<float>();
+    //                 Vector3f Ow2 = (*vit)->GetTranslation().cast<float>();
     //                 glVertex3f(Ow(0), Ow(1), Ow(2));
     //                 glVertex3f(Ow2(0), Ow2(1), Ow2(2));
     //             }
@@ -100,12 +105,12 @@ void PangolinViewer::drawKeyFrames(bool drawGraph, bool drawKF, int N)
 
     //         // Loops edge
     //         glColor4f(0.0f, 0.5f, 1.0f, 1.0f);
-    //         std::set<KeyFrame *> sLoopKFs = vpKFs[i]->GetLoopEdges();
+    //         set<KeyFrame *> sLoopKFs = vpKFs[i]->GetLoopEdges();
     //         for (auto sit = sLoopKFs.begin(), send = sLoopKFs.end(); sit != send; sit++)
     //         {
     //             if ((*sit)->mnId < vpKFs[i]->mnId)
     //                 continue;
-    //             Eigen::Vector3f Owl = (*sit)->GetTranslation().cast<float>();
+    //             Vector3f Owl = (*sit)->GetTranslation().cast<float>();
     //             glVertex3f(Ow(0), Ow(1), Ow(2));
     //             glVertex3f(Owl(0), Owl(1), Owl(2));
     //         }
@@ -123,7 +128,7 @@ void PangolinViewer::drawMapPoints(int size)
 
     const auto &vpMPs = map->GetAllMapPoints();
     const auto &vpRefMPs = map->GetReferenceMapPoints();
-    std::set<MapPoint *> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
+    set<MapPoint *> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
 
     if (vpMPs.empty())
         return;
@@ -137,7 +142,7 @@ void PangolinViewer::drawMapPoints(int size)
         if (vpMPs[i]->isBad() || spRefMPs.count(vpMPs[i]))
             continue;
 
-        Eigen::Vector3f pos = vpMPs[i]->mWorldPos.cast<float>();
+        Vector3f pos = vpMPs[i]->mWorldPos.cast<float>();
         glVertex3f(pos(0), pos(1), pos(2));
     }
 
@@ -149,12 +154,19 @@ void PangolinViewer::drawMapPoints(int size)
     for (MapPoint *pMP : spRefMPs)
         if (!pMP->isBad())
         {
-            Eigen::Vector3f pos = pMP->mWorldPos.cast<float>();
+            Vector3f pos = pMP->mWorldPos.cast<float>();
             glVertex3f(pos(0), pos(1), pos(2));
         }
 
     glEnd();
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+void PangolinViewer::drawLiveFrame(float scale)
+{
+    Matrix3f K;
+    K << 528, 0, 320, 0, 528, 240, 0, 0, 1;
+    pangolin::glDrawFrustum<float>(K.inverse(), 640, 480, liveFramePose, scale);
 }
 
 void PangolinViewer::setGlobalMap(Map *map)
@@ -165,6 +177,13 @@ void PangolinViewer::setGlobalMap(Map *map)
 void PangolinViewer::setSystemIO(FullSystem *fs)
 {
     fsIO = fs;
+}
+
+void PangolinViewer::publishLiveFrame(Frame *newF)
+{
+    liveFramePose = newF->mTcw.matrix().cast<float>();
+    cout << "==== live frame pose:" << endl
+         << liveFramePose << endl;
 }
 
 } // namespace slam

@@ -28,6 +28,7 @@ struct FrameMetaData
 
     FrameMetaData *ref;
     Sophus::SE3d camToRef;
+    Sophus::SE3d camToWorld;
 };
 
 class Frame
@@ -113,17 +114,8 @@ public:
     cv::Mat mImGray;
     cv::Mat mImDepth;
     std::vector<Eigen::Vector3d> mvRelocPoints;
-
-private:
-    // Undistort keypoints given OpenCV distortion parameters.
-    // Only for the RGB-D case. Stereo must be already rectified!
-    // (called in the constructor).
     void UndistortKeyPoints();
-
-    // Computes image bounds for the undistorted image (called in the constructor).
     void ComputeImageBounds(const cv::Mat &imLeft);
-
-    // Assign keypoints to the grid for speed up feature matching (called in the constructor).
     void AssignFeaturesToGrid();
 };
 

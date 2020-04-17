@@ -20,13 +20,13 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
     OrbVoc->loadFromBinaryFile(strVocFile);
     OrbExt = new ORBextractor();
     mpMap = new Map();
-    mpKeyFrameDB = new BoWDatabase(*OrbVoc);
-    loopCloser = new LoopClosing(mpMap, mpKeyFrameDB, OrbVoc);
+    KFDB = new BoWDatabase(*OrbVoc);
+    loopCloser = new LoopClosing(mpMap, KFDB, OrbVoc);
     localMapper = new LocalMapping(OrbVoc, mpMap);
     localMapper->SetLoopCloser(loopCloser);
     loopCloser->SetLocalMapper(localMapper);
-    mpTracker = new Tracking(this, OrbVoc, mpMap, mpKeyFrameDB);
-    mpTracker->SetLocalMapper(localMapper);
+    localTracker = new Tracking(this, OrbVoc, mpMap, KFDB);
+    localTracker->SetLocalMapper(localMapper);
 
     // start threads
     std::thread *thd = 0;
@@ -45,7 +45,7 @@ FullSystem::~FullSystem()
     }
 
     delete mpMap;
-    delete mpTracker;
+    delete localTracker;
     delete localMapper;
     delete loopCloser;
 }
@@ -65,7 +65,10 @@ void FullSystem::addImages(cv::Mat img, cv::Mat depth, double ts)
     }
 
     allFrameHistory.push_back(meta);
-    mpTracker->trackNewFrame(newF);
+    localTracker->trackNewFrame(newF);
+
+    for (auto io : outputs)
+        io->publishLiveFrame(&newF);
 }
 
 void FullSystem::deliverTrackedFrame(Frame *newF, bool makeKF)
@@ -101,23 +104,27 @@ void FullSystem::trackFrameCoarse(Frame *newF)
 {
 }
 
+void FullSystem::traceKeyFramePoints()
+{
+}
+
 void FullSystem::threadLoopClosing()
 {
-    while (1)
+    while (!emergencyShutdown)
         loopCloser->Run();
 }
 
 void FullSystem::threadLocalMapping()
 {
-    while (1)
+    while (!emergencyShutdown)
         localMapper->Run();
 }
 
 void FullSystem::reset()
 {
-    mpTracker->reset();
+    localTracker->reset();
     mpMap->reset();
-    mpKeyFrameDB->clear();
+    KFDB->clear();
 
     KeyFrame::nNextId = 0;
     MapPoint::nNextId = 0;
@@ -131,7 +138,13 @@ void FullSystem::reset()
 
 void FullSystem::shutdown()
 {
-    std::cout << "shutdown called." << std::endl;
+    emergencyShutdown = true;
+    printf("==== shutdown called.\n");
+}
+
+bool FullSystem::isShutdown()
+{
+    return emergencyShutdown;
 }
 
 void FullSystem::addOutput(BaseIOWrapper *io)
@@ -228,11 +241,11 @@ void FullSystem::SaveTrajectoryTUM(const std::string &filename)
 
     // For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
     // which is true when tracking failed (lbL).
-    std::list<KeyFrame *>::iterator lRit = mpTracker->mlpReferences.begin();
-    std::list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
-    std::list<bool>::iterator lbL = mpTracker->mlbLost.begin();
-    for (auto lit = mpTracker->mlRelativeFramePoses.begin(),
-              lend = mpTracker->mlRelativeFramePoses.end();
+    std::list<KeyFrame *>::iterator lRit = localTracker->mlpReferences.begin();
+    std::list<double>::iterator lT = localTracker->mlFrameTimes.begin();
+    std::list<bool>::iterator lbL = localTracker->mlbLost.begin();
+    for (auto lit = localTracker->mlRelativeFramePoses.begin(),
+              lend = localTracker->mlRelativeFramePoses.end();
          lit != lend; lit++, lRit++, lT++, lbL++)
     {
         if (*lbL)

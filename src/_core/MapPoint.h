@@ -64,10 +64,10 @@ public:
     int PredictScale(const float &currentDist, KeyFrame *pKF);
 
 public:
-    long unsigned int mnId;
-    static long unsigned int nNextId;
+    int mnId;
+    static int nNextId;
     long int mnFirstKFid;
-    long unsigned int mnLastFrameSeen;
+    int mnLastFrameSeen;
     int nObs;
     float mTrackProjX;
     float mTrackProjY;
@@ -75,14 +75,14 @@ public:
     bool mbTrackInView;
     int mnTrackScaleLevel;
     float mTrackViewCos;
-    long unsigned int mnTrackReferenceForFrame;
-    long unsigned int mnBALocalForKF;
-    long unsigned int mnFuseCandidateForKF;
-    long unsigned int mnLoopPointForKF;
-    long unsigned int mnCorrectedByKF;
-    long unsigned int mnCorrectedReference;
+    int mnTrackReferenceForFrame;
+    int mnBALocalForKF;
+    int mnFuseCandidateForKF;
+    int mnLoopPointForKF;
+    int mnCorrectedByKF;
+    int mnCorrectedReference;
     Eigen::Vector3d mPosGBA;
-    long unsigned int mnBAGlobalForKF;
+    int mnBAGlobalForKF;
     static std::mutex mGlobalMutex;
 
 public:

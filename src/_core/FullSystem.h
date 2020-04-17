@@ -29,6 +29,7 @@ public:
     FullSystem(const std::string &strSettings, const std::string &strVoc);
     void reset();
     void shutdown();
+    bool isShutdown();
     void initSystem(Frame *newF);
     void addOutput(BaseIOWrapper *io);
 
@@ -54,7 +55,7 @@ protected:
     Map *mpMap;
 
     // ==== main tracking thread, taking care of frame pose
-    Tracking *mpTracker;
+    Tracking *localTracker;
 
     // ==== local mapping for local BA
     LocalMapping *localMapper;
@@ -63,8 +64,9 @@ protected:
     LoopClosing *loopCloser;
     ORBVocabulary *OrbVoc;
     ORBextractor *OrbExt;
-    BoWDatabase *mpKeyFrameDB;
+    BoWDatabase *KFDB;
 
+    bool emergencyShutdown = false;
     std::vector<BaseIOWrapper *> outputs;
     std::vector<KeyFrame *> allKeyFramesHistory;
     std::vector<FrameMetaData *> allFrameHistory;

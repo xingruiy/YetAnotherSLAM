@@ -71,7 +71,7 @@ private:
     Map *mpMap;
     Tracking *mpTracker;
 
-    BoWDatabase *mpKeyFrameDB;
+    BoWDatabase *KFDB;
     ORBVocabulary *OrbVoc;
 
     LocalMapping *localMapper;
@@ -93,7 +93,7 @@ private:
     std::vector<MapPoint *> mvpLoopMapPoints;
     Sophus::SE3d mTcwNew;
 
-    long unsigned int mLastLoopKFid;
+    int mLastLoopKFid;
 
     // Variables related to Global Bundle Adjustment
     bool mbRunningGBA;

@@ -85,9 +85,9 @@ public:
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 public:
-    static long unsigned int nNextId;
-    long unsigned int mnId;
-    const long unsigned int mnFrameId;
+    static int nNextId;
+    int mnId;
+    const int mnFrameId;
 
     const double timestamp;
 
@@ -98,25 +98,25 @@ public:
     const float mfGridElementHeightInv;
 
     // Variables used by the tracking
-    long unsigned int mnTrackReferenceForFrame;
-    long unsigned int mnFuseTargetForKF;
+    int mnTrackReferenceForFrame;
+    int mnFuseTargetForKF;
 
     // Variables used by the local mapping
-    long unsigned int mnBALocalForKF;
-    long unsigned int mnBAFixedForKF;
+    int mnBALocalForKF;
+    int mnBAFixedForKF;
 
     // Variables used by the keyframe database
-    long unsigned int mnLoopQuery;
+    int mnLoopQuery;
     int mnLoopWords;
     float mLoopScore;
-    long unsigned int mnRelocQuery;
+    int mnRelocQuery;
     int mnRelocWords;
     float mRelocScore;
 
     // Variables used by loop closing
     Sophus::SE3d mTcwGBA;
     Sophus::SE3d mTcwBefGBA;
-    long unsigned int mnBAGlobalForKF;
+    int mnBAGlobalForKF;
 
     // Calibration parameters
     const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
@@ -162,7 +162,7 @@ protected:
     std::vector<MapPoint *> mvpMapPoints;
 
     // BoW
-    BoWDatabase *mpKeyFrameDB;
+    BoWDatabase *KFDB;
     ORBVocabulary *OrbVoc;
 
     // Grid over the image to speed up feature matching

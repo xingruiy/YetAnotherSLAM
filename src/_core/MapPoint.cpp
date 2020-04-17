@@ -10,7 +10,7 @@ namespace slam
 {
 
 std::mutex MapPoint::mGlobalMutex;
-unsigned long MapPoint::nNextId = 0;
+int MapPoint::nNextId = 0;
 
 MapPoint::MapPoint(const Eigen::Vector3d &pos, KeyFrame *pRefKF, Map *mpMap)
     : mnFirstKFid(pRefKF->mnId), nObs(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),

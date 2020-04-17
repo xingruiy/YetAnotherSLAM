@@ -67,7 +67,7 @@ protected:
 
     //BoW
     ORBVocabulary *OrbVoc;
-    BoWDatabase *mpKeyFrameDB;
+    BoWDatabase *KFDB;
 
     //Local Map
     KeyFrame *mpReferenceKF;

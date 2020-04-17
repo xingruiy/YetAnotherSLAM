@@ -4,7 +4,7 @@
 namespace slam
 {
 
-unsigned long KeyFrame::nNextId = 0;
+int KeyFrame::nNextId = 0;
 
 KeyFrame::KeyFrame(const Frame &F, Map *mpMap, BoWDatabase *pKFDB)
     : mnFrameId(F.meta->id), timestamp(F.meta->timestamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
@@ -17,7 +17,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *mpMap, BoWDatabase *pKFDB)
       mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
       mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
       mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
-      mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
+      mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), KFDB(pKFDB),
       OrbVoc(F.OrbVoc), mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
       mbToBeErased(false), mbBad(false), mpMap(mpMap), mImg(F.mImGray.clone()), mpVoxelStruct(nullptr)
 {
@@ -36,13 +36,11 @@ KeyFrame::KeyFrame(const Frame &F, Map *mpMap, BoWDatabase *pKFDB)
 
 void KeyFrame::ComputeBoW()
 {
-  if (mBowVec.empty())
-  {
-    std::vector<cv::Mat> vCurrentDesc = ToDescriptorVector(mDescriptors);
-    // Feature vector associate features with nodes in the 4th level (from leaves up)
-    // We assume the vocabulary tree has 6 levels, change the 4 otherwise
-    OrbVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
-  }
+  if (!mBowVec.empty())
+    return;
+
+  std::vector<cv::Mat> vCurrentDesc = ToDescriptorVector(mDescriptors);
+  OrbVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
 }
 
 void KeyFrame::SetPose(const Sophus::SE3d &Tcw)
@@ -477,7 +475,7 @@ void KeyFrame::SetBadFlag()
   }
 
   mpMap->EraseKeyFrame(this);
-  mpKeyFrameDB->erase(this);
+  KFDB->erase(this);
 }
 
 bool KeyFrame::isBad()

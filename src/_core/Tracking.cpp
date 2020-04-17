@@ -16,7 +16,7 @@ struct PointCloud
 };
 
 Tracking::Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, BoWDatabase *pKFDB)
-    : OrbVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
+    : OrbVoc(pVoc), KFDB(pKFDB), mpSystem(pSystem),
       mpLastKeyFrame(nullptr), mpMap(mpMap), mnLastSuccessRelocFrameId(0)
 {
     int w = g_width[0];
@@ -70,7 +70,7 @@ void Tracking::initSystem()
     if (currFrame.detectFeaturesInFrame() > 500)
     {
         currFrame.mTcw = Sophus::SE3d();
-        KeyFrame *pKFini = new KeyFrame(currFrame, mpMap, mpKeyFrameDB);
+        KeyFrame *pKFini = new KeyFrame(currFrame, mpMap, KFDB);
 
         // Insert KeyFrame in the map
         mpMap->AddKeyFrame(pKFini);
@@ -184,7 +184,7 @@ bool Tracking::Relocalization()
 
     // Relocalization is performed when tracking is lost
     // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
-    std::vector<KeyFrame *> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&currFrame);
+    std::vector<KeyFrame *> vpCandidateKFs = KFDB->DetectRelocalizationCandidates(&currFrame);
 
     if (vpCandidateKFs.empty())
         return false;
@@ -645,7 +645,7 @@ void Tracking::CreateNewKeyFrame()
         return;
 
     mpTracker->setKeyFrame(currFrame.mImGray, currFrame.mImDepth);
-    mpReferenceKF = new KeyFrame(currFrame, mpMap, mpKeyFrameDB);
+    mpReferenceKF = new KeyFrame(currFrame, mpMap, KFDB);
 
     CreateNewMapPoints();
 

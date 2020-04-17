@@ -7,7 +7,7 @@
 #define HASHENTRY_IN_BYTE 0.00002
 #define VOXEL_BLOCK_IN_BYTE 0.000003
 
-long unsigned int MapStruct::nNextId = 0;
+int MapStruct::nNextId = 0;
 
 Sophus::SE3d MapStruct::GetPose()
 {

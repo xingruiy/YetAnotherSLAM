@@ -48,7 +48,7 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame *> &vpKFs, const std
     if (pbStopFlag)
         optimizer.setForceStopFlag(pbStopFlag);
 
-    long unsigned int maxKFid = 0;
+    int maxKFid = 0;
 
     // Set KeyFrame vertices
     for (size_t i = 0; i < vpKFs.size(); i++)
@@ -739,7 +739,7 @@ void Optimizer::OptimizeEssentialGraph(Map *mpMap, KeyFrame *pLoopKF, KeyFrame *
         vpVertices[nIDi] = VSim3;
     }
 
-    std::set<std::pair<long unsigned int, long unsigned int>> sInsertedEdges;
+    std::set<std::pair<int, int>> sInsertedEdges;
 
     const Eigen::Matrix<double, 7, 7> matLambda = Eigen::Matrix<double, 7, 7>::Identity();
 
@@ -747,14 +747,14 @@ void Optimizer::OptimizeEssentialGraph(Map *mpMap, KeyFrame *pLoopKF, KeyFrame *
     for (auto mit = LoopConnections.begin(), mend = LoopConnections.end(); mit != mend; mit++)
     {
         KeyFrame *pKF = mit->first;
-        const long unsigned int nIDi = pKF->mnId;
+        const int nIDi = pKF->mnId;
         const std::set<KeyFrame *> &spConnections = mit->second;
         const g2o::Sim3 Siw = vScw[nIDi];
         const g2o::Sim3 Swi = Siw.inverse();
 
         for (auto sit = spConnections.begin(), send = spConnections.end(); sit != send; sit++)
         {
-            const long unsigned int nIDj = (*sit)->mnId;
+            const int nIDj = (*sit)->mnId;
             if ((nIDi != pCurKF->mnId || nIDj != pLoopKF->mnId) && pKF->GetWeight(*sit) < minFeat)
                 continue;
 
