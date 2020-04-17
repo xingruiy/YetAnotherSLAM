@@ -2,7 +2,6 @@
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 #include "Frame.h"
-#include "Viewer.h"
 #include "KeyFrame.h"
 #include "LocalMapping.h"
 #include "FullSystem.h"
@@ -16,10 +15,9 @@
 namespace slam
 {
 
-class Viewer;
+class Map;
 class FullSystem;
 class KeyFrame;
-class Map;
 class LocalMapping;
 
 class Tracking

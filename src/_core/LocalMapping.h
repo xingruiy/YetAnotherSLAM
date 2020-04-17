@@ -8,14 +8,12 @@
 #include "Map.h"
 #include "GlobalSettings.h"
 #include "KeyFrame.h"
-#include "Viewer.h"
 #include "ORBextractor.h"
 #include "LoopClosing.h"
 
 namespace slam
 {
 
-class Viewer;
 class Map;
 class LoopClosing;
 

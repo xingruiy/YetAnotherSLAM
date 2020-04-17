@@ -124,8 +124,8 @@ void Tracking::initSystem()
         mRawDepth.upload(currFrame.mImDepth);
         mpCurrVoxelMap->Fuse(mRawDepth, currFrame.mTcw);
 
-        if (mpViewer)
-            mpViewer->setKeyFrameImage(currFrame.mImGray, currFrame.mvKeys);
+        // if (mpViewer)
+        //     mpViewer->setKeyFrameImage(currFrame.mImGray, currFrame.mvKeys);
     }
 }
 
@@ -163,20 +163,18 @@ bool Tracking::addImages()
     mRawDepth.upload(currFrame.mImDepth);
     mpCurrVoxelMap->Fuse(mRawDepth, currFrame.mTcp);
 
-    if (mpViewer)
-    {
-        Sophus::SE3d Tcw = mpReferenceKF->GetPose() * currFrame.mTcp;
-        mpViewer->setLivePose(Tcw.matrix());
-    }
+    // if (mpViewer)
+    // {
+    //     Sophus::SE3d Tcw = mpReferenceKF->GetPose() * currFrame.mTcp;
+    //     mpViewer->setLivePose(Tcw.matrix());
+    // }
 
     return true;
 }
 
 bool Tracking::Relocalization()
 {
-    // Extract Features
-    currFrame.detectFeaturesInFrame();
-    if (currFrame.N < 500)
+    if (currFrame.detectFeaturesInFrame() < 500)
     {
         std::cout << "Relocalisation failed, Not enough features..." << std::endl;
         return false;
@@ -658,8 +656,8 @@ void Tracking::CreateNewKeyFrame()
     localMapper->InsertKeyFrame(mpReferenceKF);
     localMapper->SetNotStop(false);
 
-    if (mpViewer)
-        mpViewer->setKeyFrameImage(currFrame.mImGray, currFrame.mvKeys);
+    // if (mpViewer)
+    //     mpViewer->setKeyFrameImage(currFrame.mImGray, currFrame.mvKeys);
 
     createNewVoxelMap();
 }

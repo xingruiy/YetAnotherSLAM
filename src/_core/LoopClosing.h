@@ -5,6 +5,8 @@
 #include "Tracking.h"
 #include "LocalMapping.h"
 #include "KeyFrameDatabase.h"
+
+#include <thread>
 #include <sophus/se3.hpp>
 
 namespace slam

@@ -22,8 +22,7 @@ src/_cuda/VoxelMap.cu
 src/_cuda/CoarseTracking.cu
 src/_cuda/MeshEngine.cu
 src/_cuda/RayTracer.cu
-src/_gui/Viewer.cpp
-src/_gui/MapDrawer.cpp
+src/_gui/PangolinViewer.cpp
 src/_utils/PoseSolver.cpp
 src/_utils/ORBMatcher.cpp
 src/_utils/GlobalSettings.cpp

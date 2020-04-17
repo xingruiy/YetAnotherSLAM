@@ -1,4 +1,5 @@
 #include "FullSystem.h"
+#include "PangolinViewer.h"
 #include "GlobalSettings.h"
 #include <fstream>
 #include <opencv2/opencv.hpp>
@@ -51,6 +52,8 @@ int main(int argc, char **argv)
 
     printf("==== initializing the system\n");
     slam::FullSystem slam(argv[1], argv[2]);
+    slam::PangolinViewer viewer(1920, 1280);
+    slam.addOutput(&viewer);
 
     const int totalIter = 1;
     for (auto test : listOfTests)

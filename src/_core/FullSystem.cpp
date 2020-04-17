@@ -1,20 +1,19 @@
 #include "FullSystem.h"
 #include "Map.h"
 #include "Frame.h"
-#include "Viewer.h"
 #include "KeyFrame.h"
 #include "Tracking.h"
 #include "LocalMapping.h"
 #include "GlobalSettings.h"
 #include "LoopClosing.h"
-#include "MapDrawer.h"
+#include "BaseIOWrapper.h"
 #include "KeyFrameDatabase.h"
 #include "ORBextractor.h"
 
 namespace slam
 {
 
-FullSystem::FullSystem(const std::string &strSettingFile, const std::string &strVocFile) : mpViewer(0)
+FullSystem::FullSystem(const std::string &strSettingFile, const std::string &strVocFile)
 {
     //Load Settings
     readSettings(strSettingFile);
@@ -27,7 +26,7 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
 
     //Create the Map
     mpMap = new Map();
-    mpMapDrawer = new MapDrawer(mpMap);
+    // mpMapDrawer = new MapDrawer(mpMap);
 
     //Create KeyFrame Database
     mpKeyFrameDB = new KeyFrameDatabase(*OrbVoc);
@@ -46,13 +45,13 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
     mpTracker = new Tracking(this, OrbVoc, mpMap, mpKeyFrameDB);
     mpTracker->SetLocalMapper(localMapper);
 
-    if (g_bEnableViewer)
-    {
-        mpViewer = new Viewer(this, mpMapDrawer);
-        thd = new std::thread(&Viewer::Run, mpViewer);
-        allChildThreads.push_back(thd);
-        mpTracker->setIOWrapper(mpViewer);
-    }
+    // if (g_bEnableViewer)
+    // {
+    //     mpViewer = new Viewer(this, mpMapDrawer);
+    //     thd = new std::thread(&Viewer::Run, mpViewer);
+    //     allChildThreads.push_back(thd);
+    //     mpTracker->setIOWrapper(mpViewer);
+    // }
 }
 
 FullSystem::~FullSystem()
@@ -64,7 +63,6 @@ FullSystem::~FullSystem()
     }
 
     delete mpMap;
-    delete mpViewer;
     delete mpTracker;
     delete localMapper;
     delete loopCloser;
@@ -110,6 +108,21 @@ void FullSystem::reset()
 
     allFrameHistory.clear();
     allKeyFramesHistory.clear();
+}
+
+void FullSystem::shutdown()
+{
+    std::cout << "shutdown called." << std::endl;
+}
+
+void FullSystem::addOutput(BaseIOWrapper *io)
+{
+    if (io)
+    {
+        io->setSystemIO(this);
+        io->setGlobalMap(mpMap);
+        outputs.push_back(io);
+    }
 }
 
 void FullSystem::readSettings(const std::string &filename)
