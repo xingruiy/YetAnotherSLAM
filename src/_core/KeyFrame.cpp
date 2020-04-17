@@ -6,7 +6,7 @@ namespace slam
 
 unsigned long KeyFrame::nNextId = 0;
 
-KeyFrame::KeyFrame(const Frame &F, Map *mpMap, KeyFrameDatabase *pKFDB)
+KeyFrame::KeyFrame(const Frame &F, Map *mpMap, BoWDatabase *pKFDB)
     : mnFrameId(F.meta->id), timestamp(F.meta->timestamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
       mfGridElementWidthInv(F.mfGridElementWidthInv), mfGridElementHeightInv(F.mfGridElementHeightInv),
       mnTrackReferenceForFrame(0), mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),

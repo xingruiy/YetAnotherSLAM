@@ -16,13 +16,13 @@ src/_core/FullSystem.cpp
 src/_core/Tracking.cpp
 src/_core/Optimizer.cpp
 src/_core/LoopClosing.cpp
-src/_core/KeyFrameDatabase.cpp
 src/_cuda/ImageProc.cu
 src/_cuda/VoxelMap.cu
 src/_cuda/CoarseTracking.cu
 src/_cuda/MeshEngine.cu
 src/_cuda/RayTracer.cu
 src/_gui/PangolinViewer.cpp
+src/_utils/BoWDatabase.cpp
 src/_utils/PoseSolver.cpp
 src/_utils/ORBMatcher.cpp
 src/_utils/GlobalSettings.cpp

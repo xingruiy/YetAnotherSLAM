@@ -7,7 +7,7 @@
 #include "GlobalSettings.h"
 #include "LoopClosing.h"
 #include "BaseIOWrapper.h"
-#include "KeyFrameDatabase.h"
+#include "BoWDatabase.h"
 #include "ORBextractor.h"
 
 namespace slam
@@ -15,43 +15,25 @@ namespace slam
 
 FullSystem::FullSystem(const std::string &strSettingFile, const std::string &strVocFile)
 {
-    //Load Settings
     readSettings(strSettingFile);
-
-    //Load ORB Vocabulary
     OrbVoc = new ORBVocabulary();
     OrbVoc->loadFromBinaryFile(strVocFile);
-
     OrbExt = new ORBextractor();
-
-    //Create the Map
     mpMap = new Map();
-    // mpMapDrawer = new MapDrawer(mpMap);
-
-    //Create KeyFrame Database
-    mpKeyFrameDB = new KeyFrameDatabase(*OrbVoc);
-
+    mpKeyFrameDB = new BoWDatabase(*OrbVoc);
     loopCloser = new LoopClosing(mpMap, mpKeyFrameDB, OrbVoc);
-    std::thread *thd = new std::thread(&LoopClosing::Run, loopCloser);
-    allChildThreads.push_back(thd);
-
     localMapper = new LocalMapping(OrbVoc, mpMap);
     localMapper->SetLoopCloser(loopCloser);
     loopCloser->SetLocalMapper(localMapper);
-    thd = new std::thread(&LocalMapping::Run, localMapper);
-    allChildThreads.push_back(thd);
-
-    //Initialize the Tracking thread
     mpTracker = new Tracking(this, OrbVoc, mpMap, mpKeyFrameDB);
     mpTracker->SetLocalMapper(localMapper);
 
-    // if (g_bEnableViewer)
-    // {
-    //     mpViewer = new Viewer(this, mpMapDrawer);
-    //     thd = new std::thread(&Viewer::Run, mpViewer);
-    //     allChildThreads.push_back(thd);
-    //     mpTracker->setIOWrapper(mpViewer);
-    // }
+    // start threads
+    std::thread *thd = 0;
+    thd = new std::thread(&FullSystem::threadLocalMapping, this);
+    allChildThreads.push_back(thd);
+    thd = new std::thread(&FullSystem::threadLoopClosing, this);
+    allChildThreads.push_back(thd);
 }
 
 FullSystem::~FullSystem()
@@ -73,25 +55,62 @@ void FullSystem::addImages(cv::Mat img, cv::Mat depth, double ts)
     FrameMetaData *meta = new FrameMetaData();
     meta->id = allFrameHistory.size();
     meta->timestamp = ts;
+
+    Frame newF = Frame(img, depth, OrbExt, OrbVoc);
+    newF.meta = meta;
+
+    if (!hasInitialized)
+    {
+        hasInitialized = false;
+    }
+
     allFrameHistory.push_back(meta);
-
-    // Frame *newF = new Frame(img, depth, ts, ORBext, OrbVoc);
-    // newF->metaData = meta;
-    // if (mpViewer)
-    // {
-    //     // mpViewer->setLiveImage(img);
-    //     // mpViewer->setLiveDepth(depth);
-    // }
-    Frame currFrame = Frame(img, depth, OrbExt, OrbVoc);
-    currFrame.meta = meta;
-
-    mpTracker->trackNewFrame(currFrame);
-
-    traceKeyFramePoints();
+    mpTracker->trackNewFrame(newF);
 }
 
-void FullSystem::traceKeyFramePoints()
+void FullSystem::deliverTrackedFrame(Frame *newF, bool makeKF)
 {
+    if (makeKF)
+    {
+    }
+    else
+    {
+    }
+}
+
+void FullSystem::initSystem(Frame *newF)
+{
+    int N = newF->detectFeaturesInFrame();
+    if (N <= 500)
+        return;
+
+    for (int idx; idx < N; ++idx)
+    {
+        if (newF->mvuRight[idx] <= 0)
+            continue;
+
+        float x = newF->mvKeysUn[idx].pt.x;
+        float y = newF->mvKeysUn[idx].pt.y;
+        float z = newF->mvDepth[idx];
+    }
+
+    hasInitialized = true;
+}
+
+void FullSystem::trackFrameCoarse(Frame *newF)
+{
+}
+
+void FullSystem::threadLoopClosing()
+{
+    while (1)
+        loopCloser->Run();
+}
+
+void FullSystem::threadLocalMapping()
+{
+    while (1)
+        localMapper->Run();
 }
 
 void FullSystem::reset()
@@ -117,30 +136,15 @@ void FullSystem::shutdown()
 
 void FullSystem::addOutput(BaseIOWrapper *io)
 {
-    if (io)
-    {
-        io->setSystemIO(this);
-        io->setGlobalMap(mpMap);
-        outputs.push_back(io);
-    }
+    io->setSystemIO(this);
+    io->setGlobalMap(mpMap);
+    outputs.push_back(io);
 }
 
 void FullSystem::readSettings(const std::string &filename)
 {
     cv::FileStorage file(filename, cv::FileStorage::READ);
     RUNTIME_ASSERT(file.isOpened());
-
-    // read system configurations
-    g_bEnableViewer = (int)file["FullSystem.EnableViewer"] == 1;
-    g_bReverseRGB = (int)file["FullSystem.ReverseRGB"] == 1;
-    g_DepthScaleInv = 1.0 / (double)file["FullSystem.DepthScale"];
-
-    // read orb parameters
-    g_ORBScaleFactor = file["ORB_SLAM2.scaleFactor"];
-    g_ORBNFeatures = file["ORB_SLAM2.nFeatures"];
-    g_ORBNLevels = file["ORB_SLAM2.nLevels"];
-    g_ORBIniThFAST = file["ORB_SLAM2.iniThFAST"];
-    g_ORBMinThFAST = file["ORB_SLAM2.minThFAST"];
 
     // read calibration parameters
     int width = file["Calibration.width"];
@@ -166,32 +170,12 @@ void FullSystem::readSettings(const std::string &filename)
     g_distCoeff.at<float>(2) = file["UnDistortion.p1"];
     g_distCoeff.at<float>(3) = file["UnDistortion.p2"];
     const float k3 = file["UnDistortion.k3"];
+
     if (k3 != 0)
     {
         g_distCoeff.resize(5);
         g_distCoeff.at<float>(4) = k3;
     }
-
-    g_pointSize = file["Viewer.PointSize"];
-    g_bSystemRunning = (int)file["Viewer.StartWhenReady"] == 1;
-
-    std::cout << "===================================================\n"
-              << "The system is created with the following parameters:\n"
-              << "pyramid level - " << NUM_PYR << "\n";
-    for (int i = 0; i < NUM_PYR; ++i)
-    {
-        std::cout << "pyramid " << i << " -"
-                  << " width: " << g_width[i]
-                  << " height: " << g_height[i]
-                  << " fx: " << g_fx[i]
-                  << " fy: " << g_fy[i]
-                  << " cx: " << g_cx[i]
-                  << " cy: " << g_cy[i] << "\n";
-    }
-    std::cout << "camera baseline - " << g_bf / fx << "\n"
-              << "close point th - " << g_thDepth << "\n"
-              << "enable mpViewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
-              << "===================================================" << std::endl;
 }
 
 void FullSystem::FuseAllMapStruct()

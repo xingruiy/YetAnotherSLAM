@@ -19,7 +19,7 @@ class ORBextractor;
 class LoopClosing;
 class LocalMapping;
 class BaseIOWrapper;
-class KeyFrameDatabase;
+class BoWDatabase;
 struct FrameMetaData;
 
 class FullSystem
@@ -29,9 +29,11 @@ public:
     FullSystem(const std::string &strSettings, const std::string &strVoc);
     void reset();
     void shutdown();
+    void initSystem(Frame *newF);
     void addOutput(BaseIOWrapper *io);
 
     void addImages(cv::Mat img, cv::Mat depth, double timestamp);
+    void deliverTrackedFrame(Frame *newF, bool makeKF);
 
     void FuseAllMapStruct();
     void SaveTrajectoryTUM(const std::string &filename);
@@ -41,14 +43,27 @@ protected:
     void traceKeyFramePoints();
     void readSettings(const std::string &filename);
 
-    Map *mpMap;
-    Tracking *mpTracker;
-    LocalMapping *localMapper;
-    LoopClosing *loopCloser;
+    bool hasLost = false;
+    bool hasInitialized = false;
+    void trackFrameCoarse(Frame *newF);
 
-    KeyFrameDatabase *mpKeyFrameDB;
+    void threadLoopClosing();
+    void threadLocalMapping();
+
+    // ==== global feature map, protected by map mutex
+    Map *mpMap;
+
+    // ==== main tracking thread, taking care of frame pose
+    Tracking *mpTracker;
+
+    // ==== local mapping for local BA
+    LocalMapping *localMapper;
+
+    // ==== loop closure and global BA
+    LoopClosing *loopCloser;
     ORBVocabulary *OrbVoc;
     ORBextractor *OrbExt;
+    BoWDatabase *mpKeyFrameDB;
 
     std::vector<BaseIOWrapper *> outputs;
     std::vector<KeyFrame *> allKeyFramesHistory;

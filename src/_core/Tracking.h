@@ -10,7 +10,7 @@
 #include "MeshEngine.h"
 #include "CoarseTracking.h"
 #include "RayTracer.h"
-#include "KeyFrameDatabase.h"
+#include "BoWDatabase.h"
 
 namespace slam
 {
@@ -23,7 +23,7 @@ class LocalMapping;
 class Tracking
 {
 public:
-    Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB);
+    Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, BoWDatabase *pKFDB);
     void trackNewFrame(Frame &F);
     void reset();
 
@@ -67,7 +67,7 @@ protected:
 
     //BoW
     ORBVocabulary *OrbVoc;
-    KeyFrameDatabase *mpKeyFrameDB;
+    BoWDatabase *mpKeyFrameDB;
 
     //Local Map
     KeyFrame *mpReferenceKF;
@@ -83,7 +83,6 @@ protected:
     //Last Frame
     KeyFrame *mpLastKeyFrame;
     Frame lastFrame;
-    ORBextractor *ORBExt;
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastSuccessRelocFrameId;
 

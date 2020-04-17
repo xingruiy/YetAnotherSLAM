@@ -1,4 +1,6 @@
-#pragma once
+#ifndef _BOW_DATA_BASE_H
+#define _BOW_DATA_BASE_H
+
 #include <ORBVocabulary.h>
 #include <mutex>
 #include <vector>
@@ -11,10 +13,10 @@ namespace slam
 class KeyFrame;
 class Frame;
 
-class KeyFrameDatabase
+class BoWDatabase
 {
 public:
-    KeyFrameDatabase(const ORBVocabulary &voc);
+    BoWDatabase(const ORBVocabulary &voc);
     void add(KeyFrame *pKF);
     void erase(KeyFrame *pKF);
     void clear();
@@ -34,3 +36,5 @@ protected:
 };
 
 } // namespace slam
+
+#endif

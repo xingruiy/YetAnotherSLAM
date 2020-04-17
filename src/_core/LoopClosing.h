@@ -4,7 +4,7 @@
 #include "Map.h"
 #include "Tracking.h"
 #include "LocalMapping.h"
-#include "KeyFrameDatabase.h"
+#include "BoWDatabase.h"
 
 #include <thread>
 #include <sophus/se3.hpp>
@@ -16,7 +16,7 @@ class Map;
 class Tracking;
 class Map;
 class LocalMapping;
-class KeyFrameDatabase;
+class BoWDatabase;
 
 class LoopClosing
 {
@@ -27,7 +27,7 @@ public:
         KeyFrameAndPose;
 
 public:
-    LoopClosing(Map *mpMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc);
+    LoopClosing(Map *mpMap, BoWDatabase *pDB, ORBVocabulary *pVoc);
 
     void SetTracker(Tracking *pTracker);
 
@@ -71,7 +71,7 @@ private:
     Map *mpMap;
     Tracking *mpTracker;
 
-    KeyFrameDatabase *mpKeyFrameDB;
+    BoWDatabase *mpKeyFrameDB;
     ORBVocabulary *OrbVoc;
 
     LocalMapping *localMapper;

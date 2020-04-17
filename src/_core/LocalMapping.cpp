@@ -17,64 +17,52 @@ void LocalMapping::Run()
 {
     mbFinished = false;
 
-    while (!g_bSystemKilled)
+    SetAcceptKeyFrames(false);
+    if (CheckNewKeyFrames())
     {
-        // Tracking will see that Local Mapping is busy
-        SetAcceptKeyFrames(false);
+        ProcessNewKeyFrame();
+        MapPointCulling();
+        CreateNewMapPoints();
 
-        // Check if there are keyframes in the queue
-        if (CheckNewKeyFrames())
+        if (!CheckNewKeyFrames())
         {
-            // BoW conversion and insertion in Map
-            ProcessNewKeyFrame();
-
-            // Check recent MapPoints
-            MapPointCulling();
-
-            // Triangulate new MapPoints
-            CreateNewMapPoints();
-
-            if (!CheckNewKeyFrames())
-            {
-                // Find more matches in neighbor keyframes and fuse point duplications
-                SearchInNeighbors();
-            }
-
-            mbAbortBA = false;
-
-            if (!CheckNewKeyFrames() && !stopRequested())
-            {
-                // Local BA
-                if (mpMap->KeyFramesInMap() > 2)
-                    Optimizer::LocalBundleAdjustment(currKF, &mbAbortBA, mpMap);
-
-                // Check redundant local Keyframes
-                // KeyFrameCulling();
-            }
-
-            mpLoopCloser->InsertKeyFrame(currKF);
-        }
-        else if (Stop())
-        {
-            // Safe area to stop
-            while (isStopped() && !CheckFinish())
-            {
-                usleep(3000);
-            }
-            if (CheckFinish())
-                break;
+            SearchInNeighbors();
         }
 
-        ResetIfRequested();
+        mbAbortBA = false;
 
-        // Tracking will see that Local Mapping is busy
-        SetAcceptKeyFrames(true);
+        if (!CheckNewKeyFrames() && !stopRequested())
+        {
+            // Local BA
+            if (mpMap->KeyFramesInMap() > 2)
+                Optimizer::LocalBundleAdjustment(currKF, &mbAbortBA, mpMap);
 
-        if (CheckFinish())
-            break;
+            // Check redundant local Keyframes
+            KeyFrameCulling();
+        }
 
-        usleep(3000);
+        mpLoopCloser->InsertKeyFrame(currKF);
     }
+    else if (Stop())
+    {
+        // Safe area to stop
+        while (isStopped() && !CheckFinish())
+        {
+            usleep(3000);
+        }
+        if (CheckFinish())
+            return;
+    }
+
+    ResetIfRequested();
+
+    // Tracking will see that Local Mapping is busy
+    SetAcceptKeyFrames(true);
+
+    if (CheckFinish())
+        return;
+
+    usleep(3000);
 }
 
 bool LocalMapping::AcceptKeyFrames()

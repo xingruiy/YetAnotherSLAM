@@ -15,7 +15,7 @@ struct PointCloud
     std::vector<Eigen::Vector3f *> depthPyr;
 };
 
-Tracking::Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB)
+Tracking::Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, BoWDatabase *pKFDB)
     : OrbVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
       mpLastKeyFrame(nullptr), mpMap(mpMap), mnLastSuccessRelocFrameId(0)
 {
@@ -26,7 +26,6 @@ Tracking::Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFram
     mpTracker = new CoarseTracking(w, h, calib, g_bUseColour, g_bUseDepth);
     mpMeshEngine = new MeshEngine(20000000);
     rayTracer = new RayTracer(w, h, g_calib[0]);
-    ORBExt = new ORBextractor();
 }
 
 void Tracking::trackNewFrame(Frame &F)

@@ -1,18 +1,18 @@
 #include <mutex>
 #include "DBoW2/DBoW2/BowVector.h"
-#include "KeyFrameDatabase.h"
+#include "BoWDatabase.h"
 #include "KeyFrame.h"
 #include "Frame.h"
 
 namespace slam
 {
 
-KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : mpVoc(&voc)
+BoWDatabase::BoWDatabase(const ORBVocabulary &voc) : mpVoc(&voc)
 {
     mvInvertedFile.resize(voc.size());
 }
 
-void KeyFrameDatabase::add(KeyFrame *pKF)
+void BoWDatabase::add(KeyFrame *pKF)
 {
     std::unique_lock<std::mutex> lock(mMutex);
 
@@ -20,7 +20,7 @@ void KeyFrameDatabase::add(KeyFrame *pKF)
         mvInvertedFile[vit->first].push_back(pKF);
 }
 
-void KeyFrameDatabase::erase(KeyFrame *pKF)
+void BoWDatabase::erase(KeyFrame *pKF)
 {
     std::unique_lock<std::mutex> lock(mMutex);
 
@@ -40,13 +40,13 @@ void KeyFrameDatabase::erase(KeyFrame *pKF)
     }
 }
 
-void KeyFrameDatabase::clear()
+void BoWDatabase::clear()
 {
     mvInvertedFile.clear();
     mvInvertedFile.resize(mpVoc->size());
 }
 
-std::vector<KeyFrame *> KeyFrameDatabase::DetectLoopCandidates(KeyFrame *pKF, float minScore)
+std::vector<KeyFrame *> BoWDatabase::DetectLoopCandidates(KeyFrame *pKF, float minScore)
 {
     std::set<KeyFrame *> spConnectedKeyFrames = pKF->GetConnectedKeyFrames();
     std::list<KeyFrame *> lKFsSharingWords;
@@ -165,7 +165,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectLoopCandidates(KeyFrame *pKF, fl
     return vpLoopCandidates;
 }
 
-std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F)
+std::vector<KeyFrame *> BoWDatabase::DetectRelocalizationCandidates(Frame *F)
 {
     std::list<KeyFrame *> lKFsSharingWords;
 

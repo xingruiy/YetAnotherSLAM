@@ -8,7 +8,7 @@
 #include "Frame.h"
 #include "VoxelMap.h"
 #include "MapPoint.h"
-#include "KeyFrameDatabase.h"
+#include "BoWDatabase.h"
 
 namespace slam
 {
@@ -16,12 +16,12 @@ namespace slam
 class Map;
 class Frame;
 class MapPoint;
-class KeyFrameDatabase;
+class BoWDatabase;
 
 class KeyFrame
 {
 public:
-    KeyFrame(const Frame &F, Map *mpMap, KeyFrameDatabase *pKFDB);
+    KeyFrame(const Frame &F, Map *mpMap, BoWDatabase *pKFDB);
 
     // Pose functions
     void SetPose(const Sophus::SE3d &Tcw);
@@ -162,7 +162,7 @@ protected:
     std::vector<MapPoint *> mvpMapPoints;
 
     // BoW
-    KeyFrameDatabase *mpKeyFrameDB;
+    BoWDatabase *mpKeyFrameDB;
     ORBVocabulary *OrbVoc;
 
     // Grid over the image to speed up feature matching

@@ -7,7 +7,7 @@
 namespace slam
 {
 
-LoopClosing::LoopClosing(Map *mpMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
+LoopClosing::LoopClosing(Map *mpMap, BoWDatabase *pDB, ORBVocabulary *pVoc)
     : mpMap(mpMap), mpKeyFrameDB(pDB), OrbVoc(pVoc), mLastLoopKFid(0),
       mpThreadGBA(nullptr), mbRunningGBA(false), mnFullBAIdx(0)
 {
@@ -21,18 +21,10 @@ void LoopClosing::SetLocalMapper(LocalMapping *pLocalMapper)
 
 void LoopClosing::Run()
 {
-    while (!g_bSystemKilled)
-    {
-        if (CheckNewKeyFrames())
-        {
-            if (DetectLoop())
-            {
-                if (ComputeSE3())
-                    // Perform loop fusion and pose graph optimization
-                    CorrectLoop();
-            }
-        }
-    }
+    if (CheckNewKeyFrames())
+        if (DetectLoop())
+            if (ComputeSE3())
+                CorrectLoop();
 }
 
 void LoopClosing::InsertKeyFrame(KeyFrame *pKF)
