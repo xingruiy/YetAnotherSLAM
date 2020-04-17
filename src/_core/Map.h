@@ -20,6 +20,7 @@ class Map
 {
 public:
     Map();
+    void reset();
 
     void AddKeyFrame(KeyFrame *pKF);
     void AddMapPoint(MapPoint *pMP);
@@ -41,7 +42,6 @@ public:
     int MapPointsInMap();
     int KeyFramesInMap();
     int GetMaxKFid();
-    void reset();
 
     std::vector<KeyFrame *> mvpKeyFrameOrigins;
     MapStruct *mpMapStructOrigin;

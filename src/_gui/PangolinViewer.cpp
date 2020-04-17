@@ -182,8 +182,6 @@ void PangolinViewer::setSystemIO(FullSystem *fs)
 void PangolinViewer::publishLiveFrame(Frame *newF)
 {
     liveFramePose = newF->mTcw.matrix().cast<float>();
-    cout << "==== live frame pose:" << endl
-         << liveFramePose << endl;
 }
 
 } // namespace slam

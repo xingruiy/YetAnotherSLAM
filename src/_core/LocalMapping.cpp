@@ -119,10 +119,7 @@ void LocalMapping::ProcessNewKeyFrame()
         mlNewKeyFrames.pop_front();
     }
 
-    // Compute Bags of Words structures
     currKF->ComputeBoW();
-
-    // Associate MapPoints to the new keyframe and update normal and descriptor
     const auto vpMapPointMatches = currKF->GetMapPointMatches();
 
     for (size_t i = 0; i < vpMapPointMatches.size(); i++)
@@ -146,10 +143,7 @@ void LocalMapping::ProcessNewKeyFrame()
         }
     }
 
-    // Update links in the Covisibility Graph
     currKF->UpdateConnections();
-
-    // Insert Keyframe in Map
     mpMap->AddKeyFrame(currKF);
 }
 
@@ -157,7 +151,7 @@ void LocalMapping::MapPointCulling()
 {
     // Check Recent Added MapPoints
     std::list<MapPoint *>::iterator lit = mlpRecentAddedMapPoints.begin();
-    const unsigned long int nCurrentKFid = currKF->mnId;
+    const int nCurrentKFid = currKF->mnId;
 
     const int cnThObs = 3;
     while (lit != mlpRecentAddedMapPoints.end())
@@ -181,10 +175,6 @@ void LocalMapping::MapPointCulling()
 
 void LocalMapping::KeyFrameCulling()
 {
-    // Check redundant keyframes (only local keyframes)
-    // A keyframe is considered redundant if the 90% of the MapPoints it sees, are seen
-    // in at least other 3 keyframes (in the same or finer scale)
-    // We only consider close stereo points
     auto vpLocalKeyFrames = currKF->GetVectorCovisibleKeyFrames();
     for (auto vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
     {

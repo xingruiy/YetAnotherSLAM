@@ -16,7 +16,7 @@ class Frame;
 class BoWDatabase
 {
 public:
-    BoWDatabase(const ORBVocabulary &voc);
+    BoWDatabase(ORBVocabulary *voc);
     void add(KeyFrame *pKF);
     void erase(KeyFrame *pKF);
     void clear();

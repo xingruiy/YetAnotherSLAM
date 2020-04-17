@@ -637,7 +637,6 @@ void Tracking::CreateNewKeyFrame()
 
     mpCurrVoxelMap->RayTrace(currFrame.mTcp);
     currFrame.mImDepth = cv::Mat(mpCurrVoxelMap->GetRayTracingResultDepth());
-    cv::imshow("currFrame.mImDepth", currFrame.mImDepth);
     currFrame.detectFeaturesInFrame();
     currFrame.mTcw = mpReferenceKF->GetPose() * currFrame.mTcp;
 
@@ -654,9 +653,6 @@ void Tracking::CreateNewKeyFrame()
     currFrame.mTcp = Sophus::SE3d();
     localMapper->InsertKeyFrame(mpReferenceKF);
     localMapper->SetNotStop(false);
-
-    // if (mpViewer)
-    //     mpViewer->setKeyFrameImage(currFrame.mImGray, currFrame.mvKeys);
 
     createNewVoxelMap();
 }

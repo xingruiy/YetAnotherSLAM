@@ -94,7 +94,7 @@ public:
 
     // RayTrace Engine
     RayTracer *rayTracer;
-    unsigned long int mnLastFusedFrameId;
+    int mnLastFusedFrameId;
 
     uint GetVisibleBlocks();
     void ResetVisibleBlocks();

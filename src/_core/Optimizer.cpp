@@ -22,7 +22,7 @@ g2o::SE3Quat Optimizer::ToSE3Quat(const Sophus::SE3d &Tcw)
     return g2o::SE3Quat(R, t);
 }
 
-void Optimizer::GlobalBundleAdjustemnt(Map *mpMap, int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+void Optimizer::GlobalBundleAdjustemnt(Map *mpMap, int nIterations, bool *pbStopFlag, const int nLoopKF, const bool bRobust)
 {
     std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
     std::vector<MapPoint *> vpMP = mpMap->GetAllMapPoints();
@@ -30,7 +30,7 @@ void Optimizer::GlobalBundleAdjustemnt(Map *mpMap, int nIterations, bool *pbStop
 }
 
 void Optimizer::BundleAdjustment(const std::vector<KeyFrame *> &vpKFs, const std::vector<MapPoint *> &vpMP,
-                                 int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+                                 int nIterations, bool *pbStopFlag, const int nLoopKF, const bool bRobust)
 {
     std::vector<bool> vbNotIncludedMP;
     vbNotIncludedMP.resize(vpMP.size());
@@ -412,7 +412,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag, Map *mpMa
     if (pbStopFlag)
         optimizer.setForceStopFlag(pbStopFlag);
 
-    unsigned long maxKFid = 0;
+    int maxKFid = 0;
 
     // Set Local KeyFrame vertices
     for (auto lit = lLocalKeyFrames.begin(), lend = lLocalKeyFrames.end(); lit != lend; lit++)

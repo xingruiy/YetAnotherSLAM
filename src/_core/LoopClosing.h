@@ -40,8 +40,7 @@ public:
 
     void RequestReset();
 
-    // This function will run in a separate thread
-    void RunGlobalBundleAdjustment(unsigned long nLoopKF);
+    void RunGlobalBundleAdjustment(int nLoopKF);
 
     bool isRunningGBA()
     {
@@ -49,23 +48,13 @@ public:
         return mbRunningGBA;
     }
 
-    bool isFinishedGBA()
-    {
-        std::unique_lock<std::mutex> lock(mMutexGBA);
-        return mbFinishedGBA;
-    }
-
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
     bool CheckNewKeyFrames();
-
     bool DetectLoop();
-
     bool ComputeSE3();
-
     void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap);
-
     void CorrectLoop();
 
     Map *mpMap;

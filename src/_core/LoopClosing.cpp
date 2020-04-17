@@ -530,7 +530,7 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
     }
 }
 
-void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
+void LoopClosing::RunGlobalBundleAdjustment(int nLoopKF)
 {
     std::cout << "Starting Global Bundle Adjustment" << std::endl;
 

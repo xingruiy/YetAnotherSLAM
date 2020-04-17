@@ -7,9 +7,9 @@
 namespace slam
 {
 
-BoWDatabase::BoWDatabase(const ORBVocabulary &voc) : mpVoc(&voc)
+BoWDatabase::BoWDatabase(ORBVocabulary *voc) : mpVoc(voc)
 {
-    mvInvertedFile.resize(voc.size());
+    mvInvertedFile.resize(voc->size());
 }
 
 void BoWDatabase::add(KeyFrame *pKF)

@@ -20,7 +20,7 @@ FullSystem::FullSystem(const std::string &strSettingFile, const std::string &str
     OrbVoc->loadFromBinaryFile(strVocFile);
     OrbExt = new ORBextractor();
     mpMap = new Map();
-    KFDB = new BoWDatabase(*OrbVoc);
+    KFDB = new BoWDatabase(OrbVoc);
     loopCloser = new LoopClosing(mpMap, KFDB, OrbVoc);
     localMapper = new LocalMapping(OrbVoc, mpMap);
     localMapper->SetLoopCloser(loopCloser);
@@ -55,6 +55,7 @@ void FullSystem::addImages(cv::Mat img, cv::Mat depth, double ts)
     FrameMetaData *meta = new FrameMetaData();
     meta->id = allFrameHistory.size();
     meta->timestamp = ts;
+    allFrameHistory.push_back(meta);
 
     Frame newF = Frame(img, depth, OrbExt, OrbVoc);
     newF.meta = meta;
@@ -62,9 +63,9 @@ void FullSystem::addImages(cv::Mat img, cv::Mat depth, double ts)
     if (!hasInitialized)
     {
         hasInitialized = false;
+        initSystem(&newF);
     }
 
-    allFrameHistory.push_back(meta);
     localTracker->trackNewFrame(newF);
 
     for (auto io : outputs)

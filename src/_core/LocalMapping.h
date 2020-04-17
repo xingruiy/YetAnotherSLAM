@@ -36,12 +36,8 @@ public:
     void SetAcceptKeyFrames(bool flag);
     bool SetNotStop(bool flag);
 
-    void InterruptBA();
-
     void RequestFinish();
     bool isFinished();
-
-    void blockUntilReset();
 
     int KeyframesInQueue()
     {
