@@ -4,8 +4,7 @@
 namespace slam
 {
 
-System::System(const std::string &strSettingFile, const std::string &strVocFile)
-    : mpViewer(0)
+System::System(const std::string &strSettingFile, const std::string &strVocFile) : mpViewer(0)
 {
     //Load Settings
     readSettings(strSettingFile);
@@ -38,7 +37,6 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
         mpViewer = new Viewer(this, mpMapDrawer);
         mpViewerThread = new std::thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
-        mpLocalMapper->SetViewer(mpViewer);
     }
 }
 

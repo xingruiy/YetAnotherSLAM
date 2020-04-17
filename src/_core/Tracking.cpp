@@ -9,7 +9,7 @@ namespace slam
 
 Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB)
     : mState(SYSTEM_NOT_READY), ORBVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
-      mpCurrentKeyFrame(nullptr), mpLastKeyFrame(nullptr), mpMap(mpMap), mnLastSuccessRelocFrameId(0)
+      mpLastKeyFrame(nullptr), mpMap(mpMap), mnLastSuccessRelocFrameId(0)
 {
     int w = g_width[0];
     int h = g_height[0];
@@ -17,7 +17,7 @@ Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDat
 
     mpTracker = new CoarseTracking(w, h, calib, g_bUseColour, g_bUseDepth);
     mpMeshEngine = new MeshEngine(20000000);
-    mpRayTraceEngine = new RayTraceEngine(w, h, g_calib[0]);
+    rayTracer = new RayTracer(w, h, g_calib[0]);
     mpORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
 }
 
@@ -136,7 +136,7 @@ void Tracking::initSystem()
         // Create dense map struct
         mpCurrVoxelMap = new MapStruct(g_calib[0]);
         mpCurrVoxelMap->SetMeshEngine(mpMeshEngine);
-        mpCurrVoxelMap->SetRayTraceEngine(mpRayTraceEngine);
+        mpCurrVoxelMap->SetRayTraceEngine(rayTracer);
         mpCurrVoxelMap->create(15000, 12000, 12500, 0.007, 0.03);
         mpCurrVoxelMap->Reset();
 
@@ -729,7 +729,7 @@ void Tracking::createNewVoxelMap()
     mpCurrVoxelMap = new MapStruct(g_calib[0]);
     mpCurrVoxelMap->SetActiveFlag(true);
     mpCurrVoxelMap->SetMeshEngine(mpMeshEngine);
-    mpCurrVoxelMap->SetRayTraceEngine(mpRayTraceEngine);
+    mpCurrVoxelMap->SetRayTraceEngine(rayTracer);
     mpCurrVoxelMap->create(15000, 12000, 12500, 0.007, 0.03);
     mpCurrVoxelMap->Reset();
     mpReferenceKF->mpVoxelStruct = mpCurrVoxelMap;

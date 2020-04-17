@@ -191,8 +191,6 @@ protected:
 public:
     Map *mpMap;
 
-    long unsigned int GetMapId();
-
     // The original image for visualization
     cv::Mat mImg;
     cv::Mat mDepth;

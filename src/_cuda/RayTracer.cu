@@ -1,5 +1,5 @@
-#include "RayTraceEngine.h"
-#include "CudaUtils.h"
+#include "RayTracer.h"
+#include "cudaGlobalFuncs.h"
 #include "VoxelStructUtils.h"
 #include "ParallelScan.h"
 
@@ -8,8 +8,9 @@
 #define RENDERING_BLOCK_SUB_SAMPLE 8
 #define MAX_RENDERING_BLOCK 100000
 
-RayTraceEngine::RayTraceEngine(int w, int h, const Eigen::Matrix3f &K)
-    : w(w), h(h)
+RayTracer::RayTracer(int w, int h, const Eigen::Matrix3f &K)
+    : w(w),
+      h(h)
 {
     fx = K(0, 0);
     fy = K(1, 1);
@@ -28,28 +29,28 @@ RayTraceEngine::RayTraceEngine(int w, int h, const Eigen::Matrix3f &K)
     SafeCall(cudaMalloc(&mplRenderingBlockList, sizeof(RenderingBlock) * MAX_RENDERING_BLOCK));
 }
 
-RayTraceEngine::~RayTraceEngine()
+RayTracer::~RayTracer()
 {
     SafeCall(cudaFree(mpNumVisibleBlocks));
     SafeCall(cudaFree(mpNumRenderingBlocks));
     SafeCall(cudaFree(mplRenderingBlockList));
 }
 
-uint RayTraceEngine::GetNumVisibleBlock()
+uint RayTracer::GetNumVisibleBlock()
 {
     uint temp;
     SafeCall(cudaMemcpy(&temp, mpNumVisibleBlocks, sizeof(uint), cudaMemcpyDeviceToHost));
     return temp;
 }
 
-uint RayTraceEngine::GetNumRenderingBlocks()
+uint RayTracer::GetNumRenderingBlocks()
 {
     uint temp;
     SafeCall(cudaMemcpy(&temp, mpNumRenderingBlocks, sizeof(uint), cudaMemcpyDeviceToHost));
     return temp;
 }
 
-void RayTraceEngine::Reset()
+void RayTracer::Reset()
 {
     SafeCall(cudaMemset(mpNumVisibleBlocks, 0, sizeof(uint)));
     SafeCall(cudaMemset(mpNumRenderingBlocks, 0, sizeof(uint)));
@@ -67,12 +68,12 @@ struct RenderingBlockDelegate
     uint visible_block_count;
 
     HashEntry *visibleEntry;
-    RayTraceEngine::RenderingBlock *listRenderingBlock;
+    RayTracer::RenderingBlock *listRenderingBlock;
 
     mutable cv::cuda::PtrStepSz<float> zRangeX;
     mutable cv::cuda::PtrStep<float> zRangeY;
 
-    __device__ __forceinline__ bool createRenderingBlock(const Eigen::Vector3i &blockPos, RayTraceEngine::RenderingBlock &block) const
+    __device__ __forceinline__ bool createRenderingBlock(const Eigen::Vector3i &blockPos, RayTracer::RenderingBlock &block) const
     {
         block.upper_left = Eigen::Matrix<short, 2, 1>(zRangeX.cols, zRangeX.rows);
         block.lower_right = Eigen::Matrix<short, 2, 1>(-1, -1);
@@ -124,7 +125,7 @@ struct RenderingBlockDelegate
         return true;
     }
 
-    __device__ __forceinline__ void splitRenderingBlock(int offset, const RayTraceEngine::RenderingBlock &block, int &nx, int &ny) const
+    __device__ __forceinline__ void splitRenderingBlock(int offset, const RayTracer::RenderingBlock &block, int &nx, int &ny) const
     {
         for (int y = 0; y < ny; ++y)
         {
@@ -132,7 +133,7 @@ struct RenderingBlockDelegate
             {
                 if (offset < MAX_RENDERING_BLOCK)
                 {
-                    RayTraceEngine::RenderingBlock &b(listRenderingBlock[offset++]);
+                    RayTracer::RenderingBlock &b(listRenderingBlock[offset++]);
                     b.upper_left(0) = block.upper_left(0) + x * RENDERING_BLOCK_SIZE_X;
                     b.upper_left(1) = block.upper_left(1) + y * RENDERING_BLOCK_SIZE_Y;
                     b.lower_right(0) = block.upper_left(0) + (x + 1) * RENDERING_BLOCK_SIZE_X;
@@ -153,7 +154,7 @@ struct RenderingBlockDelegate
 
         bool valid = false;
         uint requiredNoBlocks = 0;
-        RayTraceEngine::RenderingBlock block;
+        RayTracer::RenderingBlock block;
         int nx, ny;
 
         if (x < visible_block_count && visibleEntry[x].ptr != -1)
@@ -185,7 +186,7 @@ struct FillRenderingBlockFunctor
 {
     mutable cv::cuda::PtrStepSz<float> zRangeX;
     mutable cv::cuda::PtrStep<float> zRangeY;
-    RayTraceEngine::RenderingBlock *listRenderingBlock;
+    RayTracer::RenderingBlock *listRenderingBlock;
 
     __device__ __forceinline__ void operator()() const
     {
@@ -196,7 +197,7 @@ struct FillRenderingBlockFunctor
         if (block >= MAX_RENDERING_BLOCK)
             return;
 
-        RayTraceEngine::RenderingBlock &b(listRenderingBlock[block]);
+        RayTracer::RenderingBlock &b(listRenderingBlock[block]);
 
         int xpos = b.upper_left(0) + x;
         if (xpos > b.lower_right(0) || xpos >= zRangeX.cols)
@@ -213,7 +214,7 @@ struct FillRenderingBlockFunctor
     }
 };
 
-void RayTraceEngine::UpdateRenderingBlocks(MapStruct *pMS, const Sophus::SE3d &Tcw)
+void RayTracer::UpdateRenderingBlocks(MapStruct *pMS, const Sophus::SE3d &Tcw)
 {
     uint nBlocks = pMS->CheckNumVisibleBlocks(w, h, Tcw);
     if (nBlocks == 0)
@@ -409,7 +410,7 @@ struct MapRenderingDelegate
     }
 };
 
-void RayTraceEngine::RayTrace(MapStruct *pMapStruct, const Sophus::SE3d &Tcm)
+void RayTracer::RayTrace(MapStruct *pMapStruct, const Sophus::SE3d &Tcm)
 {
     if (pMapStruct)
     {
@@ -449,7 +450,7 @@ void RayTraceEngine::RayTrace(MapStruct *pMapStruct, const Sophus::SE3d &Tcm)
     }
 }
 
-cv::cuda::GpuMat RayTraceEngine::GetVMap()
+cv::cuda::GpuMat RayTracer::GetVMap()
 {
     return mTracedvmap;
 }

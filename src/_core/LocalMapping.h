@@ -43,17 +43,11 @@ class LocalMapping
 {
 public:
     LocalMapping(ORBVocabulary *pVoc, Map *mpMap);
-
     void SetLoopCloser(LoopClosing *pLoopCloser);
 
-    void SetViewer(Viewer *pViewer);
-
-    // Main function
     void Run();
-
     void InsertKeyFrame(KeyFrame *pKF);
 
-    // Thread Synch
     void RequestStop();
     void RequestReset();
     bool Stop();
@@ -75,25 +69,15 @@ public:
         return mlNewKeyFrames.size();
     }
 
-    // Customised functions
-public:
-    void SetMapPointsToCheck(const std::vector<MapPoint *> &vpLocalPoints);
-
 private:
     bool CheckNewKeyFrames();
     void ProcessNewKeyFrame();
     void CreateNewMapPoints();
-
     void MapPointCulling();
     void SearchInNeighbors();
-
     void KeyFrameCulling();
-
-    cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
-
-    cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
-
     void ResetIfRequested();
+
     bool mbResetRequested;
     std::mutex mMutexReset;
 
@@ -103,17 +87,13 @@ private:
     bool mbFinished;
     std::mutex mMutexFinish;
 
-    // Map *mpMap;
     Map *mpMap;
+    KeyFrame *currKF;
 
     LoopClosing *mpLoopCloser;
 
     std::list<KeyFrame *> mlNewKeyFrames;
-
-    KeyFrame *mpCurrentKeyFrame;
-
     std::list<MapPoint *> mlpRecentAddedMapPoints;
-
     std::mutex mMutexNewKFs;
 
     bool mbAbortBA;
@@ -125,12 +105,6 @@ private:
 
     bool mbAcceptKeyFrames;
     std::mutex mMutexAccept;
-
-    // new members
-protected:
-    Viewer *mpViewer;
-    cv::Mat mImg;
-    std::vector<MapPoint *> mvpLocalMapPoints;
 };
 
 } // namespace slam

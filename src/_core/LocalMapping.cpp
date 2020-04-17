@@ -46,13 +46,13 @@ void LocalMapping::Run()
             {
                 // Local BA
                 if (mpMap->KeyFramesInMap() > 2)
-                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
+                    Optimizer::LocalBundleAdjustment(currKF, &mbAbortBA, mpMap);
 
                 // Check redundant local Keyframes
                 // KeyFrameCulling();
             }
 
-            mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+            mpLoopCloser->InsertKeyFrame(currKF);
         }
         else if (Stop())
         {
@@ -106,11 +106,6 @@ void LocalMapping::SetLoopCloser(LoopClosing *pLoopCloser)
     mpLoopCloser = pLoopCloser;
 }
 
-void LocalMapping::SetViewer(Viewer *pViewer)
-{
-    mpViewer = pViewer;
-}
-
 void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
 {
     std::unique_lock<std::mutex> lock(mMutexNewKFs);
@@ -128,15 +123,15 @@ void LocalMapping::ProcessNewKeyFrame()
 {
     {
         std::unique_lock<std::mutex> lock(mMutexNewKFs);
-        mpCurrentKeyFrame = mlNewKeyFrames.front();
+        currKF = mlNewKeyFrames.front();
         mlNewKeyFrames.pop_front();
     }
 
     // Compute Bags of Words structures
-    mpCurrentKeyFrame->ComputeBoW();
+    currKF->ComputeBoW();
 
     // Associate MapPoints to the new keyframe and update normal and descriptor
-    const auto vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
+    const auto vpMapPointMatches = currKF->GetMapPointMatches();
 
     for (size_t i = 0; i < vpMapPointMatches.size(); i++)
     {
@@ -145,9 +140,9 @@ void LocalMapping::ProcessNewKeyFrame()
         {
             if (!pMP->isBad())
             {
-                if (!pMP->IsInKeyFrame(mpCurrentKeyFrame))
+                if (!pMP->IsInKeyFrame(currKF))
                 {
-                    pMP->AddObservation(mpCurrentKeyFrame, i);
+                    pMP->AddObservation(currKF, i);
                     pMP->UpdateNormalAndDepth();
                     pMP->ComputeDistinctiveDescriptors();
                 }
@@ -160,17 +155,17 @@ void LocalMapping::ProcessNewKeyFrame()
     }
 
     // Update links in the Covisibility Graph
-    mpCurrentKeyFrame->UpdateConnections();
+    currKF->UpdateConnections();
 
     // Insert Keyframe in Map
-    mpMap->AddKeyFrame(mpCurrentKeyFrame);
+    mpMap->AddKeyFrame(currKF);
 }
 
 void LocalMapping::MapPointCulling()
 {
     // Check Recent Added MapPoints
     std::list<MapPoint *>::iterator lit = mlpRecentAddedMapPoints.begin();
-    const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
+    const unsigned long int nCurrentKFid = currKF->mnId;
 
     const int cnThObs = 3;
     while (lit != mlpRecentAddedMapPoints.end())
@@ -190,49 +185,6 @@ void LocalMapping::MapPointCulling()
         else
             lit++;
     }
-
-    // std::cout << mlpRecentAddedMapPoints.size() << std::endl;
-
-    // while (lit != mlpRecentAddedMapPoints.end())
-    // {
-    //     MapPoint *pMP = *lit;
-    //     if (pMP->isBad())
-    //     {
-    //         lit = mlpRecentAddedMapPoints.erase(lit);
-    //     }
-    //     else if (pMP->GetFoundRatio() < 0.25f)
-    //     {
-    //         pMP->SetBadFlag();
-    //         lit = mlpRecentAddedMapPoints.erase(lit);
-    //     }
-    //     else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 2 && pMP->Observations() <= cnThObs)
-    //     {
-    //         pMP->SetBadFlag();
-    //         lit = mlpRecentAddedMapPoints.erase(lit);
-    //     }
-    //     else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 3)
-    //         lit = mlpRecentAddedMapPoints.erase(lit);
-    //     else
-    //         lit++;
-    // }
-
-    // Check points created by error
-    // unsigned long int KFId = mpCurrentKeyFrame->mnId;
-    // unsigned long int FrameId = mpCurrentKeyFrame->mnFrameId;
-    // for (auto vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; ++vit)
-    // {
-    //     MapPoint *pMP = *vit;
-    //     if (pMP && pMP->Observations() < 3)
-    //     {
-    //         KeyFrame *pRefKF = pMP->GetReferenceKeyFrame();
-    //         if (pRefKF && pRefKF->mnId < KFId - 3)
-    //             if (pMP->GetFoundRatio() < 0.1f)
-    //             {
-    //                 pMP->SetBadFlag();
-    //                 mpMap->EraseMapPoint(pMP);
-    //             }
-    //     }
-    // }
 }
 
 void LocalMapping::KeyFrameCulling()
@@ -241,7 +193,7 @@ void LocalMapping::KeyFrameCulling()
     // A keyframe is considered redundant if the 90% of the MapPoints it sees, are seen
     // in at least other 3 keyframes (in the same or finer scale)
     // We only consider close stereo points
-    auto vpLocalKeyFrames = mpCurrentKeyFrame->GetVectorCovisibleKeyFrames();
+    auto vpLocalKeyFrames = currKF->GetVectorCovisibleKeyFrames();
     for (auto vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
     {
         KeyFrame *pKF = *vit;
@@ -298,7 +250,7 @@ void LocalMapping::KeyFrameCulling()
 void LocalMapping::SearchInNeighbors()
 {
     // Retrieve neighbor keyframes
-    const auto vpNeighKFs = mpCurrentKeyFrame->GetBestCovisibilityKeyFrames(10);
+    const auto vpNeighKFs = currKF->GetBestCovisibilityKeyFrames(10);
 
     if (vpNeighKFs.size() == 0)
         return;
@@ -307,17 +259,17 @@ void LocalMapping::SearchInNeighbors()
     for (auto vit = vpNeighKFs.begin(), vend = vpNeighKFs.end(); vit != vend; vit++)
     {
         KeyFrame *pKFi = *vit;
-        if (pKFi->isBad() || pKFi->mnFuseTargetForKF == mpCurrentKeyFrame->mnId)
+        if (pKFi->isBad() || pKFi->mnFuseTargetForKF == currKF->mnId)
             continue;
         vpTargetKFs.push_back(pKFi);
-        pKFi->mnFuseTargetForKF = mpCurrentKeyFrame->mnId;
+        pKFi->mnFuseTargetForKF = currKF->mnId;
 
         // Extend to some second neighbors
         const auto vpSecondNeighKFs = pKFi->GetBestCovisibilityKeyFrames(5);
         for (auto vit2 = vpSecondNeighKFs.begin(), vend2 = vpSecondNeighKFs.end(); vit2 != vend2; vit2++)
         {
             KeyFrame *pKFi2 = *vit2;
-            if (pKFi2->isBad() || pKFi2->mnFuseTargetForKF == mpCurrentKeyFrame->mnId || pKFi2->mnId == mpCurrentKeyFrame->mnId)
+            if (pKFi2->isBad() || pKFi2->mnFuseTargetForKF == currKF->mnId || pKFi2->mnId == currKF->mnId)
                 continue;
             vpTargetKFs.push_back(pKFi2);
         }
@@ -325,7 +277,7 @@ void LocalMapping::SearchInNeighbors()
 
     // Search matches by projection from current KF in target KFs
     ORBMatcher matcher;
-    auto vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
+    auto vpMapPointMatches = currKF->GetMapPointMatches();
     for (auto vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
     {
         KeyFrame *pKFi = *vit;
@@ -345,17 +297,17 @@ void LocalMapping::SearchInNeighbors()
             MapPoint *pMP = *vitMP;
             if (!pMP)
                 continue;
-            if (pMP->isBad() || pMP->mnFuseCandidateForKF == mpCurrentKeyFrame->mnId)
+            if (pMP->isBad() || pMP->mnFuseCandidateForKF == currKF->mnId)
                 continue;
-            pMP->mnFuseCandidateForKF = mpCurrentKeyFrame->mnId;
+            pMP->mnFuseCandidateForKF = currKF->mnId;
             vpFuseCandidates.push_back(pMP);
         }
     }
 
-    matcher.Fuse(mpCurrentKeyFrame, vpFuseCandidates);
+    matcher.Fuse(currKF, vpFuseCandidates);
 
     // Update points
-    vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
+    vpMapPointMatches = currKF->GetMapPointMatches();
     for (size_t i = 0, iend = vpMapPointMatches.size(); i < iend; i++)
     {
         MapPoint *pMP = vpMapPointMatches[i];
@@ -370,7 +322,7 @@ void LocalMapping::SearchInNeighbors()
     }
 
     // Update connections in covisibility graph
-    mpCurrentKeyFrame->UpdateConnections();
+    currKF->UpdateConnections();
 }
 
 void LocalMapping::CreateNewMapPoints()
@@ -465,13 +417,6 @@ bool LocalMapping::isFinished()
 {
     std::unique_lock<std::mutex> lock(mMutexFinish);
     return mbFinished;
-}
-
-// Customisation
-
-void LocalMapping::SetMapPointsToCheck(const std::vector<MapPoint *> &vpLocalPoints)
-{
-    mvpLocalMapPoints = vpLocalPoints;
 }
 
 } // namespace slam

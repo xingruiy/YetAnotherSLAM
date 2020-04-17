@@ -7,14 +7,14 @@
 #include <opencv2/opencv.hpp>
 #include <sophus/se3.hpp>
 #include "MeshEngine.h"
-#include "RayTraceEngine.h"
+#include "RayTracer.h"
 
 #define BlockSize 8
 #define BlockSize3 512
 #define BlockSizeSubOne 7
 
 class MeshEngine;
-class RayTraceEngine;
+class RayTracer;
 
 struct HashEntry
 {
@@ -44,7 +44,7 @@ public:
     void SetPose(Sophus::SE3d &Tcw);
 
     void SetMeshEngine(MeshEngine *pMeshEngine);
-    void SetRayTraceEngine(RayTraceEngine *pRayTraceEngine);
+    void SetRayTraceEngine(RayTracer *pRayTraceEngine);
     void Reset();
     bool Empty();
 
@@ -93,7 +93,7 @@ public:
     cv::cuda::GpuMat GetRayTracingResultDepth();
 
     // RayTrace Engine
-    RayTraceEngine *mpRayTraceEngine;
+    RayTracer *rayTracer;
     unsigned long int mnLastFusedFrameId;
 
     uint GetVisibleBlocks();

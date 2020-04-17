@@ -1,6 +1,6 @@
 #include "MeshEngine.h"
 #include "VoxelStructUtils.h"
-#include "CudaUtils.h"
+#include "cudaGlobalFuncs.h"
 #include "ParallelScan.h"
 #include "TriangleTable.h"
 

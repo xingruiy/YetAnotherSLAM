@@ -59,7 +59,6 @@ public:
     long unsigned int mnId;
     static long unsigned int nNextId;
     long int mnFirstKFid;
-    long int mnFirstFrame;
     long unsigned int mnLastFrameSeen;
     int nObs;
 

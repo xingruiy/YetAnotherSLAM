@@ -1,5 +1,5 @@
 #include "VoxelMap.h"
-#include "CudaUtils.h"
+#include "cudaGlobalFuncs.h"
 #include "ImageProc.h"
 #include "ParallelScan.h"
 #include "VoxelStructUtils.h"
@@ -158,9 +158,9 @@ void MapStruct::SetMeshEngine(MeshEngine *pMeshEngine)
     mpMeshEngine = pMeshEngine;
 }
 
-void MapStruct::SetRayTraceEngine(RayTraceEngine *pRayTraceEngine)
+void MapStruct::SetRayTraceEngine(RayTracer *pRayTraceEngine)
 {
-    mpRayTraceEngine = pRayTraceEngine;
+    rayTracer = pRayTraceEngine;
 }
 
 void MapStruct::Swap(MapStruct *pMapStruct)
@@ -965,20 +965,20 @@ void MapStruct::ResetVisibleBlocks()
 
 void MapStruct::RayTrace(const Sophus::SE3d &Tcm)
 {
-    if (mpRayTraceEngine)
+    if (rayTracer)
     {
-        mpRayTraceEngine->RayTrace(this, Tcm);
+        rayTracer->RayTrace(this, Tcm);
     }
 }
 
 cv::cuda::GpuMat MapStruct::GetRayTracingResult()
 {
-    return mpRayTraceEngine->GetVMap();
+    return rayTracer->GetVMap();
 }
 
 cv::cuda::GpuMat MapStruct::GetRayTracingResultDepth()
 {
-    auto vmap = mpRayTraceEngine->GetVMap();
+    auto vmap = rayTracer->GetVMap();
     cv::cuda::GpuMat depth;
     VMapToDepth(vmap, depth);
     return depth;

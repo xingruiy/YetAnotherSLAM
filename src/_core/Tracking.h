@@ -10,7 +10,7 @@
 #include "LoopClosing.h"
 #include "MeshEngine.h"
 #include "CoarseTracking.h"
-#include "RayTraceEngine.h"
+#include "RayTracer.h"
 #include "KeyFrameDatabase.h"
 
 namespace slam
@@ -109,8 +109,7 @@ protected:
     //Map
     Map *mpMap;
 
-    //Last Frame, KeyFrame and Relocalisation Info
-    KeyFrame *mpCurrentKeyFrame;
+    //Last Frame
     KeyFrame *mpLastKeyFrame;
     Frame lastFrame;
     ORBextractor *mpORBExtractor;
@@ -123,7 +122,7 @@ public:
     void createNewVoxelMap();
 
     // Dense Tracking And Mapping
-    RayTraceEngine *mpRayTraceEngine;
+    RayTracer *rayTracer;
     MeshEngine *mpMeshEngine;
     CoarseTracking *mpTracker;
 

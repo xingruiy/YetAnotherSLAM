@@ -8,11 +8,11 @@
 
 class MapStruct;
 
-class RayTraceEngine
+class RayTracer
 {
 public:
-    ~RayTraceEngine();
-    RayTraceEngine(int w, int h, const Eigen::Matrix3f &K);
+    ~RayTracer();
+    RayTracer(int w, int h, const Eigen::Matrix3f &K);
     void RayTrace(MapStruct *pMapStruct, const Sophus::SE3d &Tcw);
 
     struct RenderingBlock
@@ -30,7 +30,9 @@ protected:
     void UpdateRenderingBlocks(MapStruct *pMS, const Sophus::SE3d &Tcw);
     void Reset();
 
-    float fx, fy, cx, cy, invfx, invfy;
+    int w, h;
+    float fx, fy, cx, cy;
+    float invfx, invfy;
     Eigen::Matrix3f mK;
 
     cv::cuda::GpuMat mTracedvmap;
@@ -43,8 +45,6 @@ protected:
     uint *mpNumRenderingBlocks;
 
     RenderingBlock *mplRenderingBlockList;
-
-    int w, h;
 };
 
 #endif

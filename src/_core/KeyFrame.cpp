@@ -623,9 +623,4 @@ Eigen::Vector3d KeyFrame::UnprojectStereo(int i)
   }
 }
 
-long unsigned int KeyFrame::GetMapId()
-{
-  return mpMap->GetMapId();
-}
-
 } // namespace slam
