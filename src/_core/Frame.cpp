@@ -6,7 +6,6 @@
 namespace slam
 {
 
-long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
 float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
 float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
@@ -17,13 +16,13 @@ Frame::Frame()
 }
 
 Frame::Frame(const Frame &frame)
-    : mpORBvocabulary(frame.mpORBvocabulary), mpORBextractor(frame.mpORBextractor),
-      mTimeStamp(frame.mTimeStamp), mK(frame.mK.clone()), mDistCoef(frame.mDistCoef.clone()),
+    : OrbVoc(frame.OrbVoc), OrbExt(frame.OrbExt),
+      mK(frame.mK.clone()), mDistCoef(frame.mDistCoef.clone()),
       mbf(frame.mbf), mb(frame.mb), mThDepth(frame.mThDepth), N(frame.N), mvKeys(frame.mvKeys),
       mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
       mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
       mDescriptors(frame.mDescriptors.clone()), mTcw(frame.mTcw), mTcp(frame.mTcp),
-      mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
+      mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), meta(frame.meta),
       mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
       mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
       mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
@@ -34,27 +33,24 @@ Frame::Frame(const Frame &frame)
       mGrid[i][j] = frame.mGrid[i][j];
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor *extractor, ORBVocabulary *voc)
-    : mpORBvocabulary(voc), mpORBextractor(extractor), mTimeStamp(timeStamp), mK(g_cvCalib.clone()),
-      mDistCoef(g_distCoeff.clone()), mbf(g_bf), mThDepth(g_thDepth), mImGray(imGray.clone()),
-      mImDepth(imDepth.clone())
+Frame::Frame(cv::Mat img, cv::Mat depth, ORBextractor *ext, ORBVocabulary *voc)
+    : OrbVoc(voc), OrbExt(ext), mK(g_cvCalib.clone()),
+      mDistCoef(g_distCoeff.clone()), mbf(g_bf), mThDepth(g_thDepth),
+      mImGray(img.clone()), mImDepth(depth.clone())
 {
-  // Frame ID
-  mnId = nNextId++;
-
   // Scale Level Info
-  mnScaleLevels = mpORBextractor->GetLevels();
-  mfScaleFactor = mpORBextractor->GetScaleFactor();
+  mnScaleLevels = OrbExt->GetLevels();
+  mfScaleFactor = OrbExt->GetScaleFactor();
   mfLogScaleFactor = log(mfScaleFactor);
-  mvScaleFactors = mpORBextractor->GetScaleFactors();
-  mvInvScaleFactors = mpORBextractor->GetInverseScaleFactors();
-  mvLevelSigma2 = mpORBextractor->GetScaleSigmaSquares();
-  mvInvLevelSigma2 = mpORBextractor->GetInverseScaleSigmaSquares();
+  mvScaleFactors = OrbExt->GetScaleFactors();
+  mvInvScaleFactors = OrbExt->GetInverseScaleFactors();
+  mvLevelSigma2 = OrbExt->GetScaleSigmaSquares();
+  mvInvLevelSigma2 = OrbExt->GetInverseScaleSigmaSquares();
 
   // This is done only for the first Frame (or after a change in the calibration)
   if (mbInitialComputations)
   {
-    ComputeImageBounds(imGray);
+    ComputeImageBounds(img);
 
     mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
     mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
@@ -92,7 +88,7 @@ void Frame::AssignFeaturesToGrid()
 
 int Frame::detectFeaturesInFrame()
 {
-  (*mpORBextractor)(mImGray, cv::Mat(), mvKeys, mDescriptors);
+  (*OrbExt)(mImGray, cv::Mat(), mvKeys, mDescriptors);
 
   N = mvKeys.size();
 
@@ -235,7 +231,7 @@ void Frame::ComputeBoW()
   if (mBowVec.empty())
   {
     std::vector<cv::Mat> vCurrentDesc = ToDescriptorVector(mDescriptors);
-    mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
+    OrbVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
   }
 }
 

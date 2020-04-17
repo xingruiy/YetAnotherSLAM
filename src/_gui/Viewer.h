@@ -4,19 +4,19 @@
 #include <pangolin/gl/glcuda.h>
 #include <mutex>
 
-#include "System.h"
+#include "FullSystem.h"
 #include "MapDrawer.h"
-#include "GlobalDef.h"
+#include "GlobalSettings.h"
 
 namespace slam
 {
 
-class System;
+class FullSystem;
 
 class Viewer
 {
 public:
-    Viewer(System *pSystem, MapDrawer *pMapDrawer);
+    Viewer(FullSystem *pSystem, MapDrawer *pMapDrawer);
 
     void Run();
     void reset();
@@ -28,7 +28,7 @@ public:
 
 private:
     MapDrawer *mpMapDrawer;
-    System *mpSystem;
+    FullSystem *mpSystem;
 
     void RenderImagesToScreen();
     void RenderLiveCameraFrustum();

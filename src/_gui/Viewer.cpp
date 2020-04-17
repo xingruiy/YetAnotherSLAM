@@ -3,7 +3,7 @@
 namespace slam
 {
 
-Viewer::Viewer(System *pSystem, MapDrawer *pMapDrawer)
+Viewer::Viewer(FullSystem *pSystem, MapDrawer *pMapDrawer)
     : mpSystem(pSystem), mpMapDrawer(pMapDrawer),
       mbNewImage(false), mbNewDepth(false), mbNewKF(false)
 {
@@ -98,8 +98,6 @@ void Viewer::Run()
 
         pangolin::FinishFrame();
     }
-
-    mpSystem->Shutdown();
 }
 
 void Viewer::RenderImagesToScreen()

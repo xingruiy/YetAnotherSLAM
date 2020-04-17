@@ -3,6 +3,13 @@
 #include <Eigen/Dense>
 #include <mutex>
 
+#define RUNTIME_ASSERT(cond)                                 \
+    if (!(cond))                                             \
+    {                                                        \
+        printf("%s(%d) assert failed!", __FILE__, __LINE__); \
+        exit(-1);                                            \
+    }
+
 namespace slam
 {
 
@@ -49,10 +56,5 @@ void setGlobalCalibration(const int width,
                           const Eigen::Matrix3d &K);
 
 extern int g_pointSize;
-
-// Statistics
-extern size_t g_nFailedFrame;
-extern size_t g_nTrackedFrame;
-extern size_t g_nTrackedKeyframe;
 
 } // namespace slam

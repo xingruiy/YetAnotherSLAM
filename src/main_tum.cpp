@@ -1,12 +1,7 @@
-#include "System.h"
+#include "FullSystem.h"
+#include "GlobalSettings.h"
 #include <fstream>
-
-#define RUNTIME_ASSERT(cond)                                 \
-    if (!(cond))                                             \
-    {                                                        \
-        printf("%s(%d) assert failed!", __FILE__, __LINE__); \
-        exit(-1);                                            \
-    }
+#include <opencv2/opencv.hpp>
 
 void loadImages(
     const std::string &path,
@@ -55,7 +50,7 @@ int main(int argc, char **argv)
         "/home/xingrui/Downloads/TUM-RGBD/rgbd_dataset_freiburg1_desk2/"};
 
     printf("==== initializing the system\n");
-    slam::System slam(argv[1], argv[2]);
+    slam::FullSystem slam(argv[1], argv[2]);
 
     const int totalIter = 1;
     for (auto test : listOfTests)
@@ -85,8 +80,14 @@ int main(int argc, char **argv)
                 cv::Mat rgb = cv::imread(test + rgb_files[i], CV_LOAD_IMAGE_UNCHANGED);
                 cv::Mat depth = cv::imread(test + depth_files[i], CV_LOAD_IMAGE_UNCHANGED);
 
+                cv::Mat rgbGray;
+                cv::Mat depthFloat;
+
+                cv::cvtColor(rgb, rgbGray, cv::COLOR_BGR2GRAY);
+                depth.convertTo(depthFloat, CV_32FC1, 1.0 / 5000);
+
                 const double ts = time_stamps[i];
-                slam.takeNewFrame(rgb, depth, ts);
+                slam.addImages(rgbGray, depthFloat, ts);
                 auto t2 = std::chrono::steady_clock::now();
                 double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 

@@ -12,10 +12,9 @@ src/_core/Frame.cpp
 src/_core/MapPoint.cpp
 src/_core/KeyFrame.cpp
 src/_core/LocalMapping.cpp
-src/_core/System.cpp
+src/_core/FullSystem.cpp
 src/_core/Tracking.cpp
 src/_core/Optimizer.cpp
-src/_core/GlobalDef.cpp
 src/_core/LoopClosing.cpp
 src/_core/KeyFrameDatabase.cpp
 src/_cuda/ImageProc.cu
@@ -27,6 +26,7 @@ src/_gui/Viewer.cpp
 src/_gui/MapDrawer.cpp
 src/_utils/PoseSolver.cpp
 src/_utils/ORBMatcher.cpp
+src/_utils/GlobalSettings.cpp
 src/_utils/ORBextractor.cpp)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES 

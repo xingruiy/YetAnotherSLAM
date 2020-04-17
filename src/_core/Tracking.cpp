@@ -1,14 +1,22 @@
+#include "Map.h"
 #include "Tracking.h"
 #include "ORBMatcher.h"
 #include "Optimizer.h"
 #include "PoseSolver.h"
-#include "Map.h"
 
 namespace slam
 {
 
-Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB)
-    : mState(NOT_INITIALIZED), ORBVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
+struct PointCloud
+{
+    PointCloud(Frame *F, int finestLvl, int coarsestLvl);
+    int lvlUsed;
+    std::vector<Eigen::Vector3f *> imgPyr;
+    std::vector<Eigen::Vector3f *> depthPyr;
+};
+
+Tracking::Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB)
+    : OrbVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
       mpLastKeyFrame(nullptr), mpMap(mpMap), mnLastSuccessRelocFrameId(0)
 {
     int w = g_width[0];
@@ -21,58 +29,41 @@ Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDat
     ORBExt = new ORBextractor();
 }
 
-void Tracking::trackNewFrame(cv::Mat img, cv::Mat depth, double ts)
+void Tracking::trackNewFrame(Frame &F)
 {
-    currFrame = Frame(img, depth, ts, ORBExt, ORBVoc);
-    bool bOK = false;
-    switch (mState)
+    currFrame = F;
+
+    if (hasLost)
     {
-    case NOT_INITIALIZED:
-        // std::cout << "initialize system" << std::endl;
-        initSystem();
-        if (mState != OK)
-            return;
-
-        mpTracker->setKeyFrame(currFrame.mImGray, currFrame.mImDepth);
-        break;
-
-    case OK:
-        bOK = takeNewFrame();
-
-        if (bOK)
+        if (Relocalization())
         {
-            if (NeedNewKeyFrame())
-                CreateNewKeyFrame();
+            hasLost = false;
         }
-        else
-        {
-
-            mState = LOST;
-            return;
-        }
-
-        break;
-
-    case LOST:
-        std::cout << "tracking failed, trying to relocalise..." << std::endl;
-        bOK = Relocalization();
-
-        if (bOK)
-        {
-            mState = OK;
-        }
-        break;
     }
 
-    lastFrame = Frame(currFrame);
+    if (!isInitialized)
+    {
+        initSystem();
+        isInitialized = true;
+    }
 
-    // std::cout << "strat writing pose" << std::endl;
+    if (addImages())
+    {
+        if (NeedNewKeyFrame())
+            CreateNewKeyFrame();
+
+        lastFrame = Frame(currFrame);
+    }
+    else
+    {
+        hasLost = true;
+    }
+
     Sophus::SE3d Tcr = mpReferenceKF->GetPoseInverse() * currFrame.mTcw;
     mlRelativeFramePoses.push_back(Tcr);
     mlpReferences.push_back(mpReferenceKF);
-    mlFrameTimes.push_back(currFrame.mTimeStamp);
-    mlbLost.push_back(mState == LOST);
-    // std::cout << "end writing pose" << std::endl;
+    mlFrameTimes.push_back(currFrame.meta->timestamp);
+    mlbLost.push_back(hasLost);
 }
 
 void Tracking::initSystem()
@@ -109,16 +100,13 @@ void Tracking::initSystem()
         mpLastKeyFrame = pKFini;
 
         mvpLocalKeyFrames.push_back(pKFini);
-        mvpLocalMapPoints = mpMap->GetAllMapPoints();
+        localPoints = mpMap->GetAllMapPoints();
         mpReferenceKF = pKFini;
         currFrame.mpReferenceKF = pKFini;
 
-        mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
+        mpMap->setRefPoints(localPoints);
 
         mpMap->mvpKeyFrameOrigins.push_back(pKFini);
-
-        mState = OK;
-
         // Create dense map struct
         mpCurrVoxelMap = new MapStruct(g_calib[0]);
         mpCurrVoxelMap->SetMeshEngine(mpMeshEngine);
@@ -141,7 +129,7 @@ void Tracking::initSystem()
     }
 }
 
-bool Tracking::takeNewFrame()
+bool Tracking::addImages()
 {
     // Sophus::SE3d Tmw = mpCurrVoxelMap->mTcw;
     // Sophus::SE3d Tcm = Tmw.inverse() * lastFrame.mTcw;
@@ -161,7 +149,7 @@ bool Tracking::takeNewFrame()
     // {
     //     std::cout << DT.translation().norm() << std::endl;
     //     std::cout << DT.matrix3x4() << std::endl;
-    //     std::cout << "Tracking lost, frame id: " << currFrame.mnId << std::endl;
+    //     std::cout << "Tracking lost, frame id: " << currFrame.meta->id << std::endl;
     //     // mpTracker->WriteDebugImages();
     //     return false;
     // }
@@ -174,7 +162,6 @@ bool Tracking::takeNewFrame()
 
     mRawDepth.upload(currFrame.mImDepth);
     mpCurrVoxelMap->Fuse(mRawDepth, currFrame.mTcp);
-    g_nTrackedFrame++;
 
     if (mpViewer)
     {
@@ -363,7 +350,7 @@ bool Tracking::Relocalization()
         mpReferenceKF = pMatchedKF;
         mpCurrVoxelMap = pMatchedKF->mpVoxelStruct;
         mpCurrVoxelMap->DeleteMesh();
-        mnLastSuccessRelocFrameId = currFrame.mnId;
+        mnLastSuccessRelocFrameId = currFrame.meta->id;
         currFrame.mTcp = pMatchedKF->GetPoseInverse() * currFrame.mTcw;
         return true;
     }
@@ -389,7 +376,7 @@ bool Tracking::TrackLocalMap()
             if (!currFrame.mvbOutlier[i])
             {
                 currFrame.mvpMapPoints[i]->IncreaseFound();
-                currFrame.mvpMapPoints[i]->mnLastFrameSeen = currFrame.mnId;
+                currFrame.mvpMapPoints[i]->mnLastFrameSeen = currFrame.meta->id;
                 // if (!mbOnlyTracking)
                 // {
                 //     if (currFrame.mvpMapPoints[i]->Observations() > 0)
@@ -417,7 +404,7 @@ void Tracking::SearchLocalPoints()
     int nToMatch = 0;
 
     // Project points in frame and check its visibility
-    for (auto vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; vit++)
+    for (auto vit = localPoints.begin(), vend = localPoints.end(); vit != vend; vit++)
     {
         MapPoint *pMP = *vit;
 
@@ -435,50 +422,35 @@ void Tracking::SearchLocalPoints()
     {
         ORBMatcher matcher(0.8);
         int th = 1;
-        // If the camera has been relocalised recently, perform a coarser search
-        if (currFrame.mnId - mnLastSuccessRelocFrameId <= 1)
+
+        if (currFrame.meta->id - mnLastSuccessRelocFrameId <= 1)
             th = 3;
 
-        matcher.SearchByProjection(currFrame, mvpLocalMapPoints, th);
+        matcher.SearchByProjection(currFrame, localPoints, th);
     }
 }
 
 void Tracking::UpdateLocalMap()
 {
-    // Update
-    UpdateLocalKeyFrames();
-    UpdateLocalPoints();
+    setLocalKeyFrames();
 
-    // This is for visualization
-    mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
-}
-
-void Tracking::UpdateLocalPoints()
-{
-    mvpLocalMapPoints.clear();
-
-    for (std::vector<KeyFrame *>::const_iterator itKF = mvpLocalKeyFrames.begin(), itEndKF = mvpLocalKeyFrames.end(); itKF != itEndKF; itKF++)
+    std::set<MapPoint *> temp;
+    for (auto *pKF : mvpLocalKeyFrames)
     {
-        KeyFrame *pKF = *itKF;
-        const std::vector<MapPoint *> vpMPs = pKF->GetMapPointMatches();
-
-        for (std::vector<MapPoint *>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
-        {
-            MapPoint *pMP = *itMP;
-            if (!pMP)
-                continue;
-            if (pMP->mnTrackReferenceForFrame == currFrame.mnId)
-                continue;
-            if (!pMP->isBad())
-            {
-                mvpLocalMapPoints.push_back(pMP);
-                pMP->mnTrackReferenceForFrame = currFrame.mnId;
-            }
-        }
+        auto framePoints = pKF->GetMapPointMatches();
+        for (auto *pMP : framePoints)
+            if (pMP && !pMP->isBad())
+                temp.insert(pMP);
     }
+
+    localPoints.clear();
+    for (auto *pMP : temp)
+        localPoints.push_back(pMP);
+
+    mpMap->setRefPoints(localPoints);
 }
 
-void Tracking::UpdateLocalKeyFrames()
+void Tracking::setLocalKeyFrames()
 {
     // Each map point vote for the keyframes in which it has been observed
     std::map<KeyFrame *, int> keyframeCounter;
@@ -523,7 +495,7 @@ void Tracking::UpdateLocalKeyFrames()
         }
 
         mvpLocalKeyFrames.push_back(it->first);
-        pKF->mnTrackReferenceForFrame = currFrame.mnId;
+        pKF->mnTrackReferenceForFrame = currFrame.meta->id;
     }
 
     // Include also some not-already-included keyframes that are neighbors to already-included keyframes
@@ -542,10 +514,10 @@ void Tracking::UpdateLocalKeyFrames()
             KeyFrame *pNeighKF = *itNeighKF;
             if (!pNeighKF->isBad())
             {
-                if (pNeighKF->mnTrackReferenceForFrame != currFrame.mnId)
+                if (pNeighKF->mnTrackReferenceForFrame != currFrame.meta->id)
                 {
                     mvpLocalKeyFrames.push_back(pNeighKF);
-                    pNeighKF->mnTrackReferenceForFrame = currFrame.mnId;
+                    pNeighKF->mnTrackReferenceForFrame = currFrame.meta->id;
                     break;
                 }
             }
@@ -557,10 +529,10 @@ void Tracking::UpdateLocalKeyFrames()
             KeyFrame *pChildKF = *sit;
             if (!pChildKF->isBad())
             {
-                if (pChildKF->mnTrackReferenceForFrame != currFrame.mnId)
+                if (pChildKF->mnTrackReferenceForFrame != currFrame.meta->id)
                 {
                     mvpLocalKeyFrames.push_back(pChildKF);
-                    pChildKF->mnTrackReferenceForFrame = currFrame.mnId;
+                    pChildKF->mnTrackReferenceForFrame = currFrame.meta->id;
                     break;
                 }
             }
@@ -569,10 +541,10 @@ void Tracking::UpdateLocalKeyFrames()
         KeyFrame *pParent = pKF->GetParent();
         if (pParent)
         {
-            if (pParent->mnTrackReferenceForFrame != currFrame.mnId)
+            if (pParent->mnTrackReferenceForFrame != currFrame.meta->id)
             {
                 mvpLocalKeyFrames.push_back(pParent);
-                pParent->mnTrackReferenceForFrame = currFrame.mnId;
+                pParent->mnTrackReferenceForFrame = currFrame.meta->id;
                 break;
             }
         }
@@ -694,7 +666,8 @@ void Tracking::CreateNewKeyFrame()
 
 void Tracking::reset()
 {
-    mState = NOT_INITIALIZED;
+    isInitialized = false;
+    hasLost = false;
     mpReferenceKF = 0;
     mpLastKeyFrame = 0;
     mpCurrVoxelMap = 0;
@@ -729,10 +702,10 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 
 void Tracking::SetLoopClosing(LoopClosing *pLoopClosing)
 {
-    mpLoopClosing = pLoopClosing;
+    loopCloser = pLoopClosing;
 }
 
-void Tracking::SetViewer(Viewer *pViewer)
+void Tracking::setIOWrapper(Viewer *pViewer)
 {
     mpViewer = pViewer;
 }

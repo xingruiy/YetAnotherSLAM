@@ -6,7 +6,7 @@
 #include <ORBVocabulary.h>
 
 #include "Map.h"
-#include "GlobalDef.h"
+#include "GlobalSettings.h"
 #include "KeyFrame.h"
 #include "Viewer.h"
 #include "ORBextractor.h"

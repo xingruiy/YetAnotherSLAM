@@ -1,4 +1,4 @@
-#include "GlobalDef.h"
+#include "GlobalSettings.h"
 #include <cmath>
 
 namespace slam
@@ -81,9 +81,5 @@ void setGlobalCalibration(const int width, const int height, const Eigen::Matrix
 }
 
 int g_pointSize = 1;
-
-size_t g_nFailedFrame = 0;
-size_t g_nTrackedFrame = 0;
-size_t g_nTrackedKeyframe = 0;
 
 } // namespace slam

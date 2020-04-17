@@ -70,7 +70,7 @@ private:
     Tracking *mpTracker;
 
     KeyFrameDatabase *mpKeyFrameDB;
-    ORBVocabulary *ORBVoc;
+    ORBVocabulary *OrbVoc;
 
     LocalMapping *localMapper;
 

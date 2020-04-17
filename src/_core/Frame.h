@@ -4,7 +4,7 @@
 #include <Eigen/Core>
 #include <DBoW2/DBoW2/BowVector.h>
 
-#include "GlobalDef.h"
+#include "GlobalSettings.h"
 #include "ORBVocabulary.h"
 
 namespace slam
@@ -35,21 +35,20 @@ class Frame
 public:
     Frame();
     Frame(const Frame &frame);
-    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor *extractor, ORBVocabulary *voc);
+    Frame(cv::Mat img, cv::Mat depth, ORBextractor *ext, ORBVocabulary *voc);
     int detectFeaturesInFrame();
     void ComputeBoW();
     bool isInFrustum(MapPoint *pMP, float viewingCosLimit);
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
     std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, const float &r, const int minLevel = -1, const int maxLevel = -1) const;
     void ComputeStereoFromRGBD();
-
-public:
     void CreateRelocalisationPoints();
 
 public:
-    ORBVocabulary *mpORBvocabulary;
-    ORBextractor *mpORBextractor;
-    double mTimeStamp;
+    ORBVocabulary *OrbVoc;
+    ORBextractor *OrbExt;
+    FrameMetaData *meta;
+
     cv::Mat mK;
     static float fx;
     static float fy;
@@ -90,10 +89,6 @@ public:
     // Camera pose.
     Sophus::SE3d mTcw;
     Sophus::SE3d mTcp;
-
-    // Current and Next Frame id.
-    static long unsigned int nNextId;
-    long unsigned int mnId;
 
     // Reference Keyframe.
     KeyFrame *mpReferenceKF;

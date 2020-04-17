@@ -89,7 +89,7 @@ public:
     long unsigned int mnId;
     const long unsigned int mnFrameId;
 
-    const double mTimeStamp;
+    const double timestamp;
 
     // Grid (to speed up feature matching)
     const int mnGridCols;
@@ -163,7 +163,7 @@ protected:
 
     // BoW
     KeyFrameDatabase *mpKeyFrameDB;
-    ORBVocabulary *mpORBvocabulary;
+    ORBVocabulary *OrbVoc;
 
     // Grid over the image to speed up feature matching
     std::vector<std::vector<std::vector<size_t>>> mGrid;

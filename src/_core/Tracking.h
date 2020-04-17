@@ -5,8 +5,8 @@
 #include "Viewer.h"
 #include "KeyFrame.h"
 #include "LocalMapping.h"
-#include "System.h"
-#include "GlobalDef.h"
+#include "FullSystem.h"
+#include "GlobalSettings.h"
 #include "LoopClosing.h"
 #include "MeshEngine.h"
 #include "CoarseTracking.h"
@@ -17,7 +17,7 @@ namespace slam
 {
 
 class Viewer;
-class System;
+class FullSystem;
 class KeyFrame;
 class Map;
 class LocalMapping;
@@ -25,24 +25,17 @@ class LocalMapping;
 class Tracking
 {
 public:
-    Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB);
-    void trackNewFrame(cv::Mat img, cv::Mat depth, double ts);
+    Tracking(FullSystem *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB);
+    void trackNewFrame(Frame &F);
     void reset();
 
     void SetLocalMapper(LocalMapping *pLocalMapper);
     void SetLoopClosing(LoopClosing *pLoopClosing);
-    void SetViewer(Viewer *pViewer);
+    void setIOWrapper(Viewer *pViewer);
 
 public:
-    enum eTrackingState
-    {
-        NOT_INITIALIZED = 1,
-        OK = 2,
-        LOST = 3
-    };
-
-    eTrackingState mState;
-
+    bool hasLost = false;
+    bool isInitialized = false;
     Frame currFrame;
 
     // Lists used to recover the full camera trajectory
@@ -56,13 +49,12 @@ protected:
 
     bool Relocalization();
     void UpdateLocalMap();
-    void UpdateLocalPoints();
-    void UpdateLocalKeyFrames();
+    void setLocalKeyFrames();
 
     bool TrackLocalMap();
     void SearchLocalPoints();
 
-    bool takeNewFrame();
+    bool addImages();
 
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
@@ -70,19 +62,19 @@ protected:
 
     // Other Thread Pointers
     LocalMapping *localMapper;
-    LoopClosing *mpLoopClosing;
+    LoopClosing *loopCloser;
 
-    // System
-    System *mpSystem;
+    // FullSystem
+    FullSystem *mpSystem;
 
     //BoW
-    ORBVocabulary *ORBVoc;
+    ORBVocabulary *OrbVoc;
     KeyFrameDatabase *mpKeyFrameDB;
 
     //Local Map
     KeyFrame *mpReferenceKF;
     std::vector<KeyFrame *> mvpLocalKeyFrames;
-    std::vector<MapPoint *> mvpLocalMapPoints;
+    std::vector<MapPoint *> localPoints;
 
     //Drawers
     Viewer *mpViewer;

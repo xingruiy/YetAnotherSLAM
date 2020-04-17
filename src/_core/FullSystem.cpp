@@ -1,71 +1,102 @@
-#include "System.h"
+#include "FullSystem.h"
 #include "Map.h"
+#include "Frame.h"
+#include "Viewer.h"
+#include "KeyFrame.h"
+#include "Tracking.h"
+#include "LocalMapping.h"
+#include "GlobalSettings.h"
+#include "LoopClosing.h"
+#include "MapDrawer.h"
+#include "KeyFrameDatabase.h"
+#include "ORBextractor.h"
 
 namespace slam
 {
 
-System::System(const std::string &strSettingFile, const std::string &strVocFile) : mpViewer(0)
+FullSystem::FullSystem(const std::string &strSettingFile, const std::string &strVocFile) : mpViewer(0)
 {
     //Load Settings
     readSettings(strSettingFile);
 
     //Load ORB Vocabulary
-    ORBVoc = new ORBVocabulary();
-    ORBVoc->loadFromBinaryFile(strVocFile);
+    OrbVoc = new ORBVocabulary();
+    OrbVoc->loadFromBinaryFile(strVocFile);
+
+    OrbExt = new ORBextractor();
 
     //Create the Map
     mpMap = new Map();
     mpMapDrawer = new MapDrawer(mpMap);
 
     //Create KeyFrame Database
-    mpKeyFrameDB = new KeyFrameDatabase(*ORBVoc);
+    mpKeyFrameDB = new KeyFrameDatabase(*OrbVoc);
 
-    mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, ORBVoc);
-    mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
+    loopCloser = new LoopClosing(mpMap, mpKeyFrameDB, OrbVoc);
+    std::thread *thd = new std::thread(&LoopClosing::Run, loopCloser);
+    allChildThreads.push_back(thd);
 
-    localMapper = new LocalMapping(ORBVoc, mpMap);
-    localMapper->SetLoopCloser(mpLoopClosing);
-    mpLoopClosing->SetLocalMapper(localMapper);
-    mpLocalMappingThread = new std::thread(&LocalMapping::Run, localMapper);
+    localMapper = new LocalMapping(OrbVoc, mpMap);
+    localMapper->SetLoopCloser(loopCloser);
+    loopCloser->SetLocalMapper(localMapper);
+    thd = new std::thread(&LocalMapping::Run, localMapper);
+    allChildThreads.push_back(thd);
 
     //Initialize the Tracking thread
-    mpTracker = new Tracking(this, ORBVoc, mpMap, mpKeyFrameDB);
+    mpTracker = new Tracking(this, OrbVoc, mpMap, mpKeyFrameDB);
     mpTracker->SetLocalMapper(localMapper);
 
     if (g_bEnableViewer)
     {
         mpViewer = new Viewer(this, mpMapDrawer);
-        mpViewerThread = new std::thread(&Viewer::Run, mpViewer);
-        mpTracker->SetViewer(mpViewer);
+        thd = new std::thread(&Viewer::Run, mpViewer);
+        allChildThreads.push_back(thd);
+        mpTracker->setIOWrapper(mpViewer);
     }
 }
 
-void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
+FullSystem::~FullSystem()
 {
-    // std::cout << "track new image" << std::endl;
-    // Covert colour images to grayscale
-    if (!g_bReverseRGB)
-        cv::cvtColor(img, grayScale, cv::COLOR_RGB2GRAY);
-    else
-        cv::cvtColor(img, grayScale, cv::COLOR_BGR2GRAY);
-
-    // Convert depth to floating point
-    depth.convertTo(depthFloat, CV_32FC1, g_DepthScaleInv);
-
-    if (mpViewer)
+    for (auto th : allChildThreads)
     {
-        mpViewer->setLiveImage(img);
-        mpViewer->setLiveDepth(depthFloat);
+        th->join();
+        delete th;
     }
 
-    // if (!g_bSystemRunning)
-    //     return;
-
-    // Invoke the main tracking thread
-    mpTracker->trackNewFrame(grayScale, depthFloat, timeStamp);
+    delete mpMap;
+    delete mpViewer;
+    delete mpTracker;
+    delete localMapper;
+    delete loopCloser;
 }
 
-void System::reset()
+void FullSystem::addImages(cv::Mat img, cv::Mat depth, double ts)
+{
+    FrameMetaData *meta = new FrameMetaData();
+    meta->id = allFrameHistory.size();
+    meta->timestamp = ts;
+    allFrameHistory.push_back(meta);
+
+    // Frame *newF = new Frame(img, depth, ts, ORBext, OrbVoc);
+    // newF->metaData = meta;
+    // if (mpViewer)
+    // {
+    //     // mpViewer->setLiveImage(img);
+    //     // mpViewer->setLiveDepth(depth);
+    // }
+    Frame currFrame = Frame(img, depth, OrbExt, OrbVoc);
+    currFrame.meta = meta;
+
+    mpTracker->trackNewFrame(currFrame);
+
+    traceKeyFramePoints();
+}
+
+void FullSystem::traceKeyFramePoints()
+{
+}
+
+void FullSystem::reset()
 {
     mpTracker->reset();
     mpMap->reset();
@@ -73,10 +104,84 @@ void System::reset()
 
     KeyFrame::nNextId = 0;
     MapPoint::nNextId = 0;
-    // mpMap->reset();
+
+    for (auto meta : allFrameHistory)
+        delete meta;
+
+    allFrameHistory.clear();
+    allKeyFramesHistory.clear();
 }
 
-void System::FuseAllMapStruct()
+void FullSystem::readSettings(const std::string &filename)
+{
+    cv::FileStorage file(filename, cv::FileStorage::READ);
+    RUNTIME_ASSERT(file.isOpened());
+
+    // read system configurations
+    g_bEnableViewer = (int)file["FullSystem.EnableViewer"] == 1;
+    g_bReverseRGB = (int)file["FullSystem.ReverseRGB"] == 1;
+    g_DepthScaleInv = 1.0 / (double)file["FullSystem.DepthScale"];
+
+    // read orb parameters
+    g_ORBScaleFactor = file["ORB_SLAM2.scaleFactor"];
+    g_ORBNFeatures = file["ORB_SLAM2.nFeatures"];
+    g_ORBNLevels = file["ORB_SLAM2.nLevels"];
+    g_ORBIniThFAST = file["ORB_SLAM2.iniThFAST"];
+    g_ORBMinThFAST = file["ORB_SLAM2.minThFAST"];
+
+    // read calibration parameters
+    int width = file["Calibration.width"];
+    int height = file["Calibration.height"];
+    float fx = file["Calibration.fx"];
+    float fy = file["Calibration.fy"];
+    float cx = file["Calibration.cx"];
+    float cy = file["Calibration.cy"];
+    Eigen::Matrix3d calib;
+    calib << fx, 0, cx, 0, fy, cy, 0, 0, 1.0;
+    setGlobalCalibration(width, height, calib);
+
+    // Update tracking parameters
+    g_bf = file["Calibration.bf"];
+    g_thDepth = g_bf * (float)file["Tracking.ThDepth"] / fx;
+    g_bUseColour = (int)file["Tracking.UseColour"] == 1;
+    g_bUseDepth = (int)file["Tracking.UseDepth"] == 1;
+
+    // read distortion coefficients
+    g_distCoeff = cv::Mat(4, 1, CV_32F);
+    g_distCoeff.at<float>(0) = file["UnDistortion.k1"];
+    g_distCoeff.at<float>(1) = file["UnDistortion.k2"];
+    g_distCoeff.at<float>(2) = file["UnDistortion.p1"];
+    g_distCoeff.at<float>(3) = file["UnDistortion.p2"];
+    const float k3 = file["UnDistortion.k3"];
+    if (k3 != 0)
+    {
+        g_distCoeff.resize(5);
+        g_distCoeff.at<float>(4) = k3;
+    }
+
+    g_pointSize = file["Viewer.PointSize"];
+    g_bSystemRunning = (int)file["Viewer.StartWhenReady"] == 1;
+
+    std::cout << "===================================================\n"
+              << "The system is created with the following parameters:\n"
+              << "pyramid level - " << NUM_PYR << "\n";
+    for (int i = 0; i < NUM_PYR; ++i)
+    {
+        std::cout << "pyramid " << i << " -"
+                  << " width: " << g_width[i]
+                  << " height: " << g_height[i]
+                  << " fx: " << g_fx[i]
+                  << " fy: " << g_fy[i]
+                  << " cx: " << g_cx[i]
+                  << " cy: " << g_cy[i] << "\n";
+    }
+    std::cout << "camera baseline - " << g_bf / fx << "\n"
+              << "close point th - " << g_thDepth << "\n"
+              << "enable mpViewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
+              << "===================================================" << std::endl;
+}
+
+void FullSystem::FuseAllMapStruct()
 {
     auto mapStructs = mpMap->GetAllVoxelMaps();
     MapStruct *pMSini = mpMap->mpMapStructOrigin;
@@ -108,101 +213,7 @@ void System::FuseAllMapStruct()
     pMSini->SetActiveFlag(false);
 }
 
-void System::Shutdown()
-{
-    g_bSystemKilled = true;
-}
-
-System::~System()
-{
-    mpLoopThread->join();
-    mpViewerThread->join();
-    mpLocalMappingThread->join();
-
-    // delete mpMap;
-    delete mpViewer;
-    delete mpTracker;
-    delete mpLoopThread;
-    delete localMapper;
-    delete mpLoopClosing;
-    delete mpViewerThread;
-    delete mpLocalMappingThread;
-}
-
-void System::readSettings(const std::string &strSettingFile)
-{
-    cv::FileStorage settingsFile(strSettingFile, cv::FileStorage::READ);
-    if (!settingsFile.isOpened())
-    {
-        printf("Reading settings failed at line %d in file %s\n", __LINE__, __FILE__);
-        exit(-1);
-    }
-
-    // read system configurations
-    g_bEnableViewer = (int)settingsFile["System.EnableViewer"] == 1;
-    g_bReverseRGB = (int)settingsFile["System.ReverseRGB"] == 1;
-    g_DepthScaleInv = 1.0 / (double)settingsFile["System.DepthScale"];
-
-    // read orb parameters
-    g_ORBScaleFactor = settingsFile["ORB_SLAM2.scaleFactor"];
-    g_ORBNFeatures = settingsFile["ORB_SLAM2.nFeatures"];
-    g_ORBNLevels = settingsFile["ORB_SLAM2.nLevels"];
-    g_ORBIniThFAST = settingsFile["ORB_SLAM2.iniThFAST"];
-    g_ORBMinThFAST = settingsFile["ORB_SLAM2.minThFAST"];
-
-    // read calibration parameters
-    int width = settingsFile["Calibration.width"];
-    int height = settingsFile["Calibration.height"];
-    float fx = settingsFile["Calibration.fx"];
-    float fy = settingsFile["Calibration.fy"];
-    float cx = settingsFile["Calibration.cx"];
-    float cy = settingsFile["Calibration.cy"];
-    Eigen::Matrix3d calib;
-    calib << fx, 0, cx, 0, fy, cy, 0, 0, 1.0;
-    setGlobalCalibration(width, height, calib);
-
-    // Update tracking parameters
-    g_bf = settingsFile["Calibration.bf"];
-    g_thDepth = g_bf * (float)settingsFile["Tracking.ThDepth"] / fx;
-    g_bUseColour = (int)settingsFile["Tracking.UseColour"] == 1;
-    g_bUseDepth = (int)settingsFile["Tracking.UseDepth"] == 1;
-
-    // read distortion coefficients
-    g_distCoeff = cv::Mat(4, 1, CV_32F);
-    g_distCoeff.at<float>(0) = settingsFile["UnDistortion.k1"];
-    g_distCoeff.at<float>(1) = settingsFile["UnDistortion.k2"];
-    g_distCoeff.at<float>(2) = settingsFile["UnDistortion.p1"];
-    g_distCoeff.at<float>(3) = settingsFile["UnDistortion.p2"];
-    const float k3 = settingsFile["UnDistortion.k3"];
-    if (k3 != 0)
-    {
-        g_distCoeff.resize(5);
-        g_distCoeff.at<float>(4) = k3;
-    }
-
-    g_pointSize = settingsFile["Viewer.PointSize"];
-    g_bSystemRunning = (int)settingsFile["Viewer.StartWhenReady"] == 1;
-
-    std::cout << "===================================================\n"
-              << "The system is created with the following parameters:\n"
-              << "pyramid level - " << NUM_PYR << "\n";
-    for (int i = 0; i < NUM_PYR; ++i)
-    {
-        std::cout << "pyramid " << i << " -"
-                  << " width: " << g_width[i]
-                  << " height: " << g_height[i]
-                  << " fx: " << g_fx[i]
-                  << " fy: " << g_fy[i]
-                  << " cx: " << g_cx[i]
-                  << " cy: " << g_cy[i] << "\n";
-    }
-    std::cout << "camera baseline - " << g_bf / fx << "\n"
-              << "close point th - " << g_thDepth << "\n"
-              << "enable mpViewer? - " << (g_bEnableViewer ? "yes" : "no") << "\n"
-              << "===================================================" << std::endl;
-}
-
-void System::SaveTrajectoryTUM(const std::string &filename)
+void FullSystem::SaveTrajectoryTUM(const std::string &filename)
 {
     std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
     sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
@@ -264,7 +275,7 @@ void System::SaveTrajectoryTUM(const std::string &filename)
     file.close();
 }
 
-void System::SaveKeyFrameTrajectoryTUM(const std::string &filename)
+void FullSystem::SaveKeyFrameTrajectoryTUM(const std::string &filename)
 {
     std::vector<KeyFrame *> vpKFs = mpMap->GetAllKeyFrames();
     std::sort(vpKFs.begin(), vpKFs.end(), [&](KeyFrame *l, KeyFrame *r) { return l->mnId < r->mnId; });
@@ -294,7 +305,7 @@ void System::SaveKeyFrameTrajectoryTUM(const std::string &filename)
         Eigen::Vector3d t = Tcw.translation();
         Eigen::Quaterniond q(R);
 
-        f << std::setprecision(6) << pKF->mTimeStamp << std::setprecision(7)
+        f << std::setprecision(6) << pKF->timestamp << std::setprecision(7)
           << " " << t[0]
           << " " << t[1]
           << " " << t[2]

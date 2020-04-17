@@ -32,7 +32,7 @@ public:
     void WriteToFile(const std::string &strFile);
     void ReadFromFile(const std::string &strFile);
 
-    void SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs);
+    void setRefPoints(const std::vector<MapPoint *> &vpMPs);
 
     void InformNewBigChange();
     int GetLastBigChangeIdx();

@@ -1,12 +1,9 @@
 #pragma once
 #include <ORBVocabulary.h>
+#include <mutex>
 #include <vector>
 #include <list>
 #include <set>
-
-#include "KeyFrame.h"
-#include "Frame.h"
-#include <mutex>
 
 namespace slam
 {

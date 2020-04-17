@@ -93,7 +93,7 @@ void Map::EraseMapStruct(MapStruct *pMS)
     mspMapStructs.erase(pMS);
 }
 
-void Map::SetReferenceMapPoints(const std::vector<MapPoint *> &vpMPs)
+void Map::setRefPoints(const std::vector<MapPoint *> &vpMPs)
 {
     std::unique_lock<std::mutex> lock(mMutexMap);
     mvpReferenceMapPoints = vpMPs;

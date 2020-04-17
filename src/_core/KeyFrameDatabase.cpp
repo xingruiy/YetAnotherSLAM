@@ -2,6 +2,7 @@
 #include "DBoW2/DBoW2/BowVector.h"
 #include "KeyFrameDatabase.h"
 #include "KeyFrame.h"
+#include "Frame.h"
 
 namespace slam
 {
@@ -179,10 +180,10 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
             for (auto lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
             {
                 KeyFrame *pKFi = *lit;
-                if (pKFi->mnRelocQuery != F->mnId)
+                if (pKFi->mnRelocQuery != F->meta->id)
                 {
                     pKFi->mnRelocWords = 0;
-                    pKFi->mnRelocQuery = F->mnId;
+                    pKFi->mnRelocQuery = F->meta->id;
                     lKFsSharingWords.push_back(pKFi);
                 }
                 pKFi->mnRelocWords++;
@@ -238,7 +239,7 @@ std::vector<KeyFrame *> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *
         for (auto vit = vpNeighs.begin(), vend = vpNeighs.end(); vit != vend; vit++)
         {
             KeyFrame *pKF2 = *vit;
-            if (pKF2->mnRelocQuery != F->mnId)
+            if (pKF2->mnRelocQuery != F->meta->id)
                 continue;
 
             accScore += pKF2->mRelocScore;

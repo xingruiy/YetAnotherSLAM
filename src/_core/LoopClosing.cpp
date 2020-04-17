@@ -8,7 +8,7 @@ namespace slam
 {
 
 LoopClosing::LoopClosing(Map *mpMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc)
-    : mpMap(mpMap), mpKeyFrameDB(pDB), ORBVoc(pVoc), mLastLoopKFid(0),
+    : mpMap(mpMap), mpKeyFrameDB(pDB), OrbVoc(pVoc), mLastLoopKFid(0),
       mpThreadGBA(nullptr), mbRunningGBA(false), mnFullBAIdx(0)
 {
     mnCovisibilityConsistencyTh = 3;
@@ -79,7 +79,7 @@ bool LoopClosing::DetectLoop()
             continue;
         const DBoW2::BowVector &BowVec = pKF->mBowVec;
 
-        float score = ORBVoc->score(CurrentBowVec, BowVec);
+        float score = OrbVoc->score(CurrentBowVec, BowVec);
 
         if (score < minScore)
             minScore = score;
