@@ -14,6 +14,22 @@ class MapPoint;
 class KeyFrame;
 class ORBextractor;
 
+struct Intrinsics
+{
+    int w, h;
+    float ifx, ify;
+    float fx, fy, cx, cy;
+};
+
+struct FrameMetaData
+{
+    int id;
+    double timestamp;
+
+    FrameMetaData *ref;
+    Sophus::SE3d camToRef;
+};
+
 class Frame
 {
 public:
@@ -22,7 +38,6 @@ public:
     Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor *extractor, ORBVocabulary *voc);
     int detectFeaturesInFrame();
     void ComputeBoW();
-    void SetPose(const Sophus::SE3d &Tcw);
     bool isInFrustum(MapPoint *pMP, float viewingCosLimit);
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
     std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, const float &r, const int minLevel = -1, const int maxLevel = -1) const;

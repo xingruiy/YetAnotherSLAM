@@ -111,11 +111,6 @@ int Frame::detectFeaturesInFrame()
   return N;
 }
 
-void Frame::SetPose(const Sophus::SE3d &Tcw)
-{
-  mTcw = Tcw;
-}
-
 bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 {
   pMP->mbTrackInView = false;

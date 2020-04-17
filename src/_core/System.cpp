@@ -23,14 +23,14 @@ System::System(const std::string &strSettingFile, const std::string &strVocFile)
     mpLoopClosing = new LoopClosing(mpMap, mpKeyFrameDB, ORBVoc);
     mpLoopThread = new std::thread(&LoopClosing::Run, mpLoopClosing);
 
-    mpLocalMapper = new LocalMapping(ORBVoc, mpMap);
-    mpLocalMapper->SetLoopCloser(mpLoopClosing);
-    mpLoopClosing->SetLocalMapper(mpLocalMapper);
-    mpLocalMappingThread = new std::thread(&LocalMapping::Run, mpLocalMapper);
+    localMapper = new LocalMapping(ORBVoc, mpMap);
+    localMapper->SetLoopCloser(mpLoopClosing);
+    mpLoopClosing->SetLocalMapper(localMapper);
+    mpLocalMappingThread = new std::thread(&LocalMapping::Run, localMapper);
 
     //Initialize the Tracking thread
     mpTracker = new Tracking(this, ORBVoc, mpMap, mpKeyFrameDB);
-    mpTracker->SetLocalMapper(mpLocalMapper);
+    mpTracker->SetLocalMapper(localMapper);
 
     if (g_bEnableViewer)
     {
@@ -62,7 +62,7 @@ void System::takeNewFrame(cv::Mat img, cv::Mat depth, const double timeStamp)
     //     return;
 
     // Invoke the main tracking thread
-    mpTracker->GrabImageRGBD(grayScale, depthFloat, timeStamp);
+    mpTracker->trackNewFrame(grayScale, depthFloat, timeStamp);
 }
 
 void System::reset()
@@ -123,7 +123,7 @@ System::~System()
     delete mpViewer;
     delete mpTracker;
     delete mpLoopThread;
-    delete mpLocalMapper;
+    delete localMapper;
     delete mpLoopClosing;
     delete mpViewerThread;
     delete mpLocalMappingThread;

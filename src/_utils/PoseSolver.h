@@ -35,24 +35,17 @@ class PoseSolver
 public:
     PoseSolver(Frame *pFrame, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12);
     PoseSolver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale = true);
-
     void SetRansacParameters(double probability = 0.99, int minInliers = 6, int maxIterations = 300);
-
     bool find(std::vector<bool> &vbInliers12, int &nInliers, Sophus::SE3d &Scw);
-
     bool iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers, Sophus::SE3d &Scw);
-
     Eigen::Matrix3d GetEstimatedRotation();
     Eigen::Vector3d GetEstimatedTranslation();
     float GetEstimatedScale();
 
 protected:
     void ComputeCentroid(const std::vector<Eigen::Vector3d> &P, std::vector<Eigen::Vector3d> &Pr, Eigen::Vector3d &C);
-
     void ComputeSE3(const std::vector<Eigen::Vector3d> &P1, const std::vector<Eigen::Vector3d> &P2);
-
     void CheckInliers();
-
     void Project(const std::vector<Eigen::Vector3d> &vP3Dw, std::vector<Eigen::Vector2d> &vP2D, Sophus::SE3d Twc, cv::Mat K);
     void FromCameraToImage(const std::vector<Eigen::Vector3d> &vP3Dc, std::vector<Eigen::Vector2d> &vP2D, cv::Mat K);
 

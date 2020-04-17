@@ -72,7 +72,7 @@ private:
     KeyFrameDatabase *mpKeyFrameDB;
     ORBVocabulary *ORBVoc;
 
-    LocalMapping *mpLocalMapper;
+    LocalMapping *localMapper;
 
     std::list<KeyFrame *> mlpLoopKeyFrameQueue;
 

@@ -8,7 +8,7 @@ namespace slam
 {
 
 Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB)
-    : mState(SYSTEM_NOT_READY), ORBVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
+    : mState(NOT_INITIALIZED), ORBVoc(pVoc), mpKeyFrameDB(pKFDB), mpSystem(pSystem),
       mpLastKeyFrame(nullptr), mpMap(mpMap), mnLastSuccessRelocFrameId(0)
 {
     int w = g_width[0];
@@ -18,22 +18,16 @@ Tracking::Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDat
     mpTracker = new CoarseTracking(w, h, calib, g_bUseColour, g_bUseDepth);
     mpMeshEngine = new MeshEngine(20000000);
     rayTracer = new RayTracer(w, h, g_calib[0]);
-    mpORBExtractor = new ORBextractor(g_ORBNFeatures, g_ORBScaleFactor, g_ORBNLevels, g_ORBIniThFAST, g_ORBMinThFAST);
+    ORBExt = new ORBextractor();
 }
 
-void Tracking::GrabImageRGBD(cv::Mat ImgGray, cv::Mat ImgDepth, const double TimeStamp)
+void Tracking::trackNewFrame(cv::Mat img, cv::Mat depth, double ts)
 {
-    currFrame = Frame(ImgGray, ImgDepth, TimeStamp, mpORBExtractor, ORBVoc);
-    // std::cout << "start tracking process.." << std::endl;
-    Track();
-}
-
-void Tracking::Track()
-{
+    currFrame = Frame(img, depth, ts, ORBExt, ORBVoc);
     bool bOK = false;
     switch (mState)
     {
-    case SYSTEM_NOT_READY:
+    case NOT_INITIALIZED:
         // std::cout << "initialize system" << std::endl;
         initSystem();
         if (mState != OK)
@@ -70,7 +64,6 @@ void Tracking::Track()
         break;
     }
 
-    mLastProcessedState = mState;
     lastFrame = Frame(currFrame);
 
     // std::cout << "strat writing pose" << std::endl;
@@ -110,14 +103,7 @@ void Tracking::initSystem()
             }
         }
 
-        if (mpMap->MapPointsInMap() < 300)
-        {
-            mState = SYSTEM_NOT_READY;
-            delete mpMap;
-            return;
-        }
-
-        mpLocalMapper->InsertKeyFrame(pKFini);
+        localMapper->InsertKeyFrame(pKFini);
 
         lastFrame = Frame(currFrame);
         mpLastKeyFrame = pKFini;
@@ -677,7 +663,7 @@ void Tracking::CreateNewMapPoints()
 
 void Tracking::CreateNewKeyFrame()
 {
-    if (!mpLocalMapper->SetNotStop(true))
+    if (!localMapper->SetNotStop(true))
         return;
 
     mpCurrVoxelMap->RayTrace(currFrame.mTcp);
@@ -697,8 +683,8 @@ void Tracking::CreateNewKeyFrame()
     currFrame.mpReferenceKF = mpReferenceKF;
 
     currFrame.mTcp = Sophus::SE3d();
-    mpLocalMapper->InsertKeyFrame(mpReferenceKF);
-    mpLocalMapper->SetNotStop(false);
+    localMapper->InsertKeyFrame(mpReferenceKF);
+    localMapper->SetNotStop(false);
 
     if (mpViewer)
         mpViewer->setKeyFrameImage(currFrame.mImGray, currFrame.mvKeys);
@@ -708,7 +694,7 @@ void Tracking::CreateNewKeyFrame()
 
 void Tracking::reset()
 {
-    mState = SYSTEM_NOT_READY;
+    mState = NOT_INITIALIZED;
     mpReferenceKF = 0;
     mpLastKeyFrame = 0;
     mpCurrVoxelMap = 0;
@@ -738,7 +724,7 @@ void Tracking::createNewVoxelMap()
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 {
-    mpLocalMapper = pLocalMapper;
+    localMapper = pLocalMapper;
 }
 
 void Tracking::SetLoopClosing(LoopClosing *pLoopClosing)

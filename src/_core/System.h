@@ -49,7 +49,7 @@ private:
     // Map *mpMap;
     Tracking *mpTracker;
     Viewer *mpViewer;
-    LocalMapping *mpLocalMapper;
+    LocalMapping *localMapper;
     LoopClosing *mpLoopClosing;
     MapDrawer *mpMapDrawer;
 

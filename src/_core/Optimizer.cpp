@@ -339,7 +339,7 @@ int Optimizer::PoseOptimization(Frame &pFrame)
     // Recover optimized pose and return number of inliers
     g2o::VertexSE3Expmap *vSE3_recov = static_cast<g2o::VertexSE3Expmap *>(optimizer.vertex(0));
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
-    pFrame.SetPose(Sophus::SE3d(SE3quat_recov.to_homogeneous_matrix()).inverse());
+    pFrame.mTcw = Sophus::SE3d(SE3quat_recov.to_homogeneous_matrix()).inverse();
 
     return nInitialCorrespondences - nBad;
 }

@@ -1,6 +1,10 @@
 #include "MapPoint.h"
 #include "ORBMatcher.h"
+#include "Map.h"
+#include "Frame.h"
+#include "KeyFrame.h"
 #include <cmath>
+#include <mutex>
 
 namespace slam
 {

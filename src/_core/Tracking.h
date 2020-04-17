@@ -26,34 +26,24 @@ class Tracking
 {
 public:
     Tracking(System *pSystem, ORBVocabulary *pVoc, Map *mpMap, KeyFrameDatabase *pKFDB);
-
-    // Preprocess the input and call Track().
-    void GrabImageRGBD(cv::Mat ImGray, cv::Mat Depth, const double TimeStamp);
+    void trackNewFrame(cv::Mat img, cv::Mat depth, double ts);
+    void reset();
 
     void SetLocalMapper(LocalMapping *pLocalMapper);
     void SetLoopClosing(LoopClosing *pLoopClosing);
     void SetViewer(Viewer *pViewer);
 
-    // Use this function if you have deactivated local mapping and you only want to localize the camera.
-    void InformOnlyTracking(const bool &flag);
-
 public:
-    // Tracking states
     enum eTrackingState
     {
-        SYSTEM_NOT_READY = -1,
-        NO_IMAGES_YET = 0,
         NOT_INITIALIZED = 1,
         OK = 2,
         LOST = 3
     };
 
     eTrackingState mState;
-    eTrackingState mLastProcessedState;
 
-    // Current Frame
     Frame currFrame;
-    cv::Mat mImGray;
 
     // Lists used to recover the full camera trajectory
     std::list<Sophus::SE3d> mlRelativeFramePoses;
@@ -61,16 +51,7 @@ public:
     std::list<double> mlFrameTimes;
     std::list<bool> mlbLost;
 
-    // True if local mapping is deactivated and we are performing only localization
-    bool mbOnlyTracking;
-
-    void reset();
-
 protected:
-    // Main tracking function.
-    void Track();
-
-    // Map initialization
     void initSystem();
 
     bool Relocalization();
@@ -88,7 +69,7 @@ protected:
     void CreateNewMapPoints();
 
     // Other Thread Pointers
-    LocalMapping *mpLocalMapper;
+    LocalMapping *localMapper;
     LoopClosing *mpLoopClosing;
 
     // System
@@ -112,7 +93,7 @@ protected:
     //Last Frame
     KeyFrame *mpLastKeyFrame;
     Frame lastFrame;
-    ORBextractor *mpORBExtractor;
+    ORBextractor *ORBExt;
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastSuccessRelocFrameId;
 

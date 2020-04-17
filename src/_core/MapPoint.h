@@ -1,10 +1,9 @@
-#pragma once
+#ifndef _MAP_POINT_H
+#define _MAP_POINT_H
+
+#include <mutex>
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
-
-#include "Map.h"
-#include "Frame.h"
-#include "KeyFrame.h"
 
 namespace slam
 {
@@ -12,6 +11,15 @@ namespace slam
 class Map;
 class Frame;
 class KeyFrame;
+
+struct PatchDescriptor
+{
+    float data[25];
+
+    inline float getScoreNCC(PatchDescriptor &other)
+    {
+    }
+};
 
 class MapPoint
 {
@@ -61,8 +69,6 @@ public:
     long int mnFirstKFid;
     long unsigned int mnLastFrameSeen;
     int nObs;
-
-    // Variables used by local mapper
     float mTrackProjX;
     float mTrackProjY;
     float mTrackProjXR;
@@ -70,52 +76,34 @@ public:
     int mnTrackScaleLevel;
     float mTrackViewCos;
     long unsigned int mnTrackReferenceForFrame;
-
-    // Variables used by local mapper
     long unsigned int mnBALocalForKF;
     long unsigned int mnFuseCandidateForKF;
-
-    // Variables used by loop closing
     long unsigned int mnLoopPointForKF;
     long unsigned int mnCorrectedByKF;
     long unsigned int mnCorrectedReference;
     Eigen::Vector3d mPosGBA;
     long unsigned int mnBAGlobalForKF;
-
     static std::mutex mGlobalMutex;
 
 public:
-    // Position in absolute coordinates
     Eigen::Vector3d mWorldPos;
-
-    // Keyframes observing the point and associated index in keyframe
     std::map<KeyFrame *, size_t> mObservations;
-
-    // Mean viewing direction
     Eigen::Vector3d mAvgViewingDir;
-
-    // Best descriptor to fast matching
     cv::Mat mDescriptor;
-
-    // Reference KeyFrame
     KeyFrame *mpRefKF;
-
-    // Tracking counters
     int mnVisible;
     int mnFound;
-
-    // Bad flag (we do not currently erase MapPoint from memory)
     bool mbBad;
     MapPoint *mpReplaced;
-
-    // Scale invariance distances
     float mfMinDistance;
     float mfMaxDistance;
-
     Map *mpMap;
-
     std::mutex mMutexPos;
     std::mutex mMutexFeatures;
+
+    Eigen::Matrix<float, 5, 5> imgPatch;
 };
 
 } // namespace slam
+
+#endif
