@@ -27,6 +27,8 @@ public:
     void trackNewFrame(Frame &F);
     void reset();
 
+    bool trackFrameCoarse(Frame *newF);
+
     void SetLocalMapper(LocalMapping *pLocalMapper);
     void SetLoopClosing(LoopClosing *pLoopClosing);
     void setIOWrapper(Viewer *pViewer);

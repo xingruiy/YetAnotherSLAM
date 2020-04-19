@@ -22,7 +22,7 @@ Frame::Frame(const Frame &frame)
       mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
       mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
       mDescriptors(frame.mDescriptors.clone()), mTcw(frame.mTcw), mTcp(frame.mTcp),
-      mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), meta(frame.meta),
+      pointsMatches(frame.pointsMatches), outlierFlag(frame.outlierFlag), meta(frame.meta),
       mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
       mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
       mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
@@ -91,16 +91,36 @@ int Frame::detectFeaturesInFrame()
   (*OrbExt)(mImGray, cv::Mat(), mvKeys, mDescriptors);
 
   N = mvKeys.size();
-
   if (mvKeys.empty())
     return 0;
 
   UndistortKeyPoints();
-
   ComputeStereoFromRGBD();
 
-  mvpMapPoints = std::vector<MapPoint *>(N, nullptr);
-  mvbOutlier = std::vector<bool>(N, false);
+  std::vector<cv::KeyPoint> allFeatures;
+  std::vector<cv::KeyPoint> allFeaturesUn;
+  std::vector<float> allRight;
+  std::vector<float> allDepth;
+
+  for (int i = 0; i < N; ++i)
+  {
+    if (mvuRight[i] > 0)
+    {
+      allFeatures.push_back(mvKeys[i]);
+      allFeaturesUn.push_back(mvKeysUn[i]);
+      allRight.push_back(mvuRight[i]);
+      allDepth.push_back(mvDepth[i]);
+    }
+  }
+
+  mvKeys = allFeatures;
+  mvKeysUn = allFeaturesUn;
+  mvuRight = allRight;
+  mvDepth = allDepth;
+  N = allFeatures.size();
+
+  pointsMatches = std::vector<MapPoint *>(N, nullptr);
+  outlierFlag = std::vector<bool>(N, false);
 
   AssignFeaturesToGrid();
 
@@ -153,6 +173,7 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
   pMP->mTrackProjX = u;
   pMP->mTrackProjXR = u - mbf * invz;
   pMP->mTrackProjY = v;
+  pMP->mTrackProjZ = PcZ;
   pMP->mnTrackScaleLevel = nPredictedLevel;
   pMP->mTrackViewCos = viewCos;
 

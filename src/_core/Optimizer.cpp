@@ -251,11 +251,11 @@ int Optimizer::PoseOptimization(Frame &pFrame)
 
         for (int i = 0; i < N; i++)
         {
-            MapPoint *pMP = pFrame.mvpMapPoints[i];
+            MapPoint *pMP = pFrame.pointsMatches[i];
             if (pMP)
             {
                 nInitialCorrespondences++;
-                pFrame.mvbOutlier[i] = false;
+                pFrame.outlierFlag[i] = false;
 
                 //SET EDGE
                 Eigen::Matrix<double, 3, 1> obs;
@@ -310,7 +310,7 @@ int Optimizer::PoseOptimization(Frame &pFrame)
             g2o::EdgeStereoSE3ProjectXYZOnlyPose *e = vpEdgesStereo[i];
             const size_t idx = vnIndexEdgeStereo[i];
 
-            if (pFrame.mvbOutlier[idx])
+            if (pFrame.outlierFlag[idx])
             {
                 e->computeError();
             }
@@ -318,14 +318,14 @@ int Optimizer::PoseOptimization(Frame &pFrame)
             const float chi2 = e->chi2();
             if (chi2 > chi2Th[it])
             {
-                pFrame.mvbOutlier[idx] = true;
+                pFrame.outlierFlag[idx] = true;
                 e->setLevel(1);
                 nBad++;
             }
             else
             {
                 e->setLevel(0);
-                pFrame.mvbOutlier[idx] = false;
+                pFrame.outlierFlag[idx] = false;
             }
 
             if (it == 2)

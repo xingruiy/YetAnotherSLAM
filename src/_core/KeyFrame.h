@@ -159,7 +159,7 @@ protected:
     Sophus::SE3d mTcw;
 
     // MapPoints associated to keypoints
-    std::vector<MapPoint *> mvpMapPoints;
+    std::vector<MapPoint *> pointsMatches;
 
     // BoW
     BoWDatabase *KFDB;

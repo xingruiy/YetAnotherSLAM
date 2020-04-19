@@ -30,7 +30,7 @@ public:
         FAST_SCORE = 1
     };
 
-    ORBextractor(int nfeatures = 1000, float scaleFactor = 1.2, int nlevels = 8,
+    ORBextractor(int nfeatures = 1500, float scaleFactor = 1.2, int nlevels = 8,
                  int iniThFAST = 20, int minThFAST = 7);
 
     ~ORBextractor() {}

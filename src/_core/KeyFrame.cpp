@@ -17,7 +17,7 @@ KeyFrame::KeyFrame(const Frame &F, Map *mpMap, BoWDatabase *pKFDB)
       mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
       mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
       mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
-      mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), KFDB(pKFDB),
+      mnMaxY(F.mnMaxY), mK(F.mK), pointsMatches(F.pointsMatches), KFDB(pKFDB),
       OrbVoc(F.OrbVoc), mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
       mbToBeErased(false), mbBad(false), mpMap(mpMap), mImg(F.mImGray.clone()), mpVoxelStruct(nullptr)
 {
@@ -165,35 +165,35 @@ int KeyFrame::GetWeight(KeyFrame *pKF)
 void KeyFrame::AddMapPoint(MapPoint *pMP, const size_t &idx)
 {
   std::unique_lock<std::mutex> lock(mMutexFeatures);
-  mvpMapPoints[idx] = pMP;
+  pointsMatches[idx] = pMP;
 }
 
 void KeyFrame::EraseMapPointMatch(MapPoint *pMP)
 {
   int idx = pMP->GetIndexInKeyFrame(this);
   if (idx >= 0)
-    mvpMapPoints[idx] = nullptr;
+    pointsMatches[idx] = nullptr;
 }
 
 void KeyFrame::EraseMapPointMatch(const size_t &idx)
 {
-  mvpMapPoints[idx] = nullptr;
+  pointsMatches[idx] = nullptr;
 }
 
 void KeyFrame::ReplaceMapPointMatch(const size_t &idx, MapPoint *pMP)
 {
-  mvpMapPoints[idx] = pMP;
+  pointsMatches[idx] = pMP;
 }
 
 std::set<MapPoint *> KeyFrame::GetMapPoints()
 {
   std::unique_lock<std::mutex> lock(mMutexFeatures);
   std::set<MapPoint *> s;
-  for (size_t i = 0, iend = mvpMapPoints.size(); i < iend; i++)
+  for (size_t i = 0, iend = pointsMatches.size(); i < iend; i++)
   {
-    if (!mvpMapPoints[i])
+    if (!pointsMatches[i])
       continue;
-    MapPoint *pMP = mvpMapPoints[i];
+    MapPoint *pMP = pointsMatches[i];
     if (!pMP->isBad())
       s.insert(pMP);
   }
@@ -203,13 +203,13 @@ std::set<MapPoint *> KeyFrame::GetMapPoints()
 std::vector<MapPoint *> KeyFrame::GetMapPointMatches()
 {
   std::unique_lock<std::mutex> lock(mMutexFeatures);
-  return mvpMapPoints;
+  return pointsMatches;
 }
 
 MapPoint *KeyFrame::GetMapPoint(const size_t &idx)
 {
   std::unique_lock<std::mutex> lock(mMutexFeatures);
-  return mvpMapPoints[idx];
+  return pointsMatches[idx];
 }
 
 void KeyFrame::UpdateConnections()
@@ -219,7 +219,7 @@ void KeyFrame::UpdateConnections()
 
   {
     std::unique_lock<std::mutex> lockMPs(mMutexFeatures);
-    vpMP = mvpMapPoints;
+    vpMP = pointsMatches;
   }
 
   //For all map points in keyframe check in which other keyframes are they seen
@@ -401,9 +401,9 @@ void KeyFrame::SetBadFlag()
   for (auto mit = mConnectedKeyFrameWeights.begin(), mend = mConnectedKeyFrameWeights.end(); mit != mend; mit++)
     mit->first->EraseConnection(this);
 
-  for (size_t i = 0; i < mvpMapPoints.size(); i++)
-    if (mvpMapPoints[i])
-      mvpMapPoints[i]->EraseObservation(this);
+  for (size_t i = 0; i < pointsMatches.size(); i++)
+    if (pointsMatches[i])
+      pointsMatches[i]->EraseObservation(this);
   {
     std::unique_lock<std::mutex> lock(mMutexConnections);
     std::unique_lock<std::mutex> lock1(mMutexFeatures);
@@ -575,6 +575,7 @@ bool KeyFrame::IsInFrustum(MapPoint *pMP, float viewingCosLimit)
   pMP->mbTrackInView = true;
   pMP->mTrackProjX = u;
   pMP->mTrackProjXR = u - mbf * invz;
+  pMP->mTrackProjZ = PcZ;
   pMP->mTrackProjY = v;
   pMP->mnTrackScaleLevel = nPredictedLevel;
   pMP->mTrackViewCos = viewCos;

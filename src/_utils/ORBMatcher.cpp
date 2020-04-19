@@ -16,9 +16,9 @@ ORBMatcher::ORBMatcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbChe
 float ORBMatcher::RadiusByViewingCos(const float &viewCos)
 {
     if (viewCos > 0.998)
-        return 2.0;
+        return 2.5;
     else
-        return 3.0;
+        return 4.0;
 }
 
 int ORBMatcher::SearchByProjection(Frame &F, const std::vector<MapPoint *> &vpMapPoints, const float th)
@@ -46,7 +46,7 @@ int ORBMatcher::SearchByProjection(Frame &F, const std::vector<MapPoint *> &vpMa
 
         const auto vIndices = F.GetFeaturesInArea(pMP->mTrackProjX,
                                                   pMP->mTrackProjY,
-                                                  r * F.mvScaleFactors[nPredictedLevel],
+                                                  r, //* F.mvScaleFactors[nPredictedLevel],
                                                   nPredictedLevel - 2,
                                                   nPredictedLevel);
 
@@ -66,16 +66,22 @@ int ORBMatcher::SearchByProjection(Frame &F, const std::vector<MapPoint *> &vpMa
         {
             const size_t idx = *vit;
 
-            if (F.mvpMapPoints[idx])
-                if (F.mvpMapPoints[idx]->Observations() > 0)
+            if (F.pointsMatches[idx])
+                if (F.pointsMatches[idx]->Observations() > 0)
                     continue;
 
-            if (F.mvuRight[idx] > 0)
-            {
-                const float er = fabs(pMP->mTrackProjXR - F.mvuRight[idx]);
-                if (er > r * F.mvScaleFactors[nPredictedLevel])
-                    continue;
-            }
+            if (F.mvuRight[idx] < 0)
+                continue;
+
+            if (fabs(F.mvDepth[idx] - pMP->mTrackProjZ) > 0.05)
+                continue;
+
+            // if (F.mvuRight[idx] > 0)
+            // {
+            //     const float er = fabs(pMP->mTrackProjXR - F.mvuRight[idx]);
+            //     if (er > r * F.mvScaleFactors[nPredictedLevel])
+            //         continue;
+            // }
 
             const cv::Mat &d = F.mDescriptors.row(idx);
             const int dist = DescriptorDistance(MPdescriptor, d);
@@ -98,14 +104,18 @@ int ORBMatcher::SearchByProjection(Frame &F, const std::vector<MapPoint *> &vpMa
         // Apply ratio to second match (only if best and second are in the same scale level)
         if (bestDist <= TH_HIGH)
         {
-            if (bestLevel == bestLevel2 && bestDist > mfNNratio * bestDist2)
-                continue;
+            if (bestLevel == bestLevel2)
+                if (bestDist > mfNNratio * bestDist2)
+                {
+                    continue;
+                }
 
-            F.mvpMapPoints[bestIdx] = pMP;
+            F.pointsMatches[bestIdx] = pMP;
             nmatches++;
         }
     }
 
+    std::cout << "preliminary matches: " << nmatches << std::endl;
     return nmatches;
 }
 
@@ -176,7 +186,7 @@ int ORBMatcher::SearchByProjection(Frame &F, KeyFrame *pKF, const std::set<MapPo
                 for (auto vit = vIndices2.begin(); vit != vIndices2.end(); vit++)
                 {
                     const size_t i2 = *vit;
-                    if (F.mvpMapPoints[i2])
+                    if (F.pointsMatches[i2])
                         continue;
 
                     const cv::Mat &d = F.mDescriptors.row(i2);
@@ -192,7 +202,7 @@ int ORBMatcher::SearchByProjection(Frame &F, KeyFrame *pKF, const std::set<MapPo
 
                 if (bestDist <= ORBdist)
                 {
-                    F.mvpMapPoints[bestIdx2] = pMP;
+                    F.pointsMatches[bestIdx2] = pMP;
                     nmatches++;
 
                     if (mbCheckOrientation)
@@ -225,7 +235,7 @@ int ORBMatcher::SearchByProjection(Frame &F, KeyFrame *pKF, const std::set<MapPo
             {
                 for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
                 {
-                    F.mvpMapPoints[rotHist[i][j]] = NULL;
+                    F.pointsMatches[rotHist[i][j]] = NULL;
                     nmatches--;
                 }
             }
@@ -1057,7 +1067,7 @@ int ORBMatcher::SearchBySE3(Frame &F, KeyFrame *pKF, std::vector<MapPoint *> &vp
     // Transformation between cameras
     Sophus::SE3d Tpc = Tcp.inverse();
 
-    // const std::vector<MapPoint *> vpMapPoints1 = F.mvpMapPoints;
+    // const std::vector<MapPoint *> vpMapPoints1 = F.pointsMatches;
     // const int N1 = vpMapPoints1.size();
     const int N1 = F.N;
 

@@ -43,8 +43,8 @@ public:
     Sophus::SE3d GetPose();
     void SetPose(Sophus::SE3d &Tcw);
 
-    void SetMeshEngine(MeshEngine *pMeshEngine);
-    void SetRayTraceEngine(RayTracer *pRayTraceEngine);
+    void setMeshEngine(MeshEngine *pMeshEngine);
+    void setRayTracer(RayTracer *pRayTraceEngine);
     void Reset();
     bool Empty();
 

@@ -76,10 +76,10 @@ public:
     cv::Mat mDescriptors;
 
     // MapPoints associated to keypoints, nullptr pointer if no association.
-    std::vector<MapPoint *> mvpMapPoints;
+    std::vector<MapPoint *> pointsMatches;
 
     // Flag to identify outlier associations.
-    std::vector<bool> mvbOutlier;
+    std::vector<bool> outlierFlag;
 
     // Keypoints are assigned to cells in a grid
     // to reduce matching complexity when projecting MapPoints.

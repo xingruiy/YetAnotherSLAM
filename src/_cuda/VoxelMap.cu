@@ -153,12 +153,12 @@ void MapStruct::DeleteMesh()
     }
 }
 
-void MapStruct::SetMeshEngine(MeshEngine *pMeshEngine)
+void MapStruct::setMeshEngine(MeshEngine *pMeshEngine)
 {
     mpMeshEngine = pMeshEngine;
 }
 
-void MapStruct::SetRayTraceEngine(RayTracer *pRayTraceEngine)
+void MapStruct::setRayTracer(RayTracer *pRayTraceEngine)
 {
     rayTracer = pRayTraceEngine;
 }

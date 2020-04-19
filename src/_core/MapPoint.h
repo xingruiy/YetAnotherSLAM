@@ -71,6 +71,7 @@ public:
     int nObs;
     float mTrackProjX;
     float mTrackProjY;
+    float mTrackProjZ;
     float mTrackProjXR;
     bool mbTrackInView;
     int mnTrackScaleLevel;
